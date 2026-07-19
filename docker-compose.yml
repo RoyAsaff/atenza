@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:16
+    container_name: atenza-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: atenza
+    ports:
+      # 5433 en el host para no chocar con tu PostgreSQL local (5432)
+      - "5433:5432"
+    volumes:
+      - atenza_db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+
+volumes:
+  atenza_db_data:

@@ -1,0 +1,26 @@
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+build/
+
+# Entorno
+.env
+.env.local
+
+# Prisma
+*.db
+
+# Archivos subidos por usuarios (comprobantes, QR)
+backend/uploads/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+
+# Flutter (para cuando exista mobile/)
+mobile/.dart_tool/
+mobile/build/

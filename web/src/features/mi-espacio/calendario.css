@@ -1,0 +1,78 @@
+/* Estilo del calendario de clases (FullCalendar) a tono con el resto de la app */
+
+.fc {
+  font-family: inherit;
+}
+
+.fc .fc-toolbar {
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+}
+
+@media (max-width: 480px) {
+  .fc .fc-toolbar-title {
+    font-size: 0.9rem;
+  }
+
+  .fc .fc-button {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+  }
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #2e3a42;
+  text-transform: capitalize;
+}
+
+.fc .fc-button {
+  background-color: #f2f5fa;
+  border: none;
+  color: #2d5a9a;
+  font-weight: 600;
+  text-transform: capitalize;
+  box-shadow: none !important;
+}
+
+.fc .fc-button:hover {
+  background-color: #e5ecf5;
+  color: #254674;
+}
+
+.fc .fc-button:disabled {
+  opacity: 0.5;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background-color: #cbd9ec;
+  color: #1c3354;
+}
+
+.fc-daygrid-day-number {
+  color: #556672;
+  font-size: 0.8rem;
+}
+
+.fc-day-today {
+  background-color: #f2f5fa !important;
+}
+
+.fc-event {
+  cursor: pointer;
+  border: none !important;
+  font-size: 0.72rem;
+  padding: 1px 4px;
+  border-radius: 6px !important;
+}
+
+.clase-proxima.fc-event {
+  background-color: #366dba;
+}
+
+.clase-pasada.fc-event {
+  background-color: #d2dde5;
+  color: #556672;
+}

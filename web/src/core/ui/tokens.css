@@ -1,0 +1,92 @@
+/* Design tokens de Atenza — Fase A del rediseño de marca.
+   Paleta generada por interpolación HSL desde los 4 hex de marca; ver el
+   plan de rediseño para el detalle de anclaje/verificación de contraste. */
+
+@import 'tailwindcss';
+@import '@fontsource-variable/plus-jakarta-sans';
+
+@theme {
+  /* ── Tipografía ── */
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', sans-serif;
+
+  /* ── Primary (navy) ── */
+  --color-primary-50: #f2f5fa;
+  --color-primary-100: #e5ecf5;
+  --color-primary-200: #cbd9ec;
+  --color-primary-300: #acc2e2;
+  --color-primary-400: #85a7d6;
+  --color-primary-500: #5c8bcc;
+  --color-primary-600: #366dba;
+  --color-primary-700: #2d5a9a;
+  --color-primary-800: #254674;
+  --color-primary-900: #1c3354;
+
+  /* ── Secondary (teal) ── */
+  --color-secondary-50: #f1fafb;
+  --color-secondary-100: #e3f5f7;
+  --color-secondary-200: #c7ecf0;
+  --color-secondary-300: #a4e3ea;
+  --color-secondary-400: #76dae5;
+  --color-secondary-500: #45d3e3;
+  --color-secondary-600: #18c5d8;
+  --color-secondary-700: #14a3b3;
+  --color-secondary-800: #0f7e8a;
+  --color-secondary-900: #0c5b64;
+
+  /* ── Accent (naranja, uso escaso) ── */
+  --color-accent-50: #fef4ee;
+  --color-accent-100: #fde9de;
+  --color-accent-200: #f9d3bd;
+  --color-accent-300: #f5ba98;
+  --color-accent-400: #ef9c6c;
+  --color-accent-500: #e67e41;
+  --color-accent-600: #cc6124;
+  --color-accent-700: #a15326;
+  --color-accent-800: #774122;
+  --color-accent-900: #54311c;
+
+  /* ── Neutral (gris azulado; fondo de marca = 100) ── */
+  --color-neutral-50: #f3f7f9;
+  --color-neutral-100: #e8eef3;
+  --color-neutral-200: #d2dde5;
+  --color-neutral-300: #bbc9d3;
+  --color-neutral-400: #9fb0bc;
+  --color-neutral-500: #8497a4;
+  --color-neutral-600: #677b89;
+  --color-neutral-700: #556672;
+  --color-neutral-800: #404f59;
+  --color-neutral-900: #2e3a42;
+
+  /* ── Semánticos (indirección para futuro dark mode) ── */
+  --color-canvas: var(--color-neutral-50);
+  --color-surface: #ffffff;
+  --color-surface-hover: var(--color-neutral-50);
+  --color-surface-sunken: var(--color-neutral-100);
+  --color-border: var(--color-neutral-200);
+  --color-border-hover: var(--color-neutral-300);
+  --color-text: var(--color-neutral-900);
+  --color-text-secondary: var(--color-neutral-700);
+  --color-text-muted: var(--color-neutral-600);
+  --color-text-disabled: var(--color-neutral-400);
+  --color-link: var(--color-primary-700);
+  --color-focus: var(--color-primary-500);
+
+  /* ── Radios (rango Linear/Vercel) ── */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* ── Sombras (sutiles, profundidad vía contraste/spacing) ── */
+  --shadow-xs: 0 1px 2px rgba(46, 58, 66, 0.05);
+  --shadow-sm: 0 1px 2px rgba(46, 58, 66, 0.06), 0 1px 1px rgba(46, 58, 66, 0.04);
+  --shadow-md: 0 4px 12px rgba(46, 58, 66, 0.08), 0 2px 4px rgba(46, 58, 66, 0.04);
+  --shadow-lg: 0 12px 32px rgba(28, 51, 84, 0.14);
+
+  /* ── Motion ── */
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 250ms;
+  --ease-atenza: cubic-bezier(0.16, 1, 0.3, 1);
+}

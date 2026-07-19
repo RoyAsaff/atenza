@@ -1,0 +1,441 @@
+// ATENZA — Schema Prisma
+// Fuente: Diagrama de clases (E1, E2) + decisiones acordadas el 12/07/2026:
+//   - Bitacora y Sesion agregadas (HU-29, D-03/HU-33) — pendiente reflejar en diagrama
+//   - codigo_estudiante removido de Usuario (D-04): irá en la inscripción (E3)
+//   - Pagos.fecha como DateTime y estados alineados al backlog (HU-06/07/08)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Diagrama: Rol ────────────────────────────────────────────────
+enum NombreRol {
+  admin
+  docente_estudiante
+}
+
+model Rol {
+  id         Int       @id @default(autoincrement())
+  nombre_rol NombreRol @unique
+  usuarios   Usuario[]
+
+  @@map("roles")
+}
+
+// ── Diagrama: Usuario ────────────────────────────────────────────
+model Usuario {
+  id        Int     @id @default(autoincrement())
+  nombres   String
+  apellidos String
+  email     String  @unique
+  password  String // hash bcrypt, nunca texto plano
+  whatsapp  String?
+  rol       Rol     @relation(fields: [rol_id], references: [id])
+  rol_id    Int
+  activo    Boolean @default(true) // estado implícito del método desactivar(id) del diagrama
+
+  // HU-04 (acordado 12/07): verificación de correo — pendiente reflejar en diagrama
+  email_verificado Boolean @default(false)
+
+  materias      Materia[] // materias que dicta (docente)
+  pagos         Pago[]
+  sesiones      Sesion[]
+  tokens        TokenUsuario[]
+  inscripciones Inscripcion[] // materias donde está inscrito (estudiante, E3)
+  asistencias   Asistencia[] // marcajes como estudiante (E5)
+  intentos      Intento[] // exámenes rendidos como estudiante (E7)
+
+  // SaaS por cuenta (reemplaza el pago por materia, decisión con Roy 17/07):
+  // la prueba gratis de 30 días arranca al registrarse; plan_id es el plan
+  // contratado actualmente (Básico por defecto), se actualiza al aprobar un pago.
+  trial_inicio DateTime @default(now())
+  plan         Plan?    @relation(fields: [plan_id], references: [id])
+  plan_id      Int?
+
+  @@map("usuarios")
+}
+
+// ── SaaS por cuenta (17/07): tramos de precio por cantidad de
+// estudiantes activos en toda la cuenta del docente, no por materia.
+// Tabla editable por el admin (mismo espíritu que el viejo Precio).
+model Plan {
+  id                 Int       @id @default(autoincrement())
+  nombre             String // Básico, Intermedio, Avanzado, Institucional
+  limite_estudiantes Int? // null = sin límite / "a medida" (Institucional)
+  monto_mensual      Decimal   @db.Decimal(10, 2) // precio anual = monto_mensual * 10 (2 meses gratis)
+  orden              Int // orden de presentación / plan por defecto = menor orden
+  activo             Boolean   @default(true)
+  usuarios           Usuario[]
+  pagos              Pago[]
+
+  @@map("planes")
+}
+
+// Un solo QR global de cobro (fila única, patrón singleton) — no hay uno
+// por plan, es la misma cuenta bancaria/QR sin importar el monto (17/07).
+model ConfiguracionPago {
+  id     Int    @id @default(1)
+  url_qr String
+
+  @@map("configuracion_pago")
+}
+
+// ── Diagrama: Pagos (estados según HU-06/07/08, D-09) ───────────
+enum EstadoPago {
+  pendiente // solicitud creada, esperando comprobante (24 h)
+  en_verificacion // comprobante subido, esperando al admin
+  aprobada
+  rechazada
+  expirada
+}
+
+// Ciclo elegido en CADA pago puntual (ya no es una propiedad del precio
+// global): reemplaza al viejo TipoPlan. 17/07, estilo Claude/Anthropic.
+enum CicloPago {
+  mensual // 30 días de vigencia
+  anual // 365 días de vigencia (10x el mensual, 2 meses gratis)
+}
+
+model Pago {
+  id             Int        @id @default(autoincrement())
+  fecha          DateTime   @default(now())
+  usuario        Usuario    @relation(fields: [usuario_id], references: [id])
+  usuario_id     Int
+  monto          Decimal    @db.Decimal(10, 2) // conserva el precio mostrado (D-09)
+  comprobante    String? // ruta/URL de imagen o PDF; null hasta subirlo
+  estado         EstadoPago @default(pendiente)
+  // HU-08 Esc. 2 (acordado 12/07): motivo visible para el docente al rechazar
+  motivo_rechazo String?
+  // Plan y vigencia: fecha_expira se fija al APROBAR, sumando 30 (mensual)
+  // o 365 (anual) días; si es renovación anticipada, se suma desde el
+  // vencimiento vigente de la CUENTA (no de una materia).
+  ciclo          CicloPago  @default(mensual)
+  fecha_expira   DateTime?
+  plan           Plan       @relation(fields: [plan_id], references: [id])
+  plan_id        Int
+
+  @@index([usuario_id, estado])
+  @@map("pagos")
+}
+
+// ── Diagrama: Materia ────────────────────────────────────────────
+model Materia {
+  id             Int           @id @default(autoincrement())
+  nombre_materia String
+  sigla          String?
+  codigo         String        @unique // código de inscripción (E3)
+  // HU-11 (acordado 12/07): el docente puede desactivar el código para
+  // cerrar inscripciones sin perderlo — pendiente reflejar en diagrama
+  codigo_activo  Boolean       @default(true)
+  carrera        String
+  semestre       String
+  universidad    String
+  // SaaS por cuenta (17/07): la materia ya no tiene su propio estado de
+  // activación/pago — vive mientras la cuenta del docente esté vigente.
+  docente        Usuario       @relation(fields: [docente_id], references: [id])
+  docente_id     Int
+  inscripciones  Inscripcion[]
+  clases         Clase[]
+
+  @@map("materias")
+}
+
+// ── Diagrama: Clase (E4) ─────────────────────────────────────────
+// hora se guarda como texto "HH:MM" (el diagrama la tipa como time;
+// evitamos el DateTime ficticio de Prisma para columnas TIME).
+model Clase {
+  id           Int          @id @default(autoincrement())
+  fecha        DateTime     @db.Date
+  hora         String       @db.VarChar(5) // "08:00"
+  tema         String
+  materia      Materia      @relation(fields: [materia_id], references: [id])
+  materia_id   Int
+  asistencias  Asistencia[]
+  evaluaciones Evaluacion[]
+
+  // HU-14: la generación masiva no debe duplicar una clase ya creada
+  // en la misma fecha y hora.
+  @@unique([materia_id, fecha, hora])
+  @@index([materia_id, fecha])
+  @@map("clases")
+}
+
+// ── Diagrama: estudiante_materia (E3) ────────────────────────────
+// En código se llama Inscripcion. Campos extra acordados con Roy el
+// 12/07 (pendiente reflejar en diagrama):
+//   - codigo_estudiante: pertenece a la inscripción, no a la cuenta (D-04)
+//   - retirado + fecha_retiro: el retiro conserva el historial (HU-12)
+model Inscripcion {
+  id                Int       @id @default(autoincrement())
+  estudiante        Usuario   @relation(fields: [estudiante_id], references: [id])
+  estudiante_id     Int
+  materia           Materia   @relation(fields: [materia_id], references: [id])
+  materia_id        Int
+  codigo_estudiante String
+  fecha_inscripcion DateTime  @default(now())
+  retirado          Boolean   @default(false)
+  fecha_retiro      DateTime?
+
+  // HU-10 Esc. 2: una sola inscripción por estudiante y materia;
+  // si estaba retirado y vuelve a usar el código, se reactiva.
+  @@unique([estudiante_id, materia_id])
+  @@index([materia_id, retirado])
+  @@map("inscripciones")
+}
+
+// ── Diagrama: Asistencia (E5) ────────────────────────────────────
+// HU-15: la Licencia solo la registra el docente; Falta es el valor
+// por defecto para quien no fue marcado explícitamente al guardar.
+enum EstadoAsistencia {
+  puntual
+  atrasado
+  licencia
+  falta
+}
+
+model Asistencia {
+  id            Int              @id @default(autoincrement())
+  clase         Clase            @relation(fields: [clase_id], references: [id])
+  clase_id      Int
+  estudiante    Usuario          @relation(fields: [estudiante_id], references: [id])
+  estudiante_id Int
+  marcaje       EstadoAsistencia
+
+  // Un registro por estudiante y clase: corregir el marcaje (HU-15 Esc. 2)
+  // actualiza esta fila, no crea una nueva.
+  @@unique([clase_id, estudiante_id])
+  @@index([estudiante_id])
+  @@map("asistencias")
+}
+
+// ── Diagrama: Evaluacion / Preguntas / Opciones (E6) ────────────
+// HU-17/HU-19 (acordado 13/07): estado del flujo Borrador → Lista →
+// Lanzada → Finalizada — pendiente reflejar en diagrama (la clase
+// Evaluacion del diagrama no trae este campo).
+enum EstadoEvaluacion {
+  borrador
+  lista
+  lanzada
+  finalizada
+}
+
+model Evaluacion {
+  id        Int              @id @default(autoincrement())
+  tema      String
+  clase     Clase            @relation(fields: [clase_id], references: [id])
+  clase_id  Int
+  nota      Int // nota total (D-05): cada pregunta vale nota / n° de preguntas
+  estado    EstadoEvaluacion @default(borrador)
+  preguntas Pregunta[]
+
+  // E7 (acordado 13/07, HU-24/HU-20) — pendiente reflejar en diagrama:
+  tiempo_limite_minutos Int? // D-07: límite opcional; null = sin límite
+  fecha_lanzamiento     DateTime? // se fija al pasar a "lanzada"
+  intentos              Intento[]
+
+  // E8 (HU-26) — pendiente reflejar en diagrama: el docente decide cuándo
+  // los estudiantes ven su nota, independiente de que ya esté finalizada.
+  publicada         Boolean   @default(false)
+  fecha_publicacion DateTime?
+
+  @@index([clase_id])
+  @@map("evaluaciones")
+}
+
+// En el diagrama: Preguntas. HU-18 Esc. 1 (acordado 13/07): "orden"
+// permite reordenar preguntas — pendiente reflejar en diagrama.
+model Pregunta {
+  id            Int         @id @default(autoincrement())
+  pregunta      String
+  url_imagen    String?
+  evaluacion    Evaluacion  @relation(fields: [evaluacion_id], references: [id])
+  evaluacion_id Int
+  orden         Int
+  opciones      Opcion[]
+  respuestas    Respuesta[]
+
+  @@index([evaluacion_id, orden])
+  @@map("preguntas")
+}
+
+// En el diagrama: Opciones.
+model Opcion {
+  id          Int         @id @default(autoincrement())
+  texto       String
+  // onDelete Cascade: eliminar una pregunta (HU-18) borra sus opciones.
+  pregunta    Pregunta    @relation(fields: [pregunta_id], references: [id], onDelete: Cascade)
+  pregunta_id Int
+  es_correcta Boolean     @default(false)
+  respuestas  Respuesta[]
+
+  @@index([pregunta_id])
+  @@map("opciones")
+}
+
+// ── E7 (13/07): ejecución en vivo — no está en el diagrama (que solo
+// trae Respuesta); Intento e Incidente se acordaron con Roy para poder
+// pausar/reanudar individualmente, guardar el orden aleatorio fijo por
+// estudiante (D-05 aleatorización, HU-20 Esc. 3) y registrar salidas de
+// pantalla (HU-21 Esc. 2). Pendiente reflejar en diagrama.
+enum EstadoIntento {
+  en_curso
+  pausado
+  finalizado
+  desconectado
+  cancelado
+}
+
+model Intento {
+  id              Int           @id @default(autoincrement())
+  evaluacion      Evaluacion    @relation(fields: [evaluacion_id], references: [id])
+  evaluacion_id   Int
+  estudiante      Usuario       @relation(fields: [estudiante_id], references: [id])
+  estudiante_id   Int
+  estado          EstadoIntento @default(en_curso)
+  // Orden barajado y fijo desde que se lanza (HU-20 Esc. 3): permite que
+  // cada estudiante vea un orden distinto y que sea el mismo al reanudar.
+  orden_preguntas Json // number[] de Pregunta.id
+  orden_opciones  Json // { [preguntaId: string]: number[] de Opcion.id }
+  fecha_inicio    DateTime      @default(now())
+  fecha_limite    DateTime? // HU-24: fecha_inicio + tiempo_limite_minutos, si aplica
+  fecha_fin       DateTime?
+  respuestas      Respuesta[]
+  incidentes      Incidente[]
+  notas           Nota[] // E8: versiones de nota calculadas para este intento
+
+  // Un intento por estudiante y evaluación (HU-20: se crea uno al lanzar).
+  @@unique([evaluacion_id, estudiante_id])
+  @@index([evaluacion_id])
+  @@index([estudiante_id])
+  @@map("intentos")
+}
+
+// Diagrama: Respuesta (estudiante, opcion). En código se ancla también
+// al Intento y a la Pregunta para poder guardar/reanudar pregunta a
+// pregunta (D-06) y saber qué falta responder.
+model Respuesta {
+  id            Int      @id @default(autoincrement())
+  intento       Intento  @relation(fields: [intento_id], references: [id])
+  intento_id    Int
+  pregunta      Pregunta @relation(fields: [pregunta_id], references: [id])
+  pregunta_id   Int
+  opcion        Opcion   @relation(fields: [opcion_id], references: [id])
+  opcion_id     Int
+  respondida_en DateTime @default(now())
+
+  // Guardar de nuevo la misma pregunta corrige la respuesta, no duplica.
+  @@unique([intento_id, pregunta_id])
+  @@map("respuestas")
+}
+
+// HU-21 Esc. 2: salida de pantalla durante el examen (multitarea, home,
+// apagado de pantalla) — no está en el diagrama, acordado el 13/07.
+enum TipoIncidente {
+  salida_pantalla
+}
+
+model Incidente {
+  id         Int           @id @default(autoincrement())
+  intento    Intento       @relation(fields: [intento_id], references: [id])
+  intento_id Int
+  tipo       TipoIncidente
+  detalle    String?
+  fecha_hora DateTime      @default(now())
+
+  @@index([intento_id])
+  @@map("incidentes")
+}
+
+// ── E8 (HU-25/26/27) — resultados, notas y centralizador. No está en
+// el diagrama (que no llega a esta épica); pendiente reflejar.
+// D-12: las notas nunca se sobrescriben, se versionan (insert-only, sin
+// @@unique a propósito). "Vigente" = mayor `version` por intento_id.
+model Nota {
+  id              Int      @id @default(autoincrement())
+  intento         Intento  @relation(fields: [intento_id], references: [id])
+  intento_id      Int
+  // Denormalizados desde Intento para no tener que hacer join al listar
+  // por evaluación (Resultados/Centralizador) o por estudiante (Mis notas).
+  evaluacion_id   Int
+  estudiante_id   Int
+  version         Int      @default(1)
+  aciertos        Int
+  total_preguntas Int
+  nota_obtenida   Float // aciertos/total_preguntas * evaluacion.nota (D-05)
+  calculada_en    DateTime @default(now())
+
+  @@index([evaluacion_id])
+  @@index([estudiante_id])
+  @@map("notas")
+}
+
+// ── Acordado 12/07: Sesion (D-03, HU-01, HU-33) ─────────────────
+enum ContextoSesion {
+  docente // credenciales por ingreso, sesión única
+  estudiante // sesión persistente
+  admin
+}
+
+model Sesion {
+  id            Int            @id @default(autoincrement())
+  usuario       Usuario        @relation(fields: [usuario_id], references: [id])
+  usuario_id    Int
+  contexto      ContextoSesion
+  jti           String         @unique // id del JWT emitido
+  dispositivo   String?
+  ip            String?
+  creada_en     DateTime       @default(now())
+  expira_en     DateTime
+  cerrada_en    DateTime?
+  motivo_cierre String? // logout | reemplazada_por_nuevo_login | password_reset
+
+  @@index([usuario_id, contexto])
+  @@map("sesiones")
+}
+
+// ── Acordado 12/07: TokenUsuario (HU-04) ────────────────────────
+enum TipoTokenUsuario {
+  verificacion_email
+  reset_password
+}
+
+model TokenUsuario {
+  id         Int              @id @default(autoincrement())
+  usuario    Usuario          @relation(fields: [usuario_id], references: [id])
+  usuario_id Int
+  tipo       TipoTokenUsuario
+  token_hash String           @unique // se guarda hasheado, nunca el token plano
+  creado_en  DateTime         @default(now())
+  expira_en  DateTime
+  usado_en   DateTime? // un solo uso (HU-04 Escenario 2)
+
+  @@index([usuario_id, tipo])
+  @@map("tokens_usuario")
+}
+
+// ── Acordado 12/07: Bitacora append-only (HU-29, D-10) ──────────
+model Bitacora {
+  id             BigInt   @id @default(autoincrement())
+  fecha_hora     DateTime @default(now())
+  usuario_id     Int? // null para eventos de sistema (p. ej. expiración automática)
+  rol_contexto   String // admin | docente | estudiante | sistema
+  accion         String // p. ej. login, cierre_sesion_forzado, pago_aprobado
+  entidad        String // tabla/entidad afectada
+  entidad_id     String?
+  valor_anterior Json?
+  valor_nuevo    Json?
+  ip             String?
+  dispositivo    String?
+
+  // Sin relaciones FK a propósito: la bitácora debe poder conservar
+  // eventos aunque la entidad origen cambie. Inmutabilidad garantizada
+  // por permisos de BD (db/grants.sql), no solo por el backend.
+  @@index([entidad, entidad_id])
+  @@index([usuario_id, fecha_hora])
+  @@map("bitacora")
+}
