@@ -9,7 +9,9 @@ let socket: Socket | null = null;
 export function obtenerSocket(): Socket {
   if (socket) return socket;
   const sesion = obtenerSesion();
-  socket = io({
+  // Sin VITE_API_URL, io(undefined, ...) se conecta al mismo origen —
+  // igual razón que en core/api/cliente.ts.
+  socket = io(import.meta.env.VITE_API_URL || undefined, {
     path: '/socket.io',
     auth: { token: sesion?.token },
   });

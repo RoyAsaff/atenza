@@ -4,7 +4,11 @@
 import axios from 'axios';
 import { limpiarSesion, obtenerSesion } from '../auth/almacen-sesion';
 
-export const api = axios.create({ baseURL: '/' });
+// Vacío (default) = mismo origen ("/"), para cuando un proxy enruta /api
+// al backend bajo el mismo dominio (ver web/src/vite-env.d.ts). Si web y
+// backend quedan en dominios separados (ej. Railway), VITE_API_URL trae
+// la URL absoluta del backend.
+export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/' });
 
 api.interceptors.request.use((config) => {
   const sesion = obtenerSesion();
