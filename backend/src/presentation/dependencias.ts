@@ -11,6 +11,7 @@ import { PrismaTokenUsuarioRepositorio } from '../infrastructure/repositorios/pr
 import { PrismaMateriaRepositorio } from '../infrastructure/repositorios/prisma-materia-repositorio';
 import { ConsolaEmailService } from '../infrastructure/email/consola-email-service';
 import { SmtpEmailService } from '../infrastructure/email/smtp-email-service';
+import { ResendEmailService } from '../infrastructure/email/resend-email-service';
 import { RegistrarUsuario } from '../application/auth/registrar-usuario';
 import { IniciarSesion } from '../application/auth/iniciar-sesion';
 import {
@@ -122,17 +123,21 @@ export const tokenUsuarioRepositorio = new PrismaTokenUsuarioRepositorio(prisma)
 export const materiaRepositorio = new PrismaMateriaRepositorio(prisma);
 export const passwordHasher = new BcryptPasswordHasher();
 export const tokenService = new JwtTokenService(JWT_SECRET);
-// Sin SMTP_HOST (dev local) sigue imprimiendo en consola; en producción,
-// con las variables cargadas (ver backend/.env.example), manda de verdad.
-export const emailService = process.env.SMTP_HOST
-  ? new SmtpEmailService({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT ?? 587),
-      usuario: process.env.SMTP_USER ?? '',
-      password: process.env.SMTP_PASSWORD ?? '',
-      remitente: process.env.EMAIL_FROM ?? 'Atenza <no-responde@atenza.com>',
-    })
-  : new ConsolaEmailService();
+// Prioridad: RESEND_API_KEY (API HTTP — funciona en plataformas que
+// bloquean SMTP saliente, como Railway en plan Hobby) > SMTP_HOST (VPS/
+// Coolify, sin esa restricción) > consola (dev local, sin nada cargado).
+const EMAIL_FROM = process.env.EMAIL_FROM ?? 'Atenza <no-responde@atenza.com>';
+export const emailService = process.env.RESEND_API_KEY
+  ? new ResendEmailService(process.env.RESEND_API_KEY, EMAIL_FROM)
+  : process.env.SMTP_HOST
+    ? new SmtpEmailService({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT ?? 587),
+        usuario: process.env.SMTP_USER ?? '',
+        password: process.env.SMTP_PASSWORD ?? '',
+        remitente: EMAIL_FROM,
+      })
+    : new ConsolaEmailService();
 
 // SaaS por cuenta (17/07): declarados antes de registrarUsuario porque el
 // registro ya necesita el plan por defecto (prueba gratis).
