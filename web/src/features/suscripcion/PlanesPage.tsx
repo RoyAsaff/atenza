@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { api, mensajeDeError } from '../../core/api/cliente';
+import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import { CicloPago, Pago, Plan } from '../../core/tipos';
 import { Alert, Button, Card, CardBody, PageHeader } from '../../core/ui/ui';
 
@@ -54,7 +54,7 @@ export function PlanesPage() {
               {elegir.data.pago.plan.nombre} · {elegir.data.pago.ciclo}
             </p>
             <img
-              src={elegir.data.qr_pago}
+              src={urlArchivo(elegir.data.qr_pago)}
               alt="QR de cobro"
               className="mx-auto h-56 w-56 rounded-xl border border-border bg-surface object-contain p-2 shadow-sm"
             />

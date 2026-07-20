@@ -18,8 +18,14 @@ Tres recursos en Coolify, no un `docker-compose` combinado:
 Un solo dominio (p. ej. `atenza.tudominio.com`), con reglas de
 enrutamiento en Coolify (Traefik por debajo):
 
-- `/api/*` y `/socket.io/*` → `atenza-backend`
+- `/api/*`, `/uploads/*` y `/socket.io/*` → `atenza-backend`
 - todo lo demás → `atenza-web`
+
+**Importante:** no olvidar `/uploads/*` — es donde se sirven el QR de
+cobro y los comprobantes de pago (`express.static` en
+`backend/src/presentation/app.ts`). Si falta esa regla, esas imágenes
+dan 404 porque caen en `atenza-web` en vez de en el backend (síntoma:
+el QR no se ve ni en `/admin/planes` ni al elegir plan como docente).
 
 Así el frontend sigue funcionando con `baseURL: '/'`
 (`web/src/core/api/cliente.ts`) **sin tocar código ni configurar CORS** —

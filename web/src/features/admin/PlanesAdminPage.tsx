@@ -3,7 +3,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, mensajeDeError } from '../../core/api/cliente';
+import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import { Plan } from '../../core/tipos';
 import {
   Alert,
@@ -121,7 +121,7 @@ function SeccionQr() {
         <div className="flex flex-wrap items-center gap-4">
           {qr.data ? (
             <img
-              src={qr.data}
+              src={urlArchivo(qr.data)}
               alt="QR de cobro vigente"
               className="h-32 w-32 rounded-xl border border-border bg-surface object-contain p-2 shadow-sm"
             />

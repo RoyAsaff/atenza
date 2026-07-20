@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, mensajeDeError } from '../../core/api/cliente';
+import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import { EstadoPago, Pago } from '../../core/tipos';
 import { Button, Card, CardBody, EmptyState, EstadoBadge, PageHeader, Spinner } from '../../core/ui/ui';
 
@@ -115,7 +115,7 @@ export function SolicitudesAdminPage() {
                 <EstadoBadge estado={p.estado} />
                 {p.comprobante && (
                   <a
-                    href={p.comprobante}
+                    href={urlArchivo(p.comprobante)}
                     target="_blank"
                     rel="noreferrer"
                     className="text-sm font-medium text-primary-700 hover:text-primary-800 hover:underline"

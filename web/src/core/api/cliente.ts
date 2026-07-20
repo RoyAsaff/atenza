@@ -10,6 +10,15 @@ import { limpiarSesion, obtenerSesion } from '../auth/almacen-sesion';
 // la URL absoluta del backend.
 export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || '/' });
 
+// Los archivos subidos (QR de cobro, comprobantes) llegan del backend como
+// ruta relativa ("/uploads/xxx.png"). En src/href eso se resuelve contra el
+// origen de "web", no el de la API — funciona con baseURL "/" (mismo
+// origen) pero rompe cuando VITE_API_URL apunta a un dominio aparte
+// (Railway). Hay que anteponer la base absoluta a mano.
+export function urlArchivo(rutaRelativa: string): string {
+  return `${import.meta.env.VITE_API_URL || ''}${rutaRelativa}`;
+}
+
 api.interceptors.request.use((config) => {
   const sesion = obtenerSesion();
   if (sesion) config.headers.Authorization = `Bearer ${sesion.token}`;

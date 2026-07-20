@@ -4,9 +4,12 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { api, mensajeDeError } from '../../core/api/cliente';
+import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import { EstadoCuenta, Pago } from '../../core/tipos';
 import { Alert, Badge, Button, Card, CardBody, EstadoBadge, PageHeader } from '../../core/ui/ui';
+
+// Debe coincidir con PLAZO_COMPROBANTE_HORAS en backend/src/domain/entidades/pago.ts
+const PLAZO_COMPROBANTE_HORAS = 24;
 
 export function MiSuscripcionPage() {
   const queryClient = useQueryClient();
@@ -28,6 +31,17 @@ export function MiSuscripcionPage() {
       const { data } = await api.get<{ pagos: Pago[] }>('/api/cuenta/pagos');
       return data.pagos;
     },
+  });
+
+  const hayPendiente = pagos.data?.some((p) => p.estado === 'pendiente') ?? false;
+
+  const qr = useQuery({
+    queryKey: ['cuenta-qr'],
+    queryFn: async () => {
+      const { data } = await api.get<{ url_qr: string | null }>('/api/cuenta/qr');
+      return data.url_qr;
+    },
+    enabled: hayPendiente,
   });
 
   const subir = useMutation({
@@ -126,48 +140,69 @@ export function MiSuscripcionPage() {
         {pagos.data?.map((p) => (
           <div
             key={p.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-5 shadow-sm"
+            className="rounded-2xl border border-border bg-surface p-5 shadow-sm"
           >
-            <div>
-              <p className="font-bold text-text">{p.plan.nombre}</p>
-              <p className="text-sm text-text-secondary">
-                Bs. {p.monto} · {p.ciclo} · {new Date(p.fecha).toLocaleString()}
-              </p>
-              {p.estado === 'aprobada' && p.fecha_expira && (
-                <p className="text-xs text-text-disabled">
-                  Vigencia hasta {new Date(p.fecha_expira).toLocaleDateString()}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-bold text-text">{p.plan.nombre}</p>
+                <p className="text-sm text-text-secondary">
+                  Bs. {p.monto} · {p.ciclo} · {new Date(p.fecha).toLocaleString()}
                 </p>
-              )}
-              {p.estado === 'rechazada' && p.motivo_rechazo && (
-                <p className="text-sm text-red-600 mt-1">Motivo: {p.motivo_rechazo}</p>
-              )}
+                {p.estado === 'aprobada' && p.fecha_expira && (
+                  <p className="text-xs text-text-disabled">
+                    Vigencia hasta {new Date(p.fecha_expira).toLocaleDateString()}
+                  </p>
+                )}
+                {p.estado === 'rechazada' && p.motivo_rechazo && (
+                  <p className="text-sm text-red-600 mt-1">Motivo: {p.motivo_rechazo}</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <EstadoBadge estado={p.estado} />
+                {p.comprobante && (
+                  <a
+                    href={urlArchivo(p.comprobante)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium text-primary-700 hover:text-primary-800 hover:underline"
+                  >
+                    Ver comprobante
+                  </a>
+                )}
+                {p.estado === 'pendiente' && (
+                  <Button
+                    tamano="sm"
+                    onClick={() => elegirArchivo(p.id)}
+                    disabled={subir.isPending}
+                    cargando={subir.isPending && pagoSeleccionado === p.id}
+                  >
+                    {subir.isPending && pagoSeleccionado === p.id
+                      ? 'Subiendo…'
+                      : 'Subir comprobante'}
+                  </Button>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <EstadoBadge estado={p.estado} />
-              {p.comprobante && (
-                <a
-                  href={p.comprobante}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm font-medium text-primary-700 hover:text-primary-800 hover:underline"
-                >
-                  Ver comprobante
-                </a>
-              )}
-              {p.estado === 'pendiente' && (
-                <Button
-                  tamano="sm"
-                  onClick={() => elegirArchivo(p.id)}
-                  disabled={subir.isPending}
-                  cargando={subir.isPending && pagoSeleccionado === p.id}
-                >
-                  {subir.isPending && pagoSeleccionado === p.id
-                    ? 'Subiendo…'
-                    : 'Subir comprobante'}
-                </Button>
-              )}
-            </div>
+            {p.estado === 'pendiente' && (
+              <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-border pt-4">
+                {qr.data ? (
+                  <img
+                    src={urlArchivo(qr.data)}
+                    alt="QR de cobro"
+                    className="h-32 w-32 rounded-xl border border-border bg-surface object-contain p-2 shadow-sm"
+                  />
+                ) : (
+                  qr.isLoading && <p className="text-sm text-text-secondary">Cargando QR…</p>
+                )}
+                <p className="max-w-sm text-sm text-text-secondary">
+                  Escanea el QR, paga Bs. {p.monto} y sube el comprobante antes de que venza el
+                  plazo de {PLAZO_COMPROBANTE_HORAS} horas (a partir de{' '}
+                  {new Date(p.fecha).toLocaleString()}).
+                </p>
+              </div>
+            )}
           </div>
         ))}
       </div>
