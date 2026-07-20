@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- En debug/profile, Flutter la agrega solo (para el depurador) — en
+         release hace falta declararla a mano, si no toda llamada de red
+         falla con un error genérico de conexión. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Atenza"
         android:name="${applicationName}"
