@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firma de release — NUNCA committear (perderla = no poder actualizar la
+# app con el mismo ID una vez que alguien la instale). Respaldar aparte.
+/android/*.jks
+/android/*.keystore
+/android/key.properties

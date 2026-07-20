@@ -1,4 +1,4 @@
-package com.example.atenza_mobile
+package com.atenzabo.atenza
 
 import io.flutter.embedding.android.FlutterActivity
 
