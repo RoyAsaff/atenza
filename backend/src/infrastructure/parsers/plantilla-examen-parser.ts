@@ -103,16 +103,21 @@ function expandirListasWordAParrafos(html: string): string {
   return resultado;
 }
 
-/** Separa el HTML de mammoth en párrafos (una línea de Word = un <p>). */
+/** Separa el HTML de mammoth en párrafos (una línea de Word = un <p>) — y
+ * dentro de cada <p>, también por <br> (Mayús+Enter dentro del mismo
+ * párrafo, en vez de Enter = párrafo nuevo): es común que un docente ponga
+ * las 4 opciones así, todas pegadas en un solo <p>, y sin este split se
+ * leían como una sola opción gigante en vez de 4. */
 function extraerParrafos(html: string): ParrafoHtml[] {
   const parrafos: ParrafoHtml[] = [];
   const regex = /<p[^>]*>([\s\S]*?)<\/p>/g;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html))) {
-    const interno = match[1];
-    const texto = decodificarEntidades(interno.replace(/<[^>]+>/g, '')).trim();
-    if (!texto) continue;
-    parrafos.push({ texto, tieneNegrita: /<(strong|b)[\s>]/i.test(interno) });
+    for (const linea of match[1].split(/<br\s*\/?>/i)) {
+      const texto = decodificarEntidades(linea.replace(/<[^>]+>/g, '')).trim();
+      if (!texto) continue;
+      parrafos.push({ texto, tieneNegrita: /<(strong|b)[\s>]/i.test(linea) });
+    }
   }
   return parrafos;
 }
