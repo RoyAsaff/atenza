@@ -6,13 +6,19 @@ import { Link } from 'react-router-dom';
 import {
   Activity,
   ClipboardCheck,
+  Download,
   FileSpreadsheet,
   ListChecks,
   ShieldCheck,
+  Smartphone,
   SquareUser,
 } from 'lucide-react';
 import { Card, CardBody, botonClases } from '../../core/ui/ui';
 import { LogoLockup, LogoMark } from '../../core/ui/Logo';
+
+// Apunta siempre al asset del último release en GitHub — no hay que
+// actualizar este link cada vez que se publique una versión nueva.
+const URL_APK_ANDROID = 'https://github.com/RoyAsaff/atenza/releases/latest/download/app-release.apk';
 
 const CARACTERISTICAS = [
   {
@@ -109,6 +115,30 @@ export function LandingPage() {
                 </Card>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="border-t border-border bg-surface py-20">
+          <div className="mx-auto flex max-w-6xl flex-col items-center gap-8 px-6 text-center lg:flex-row lg:text-left">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+              <Smartphone size={32} />
+            </span>
+            <div className="flex-1">
+              <h2 className="text-2xl font-extrabold tracking-tight text-text">
+                App para estudiantes (Android)
+              </h2>
+              <p className="mx-auto mt-2 max-w-2xl text-text-secondary lg:mx-0">
+                Mis materias, asistencia, notas y el modo examen seguro en modo kiosco, desde el
+                celular. ¿Tienes iPhone? Rinde el examen igual desde{' '}
+                <Link to="/examen/login" className="text-primary-700 hover:underline">
+                  el navegador
+                </Link>
+                , sin instalar nada.
+              </p>
+            </div>
+            <a href={URL_APK_ANDROID} className={`${botonClases('primary', 'lg')} shrink-0`}>
+              <Download size={18} /> Descargar APK
+            </a>
           </div>
         </section>
 
