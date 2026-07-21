@@ -12,6 +12,11 @@ export function RaizPublica({ children }: { children: ReactNode }) {
   const { sesion } = useAuth();
   const location = useLocation();
 
+  // Este árbol de rutas (Layout de docente/admin) no es para estudiantes —
+  // su app vive en /examen. Sin este chequeo, un estudiante logueado podía
+  // entrar a /materias/:id, /suscripcion, etc. tecleando la URL (el backend
+  // rechazaba las llamadas a la API, pero la pantalla igual se mostraba).
+  if (sesion?.contexto === 'estudiante') return <Navigate to="/examen" replace />;
   if (sesion) return <>{children}</>;
   if (location.pathname === '/') return <LandingPage />;
   return <Navigate to="/login" replace />;
