@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { HelpCircle, Lock, Plus, Sparkles, Upload } from 'lucide-react';
-import { api, mensajeDeError } from '../../core/api/cliente';
+import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import {
   Demostracion,
   ErrorParseoPregunta,
@@ -153,7 +153,7 @@ function FormPregunta({
         ) : (
           inicial?.url_imagen && (
             <img
-              src={inicial.url_imagen}
+              src={urlArchivo(inicial.url_imagen)}
               alt=""
               className="mb-2 max-h-32 rounded-xl border border-border"
             />
@@ -406,7 +406,7 @@ function TarjetaPregunta({
       </div>
         {pregunta.url_imagen && (
         <img
-          src={pregunta.url_imagen}
+          src={urlArchivo(pregunta.url_imagen)}
           alt=""
           className="ml-9 mt-2 max-h-32 rounded-xl border border-border"
         />
@@ -782,7 +782,7 @@ function ModalDemostracion({ demo, onCerrar }: { demo: Demostracion; onCerrar: (
             </p>
             {p.url_imagen && (
               <img
-                src={p.url_imagen}
+                src={urlArchivo(p.url_imagen)}
                 alt=""
                 className="mt-2 max-h-40 rounded-xl border border-border"
               />

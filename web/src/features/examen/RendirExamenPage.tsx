@@ -27,7 +27,7 @@ import {
   PauseCircle,
   ShieldAlert,
 } from 'lucide-react';
-import { api, mensajeDeError } from '../../core/api/cliente';
+import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import { obtenerSocket } from '../../core/realtime/socket';
 import { useAuth } from '../../core/auth/AuthContext';
 import { IntentoParaRendir } from '../../core/tipos';
@@ -221,7 +221,7 @@ function VistaPreguntas({
           <p className="text-base font-semibold">{pregunta.pregunta}</p>
           {pregunta.url_imagen && (
             <img
-              src={pregunta.url_imagen}
+              src={urlArchivo(pregunta.url_imagen)}
               alt=""
               className="mt-3 max-h-52 w-full rounded-xl border border-white/10 object-contain"
             />

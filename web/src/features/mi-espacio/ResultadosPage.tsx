@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Eye, Hourglass, XCircle } from 'lucide-react';
-import { api, mensajeDeError } from '../../core/api/cliente';
+import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import { DetalleIntento, Evaluacion, Resultados } from '../../core/tipos';
 import {
   Alert,
@@ -98,7 +98,7 @@ function ModalDetalleIntento({
               </div>
               {pregunta.url_imagen && (
                 <img
-                  src={pregunta.url_imagen}
+                  src={urlArchivo(pregunta.url_imagen)}
                   alt=""
                   className="ml-9 mt-2 max-h-32 rounded-xl border border-border"
                 />
