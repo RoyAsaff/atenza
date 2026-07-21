@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { LoginPage } from '../features/auth/LoginPage';
 import { RegistroPage } from '../features/auth/RegistroPage';
 import { OlvidePasswordPage } from '../features/auth/OlvidePasswordPage';
@@ -64,40 +64,53 @@ export function App() {
         >
           <Route index element={<Inicio />} />
 
-          {/* Docente: suscripción SaaS por cuenta (17/07) */}
-          <Route path="suscripcion" element={<MiSuscripcionPage />} />
-          <Route path="suscripcion/planes" element={<PlanesPage />} />
-
-          {/* Docente (E3) */}
-          <Route path="materias/:id" element={<MateriaDetallePage />} />
-          <Route path="materias/:id/evaluaciones" element={<EvaluacionesMateriaPage />} />
-
-          {/* Docente (E5) */}
+          {/* Todo lo de abajo es exclusivo de docente — sin este guard, un
+              admin logueado podía entrar tecleando estas URLs (el backend
+              rechaza las llamadas a la API, pero la pantalla igual se
+              mostraba). Mismo patrón que ProtegerRuta contexto="estudiante"
+              en /examen. */}
           <Route
-            path="materias/:id/clases/:claseId/asistencia"
-            element={<PasarListaPage />}
-          />
-          <Route path="materias/:id/asistencia" element={<ConsolidadoAsistenciaPage />} />
+            element={
+              <ProtegerRuta contexto="docente">
+                <Outlet />
+              </ProtegerRuta>
+            }
+          >
+            {/* Docente: suscripción SaaS por cuenta (17/07) */}
+            <Route path="suscripcion" element={<MiSuscripcionPage />} />
+            <Route path="suscripcion/planes" element={<PlanesPage />} />
 
-          {/* Docente (E6) */}
-          <Route
-            path="materias/:id/clases/:claseId/evaluaciones"
-            element={<EvaluacionesClasePage />}
-          />
-          <Route path="materias/:id/evaluaciones/:evalId" element={<EvaluacionEditorPage />} />
+            {/* Docente (E3) */}
+            <Route path="materias/:id" element={<MateriaDetallePage />} />
+            <Route path="materias/:id/evaluaciones" element={<EvaluacionesMateriaPage />} />
 
-          {/* Docente (E7) */}
-          <Route
-            path="materias/:id/evaluaciones/:evalId/monitoreo"
-            element={<MonitoreoPage />}
-          />
+            {/* Docente (E5) */}
+            <Route
+              path="materias/:id/clases/:claseId/asistencia"
+              element={<PasarListaPage />}
+            />
+            <Route path="materias/:id/asistencia" element={<ConsolidadoAsistenciaPage />} />
 
-          {/* Docente (E8) */}
-          <Route
-            path="materias/:id/evaluaciones/:evalId/resultados"
-            element={<ResultadosPage />}
-          />
-          <Route path="materias/:id/centralizador" element={<CentralizadorPage />} />
+            {/* Docente (E6) */}
+            <Route
+              path="materias/:id/clases/:claseId/evaluaciones"
+              element={<EvaluacionesClasePage />}
+            />
+            <Route path="materias/:id/evaluaciones/:evalId" element={<EvaluacionEditorPage />} />
+
+            {/* Docente (E7) */}
+            <Route
+              path="materias/:id/evaluaciones/:evalId/monitoreo"
+              element={<MonitoreoPage />}
+            />
+
+            {/* Docente (E8) */}
+            <Route
+              path="materias/:id/evaluaciones/:evalId/resultados"
+              element={<ResultadosPage />}
+            />
+            <Route path="materias/:id/centralizador" element={<CentralizadorPage />} />
+          </Route>
 
           {/* Admin (E2) */}
           <Route

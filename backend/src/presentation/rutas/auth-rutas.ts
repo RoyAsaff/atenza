@@ -12,6 +12,7 @@ import {
   verificarEmail,
 } from '../dependencias';
 import { crearAutenticar } from '../middlewares/autenticar';
+import { limitarLogin, limitarResetPassword } from '../middlewares/limitar-tasa';
 import { aPublico } from '../../domain/entidades/usuario';
 
 export const authRouter = Router();
@@ -61,7 +62,7 @@ authRouter.post('/verificar-email', async (req, res, next) => {
 });
 
 // POST /api/auth/password/olvide — HU-04 Esc. 2 (paso 1)
-authRouter.post('/password/olvide', async (req, res, next) => {
+authRouter.post('/password/olvide', limitarResetPassword, async (req, res, next) => {
   try {
     const { email } = z.object({ email: z.string().email() }).parse(req.body);
     await solicitarResetPassword.ejecutar(email);
@@ -94,7 +95,7 @@ authRouter.post('/password/restablecer', async (req, res, next) => {
 });
 
 // POST /api/auth/login — HU-01
-authRouter.post('/login', async (req, res, next) => {
+authRouter.post('/login', limitarLogin, async (req, res, next) => {
   try {
     const datos = esquemaLogin.parse(req.body);
     const resultado = await iniciarSesion.ejecutar({

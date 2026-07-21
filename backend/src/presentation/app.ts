@@ -14,6 +14,11 @@ import { CARPETA_UPLOADS } from './middlewares/subir-archivos';
 export function createApp() {
   const app = express();
 
+  // Detrás de un proxy (Railway/Coolify): sin esto, req.ip es la IP del
+  // proxy para todos los clientes — rompe el rate-limit por IP y la IP
+  // que se guarda en la bitácora de auditoría.
+  app.set('trust proxy', 1);
+
   app.use(cors());
   app.use(express.json());
 
