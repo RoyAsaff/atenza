@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "evaluaciones" ADD COLUMN     "creado_en" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

@@ -12,6 +12,7 @@ import {
   crearEvaluacion,
   cuentaActiva,
   demostracionEvaluacion,
+  duplicarEvaluacion,
   eliminarPregunta,
   exportarCentralizador,
   guardarEvaluacion,
@@ -80,6 +81,34 @@ evaluacionesRouter.post(
         docente_id: req.auth!.sub,
         tema,
         nota,
+        ip: req.ip,
+        dispositivo: req.headers['user-agent'],
+      });
+      res.status(201).json({ evaluacion });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST /api/materias/:id/clases/:claseId/evaluaciones/duplicar — "Reutilizar
+// evaluación": clona tema/nota/preguntas/opciones de una evaluación propia
+// (de cualquier materia) en esta clase.
+evaluacionesRouter.post(
+  '/:id/clases/:claseId/evaluaciones/duplicar',
+  autenticar,
+  soloDocente,
+  cuentaActiva,
+  async (req, res, next) => {
+    try {
+      const { evaluacion_origen_id } = z
+        .object({ evaluacion_origen_id: idNumerico })
+        .parse(req.body);
+      const evaluacion = await duplicarEvaluacion.ejecutar({
+        materia_id: idNumerico.parse(req.params.id),
+        clase_id: idNumerico.parse(req.params.claseId),
+        evaluacion_origen_id,
+        docente_id: req.auth!.sub,
         ip: req.ip,
         dispositivo: req.headers['user-agent'],
       });

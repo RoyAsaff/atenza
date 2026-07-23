@@ -2,6 +2,7 @@ import {
   EstadoEvaluacion,
   Evaluacion,
   EvaluacionConClase,
+  EvaluacionConMateria,
   EvaluacionConPreguntas,
   Pregunta,
 } from '../entidades/evaluacion';
@@ -30,6 +31,9 @@ export interface EvaluacionRepositorio {
   /** Todas las evaluaciones de la materia (cualquier clase, cualquier
    * estado), con el dato de su clase — vista "Evaluaciones" a nivel materia. */
   listarPorMateriaConClase(materia_id: number): Promise<EvaluacionConClase[]>;
+  /** "Reutilizar evaluación": todas las evaluaciones del docente en
+   * cualquiera de sus materias, ordenadas por fecha de creación descendente. */
+  listarPorDocente(docente_id: number): Promise<EvaluacionConMateria[]>;
   crear(datos: DatosNuevaEvaluacion): Promise<Evaluacion>;
   actualizar(
     id: number,

@@ -59,12 +59,14 @@ import {
   AgregarPregunta,
   CrearEvaluacion,
   DemostracionEvaluacion,
+  DuplicarEvaluacion,
   EliminarPregunta,
   GuardarEvaluacion,
   ReordenarPreguntas,
   SubirImagenPregunta,
   VerEvaluacion,
   VerEvaluaciones,
+  VerEvaluacionesDocente,
   VerEvaluacionesMateria,
 } from '../application/evaluaciones/gestionar-evaluaciones';
 import { PrismaIntentoRepositorio } from '../infrastructure/repositorios/prisma-intento-repositorio';
@@ -319,6 +321,13 @@ export const verEvaluacion = new VerEvaluacion(
 export const verEvaluacionesMateria = new VerEvaluacionesMateria(
   evaluacionRepositorio,
   materiaRepositorio,
+);
+export const verEvaluacionesDocente = new VerEvaluacionesDocente(evaluacionRepositorio);
+export const duplicarEvaluacion = new DuplicarEvaluacion(
+  evaluacionRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
 );
 export const actualizarEvaluacion = new ActualizarEvaluacion(
   evaluacionRepositorio,

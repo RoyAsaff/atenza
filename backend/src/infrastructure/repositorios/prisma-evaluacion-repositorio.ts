@@ -3,6 +3,7 @@ import {
   EstadoEvaluacion,
   Evaluacion,
   EvaluacionConClase,
+  EvaluacionConMateria,
   EvaluacionConPreguntas,
   Pregunta,
 } from '../../domain/entidades/evaluacion';
@@ -41,6 +42,29 @@ export class PrismaEvaluacionRepositorio implements EvaluacionRepositorio {
       include: { clase: { select: { id: true, fecha: true, hora: true, tema: true } } },
       orderBy: [{ clase: { fecha: 'desc' } }, { id: 'desc' }],
     });
+  }
+
+  async listarPorDocente(docente_id: number): Promise<EvaluacionConMateria[]> {
+    const evaluaciones = await this.prisma.evaluacion.findMany({
+      where: { clase: { materia: { docente_id } } },
+      include: {
+        clase: {
+          select: {
+            id: true,
+            fecha: true,
+            hora: true,
+            tema: true,
+            materia: { select: { id: true, nombre_materia: true } },
+          },
+        },
+      },
+      orderBy: { creado_en: 'desc' },
+    });
+    return evaluaciones.map(({ clase: { materia, ...clase }, ...evaluacion }) => ({
+      ...evaluacion,
+      clase,
+      materia,
+    }));
   }
 
   async crear(datos: DatosNuevaEvaluacion): Promise<Evaluacion> {

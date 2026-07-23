@@ -7,6 +7,7 @@ import {
   Demostracion,
   Evaluacion,
   EvaluacionConClase,
+  EvaluacionConMateria,
   EvaluacionConPreguntas,
   Pregunta,
 } from '../../domain/entidades/evaluacion';
@@ -133,6 +134,77 @@ export class CrearEvaluacion {
   }
 }
 
+// ── Reutilizar evaluación: clona tema/nota/preguntas/opciones en otra clase ─
+
+export class DuplicarEvaluacion {
+  constructor(
+    private readonly evaluaciones: EvaluacionRepositorio,
+    private readonly clases: ClaseRepositorio,
+    private readonly materias: MateriaRepositorio,
+    private readonly bitacora: BitacoraRepositorio,
+  ) {}
+
+  async ejecutar(
+    entrada: Auditoria & {
+      materia_id: number;
+      clase_id: number;
+      evaluacion_origen_id: number;
+      docente_id: number;
+    },
+  ): Promise<Evaluacion> {
+    await exigirMateriaPropia(this.materias, entrada.materia_id, entrada.docente_id);
+
+    const claseDestino = await this.clases.buscarPorId(entrada.clase_id);
+    if (!claseDestino || claseDestino.materia_id !== entrada.materia_id) {
+      throw new NoEncontradoError('Clase');
+    }
+
+    const origen = await this.evaluaciones.buscarConPreguntas(entrada.evaluacion_origen_id);
+    if (!origen) throw new NoEncontradoError('Evaluación');
+
+    // La evaluación origen puede ser de cualquier materia del docente, no
+    // necesariamente la materia destino — se valida dueño vía su propia clase.
+    const claseOrigen = await this.clases.buscarPorId(origen.clase_id);
+    if (!claseOrigen) throw new NoEncontradoError('Evaluación');
+    await exigirMateriaPropia(this.materias, claseOrigen.materia_id, entrada.docente_id);
+
+    const nueva = await this.evaluaciones.crear({
+      clase_id: entrada.clase_id,
+      tema: origen.tema,
+      nota: origen.nota,
+    });
+
+    for (const pregunta of origen.preguntas) {
+      const creada = await this.evaluaciones.agregarPregunta(nueva.id, {
+        pregunta: pregunta.pregunta,
+        opciones: pregunta.opciones.map(({ texto, es_correcta }) => ({ texto, es_correcta })),
+      });
+      if (pregunta.url_imagen) {
+        await this.evaluaciones.actualizarImagenPregunta(creada.id, pregunta.url_imagen);
+      }
+    }
+
+    await this.bitacora.registrar({
+      usuario_id: entrada.docente_id,
+      rol_contexto: 'docente',
+      accion: 'evaluacion_duplicada',
+      entidad: 'evaluacion',
+      entidad_id: String(nueva.id),
+      valor_nuevo: {
+        origen_id: origen.id,
+        clase_id: nueva.clase_id,
+        tema: nueva.tema,
+        nota: nueva.nota,
+        preguntas: origen.preguntas.length,
+      },
+      ip: entrada.ip,
+      dispositivo: entrada.dispositivo,
+    });
+
+    return nueva;
+  }
+}
+
 // ── Ver evaluaciones de una clase / detalle con preguntas ────────
 
 export class VerEvaluaciones {
@@ -168,6 +240,16 @@ export class VerEvaluacionesMateria {
   async ejecutar(entrada: { materia_id: number; docente_id: number }): Promise<EvaluacionConClase[]> {
     await exigirMateriaPropia(this.materias, entrada.materia_id, entrada.docente_id);
     return this.evaluaciones.listarPorMateriaConClase(entrada.materia_id);
+  }
+}
+
+/** "Reutilizar evaluación": todas las evaluaciones del docente en cualquiera
+ * de sus materias, para elegir cuál clonar al crear una nueva. */
+export class VerEvaluacionesDocente {
+  constructor(private readonly evaluaciones: EvaluacionRepositorio) {}
+
+  async ejecutar(entrada: { docente_id: number }): Promise<EvaluacionConMateria[]> {
+    return this.evaluaciones.listarPorDocente(entrada.docente_id);
   }
 }
 

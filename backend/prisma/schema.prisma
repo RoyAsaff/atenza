@@ -243,6 +243,10 @@ model Evaluacion {
   publicada         Boolean   @default(false)
   fecha_publicacion DateTime?
 
+  // Reutilizar evaluación: fecha real de creación (independiente de la
+  // clase asociada) para poder listar/ordenar "mis evaluaciones" cross-materia.
+  creado_en DateTime @default(now())
+
   @@index([clase_id])
   @@map("evaluaciones")
 }

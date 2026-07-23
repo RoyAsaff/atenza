@@ -4,15 +4,16 @@
 
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
-import { ListChecks, Plus } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ListChecks, Plus, Search } from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
-import { Clase, EstadoEvaluacion, EvaluacionConClase, Materia } from '../../core/tipos';
+import { Clase, EstadoEvaluacion, EvaluacionConClase, EvaluacionConMateria, Materia } from '../../core/tipos';
 import {
   Badge,
   Button,
   Campo,
   Card,
+  cn,
   EmptyState,
   Input,
   Modal,
@@ -20,6 +21,10 @@ import {
   PageHeader,
   Select,
   Spinner,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '../../core/ui/ui';
 
 const ESTADO_TONO: Record<
@@ -51,11 +56,22 @@ function ModalNuevaEvaluacion({
   clases: Clase[];
   onCerrar: () => void;
 }) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [modo, setModo] = useState<'nueva' | 'reutilizar'>('nueva');
   const [claseId, setClaseId] = useState('');
   const [tema, setTema] = useState('');
   const [nota, setNota] = useState('100');
+  const [busqueda, setBusqueda] = useState('');
+  const [origenId, setOrigenId] = useState<number | null>(null);
   const [error, setError] = useState('');
+
+  const invalidarYCerrar = (nuevaEvaluacionId: number) => {
+    setError('');
+    queryClient.invalidateQueries({ queryKey: ['evaluaciones-materia', String(materiaId)] });
+    onCerrar();
+    navigate(`/materias/${materiaId}/evaluaciones/${nuevaEvaluacionId}`);
+  };
 
   const crear = useMutation({
     mutationFn: () =>
@@ -71,58 +87,184 @@ function ModalNuevaEvaluacion({
     onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
-  function manejarEnvio(e: FormEvent) {
+  const { data: misEvaluaciones, isLoading: cargandoMisEvaluaciones } = useQuery({
+    queryKey: ['mis-evaluaciones'],
+    queryFn: async () => {
+      const { data } = await api.get<{ evaluaciones: EvaluacionConMateria[] }>(
+        '/api/mi-espacio/evaluaciones',
+      );
+      return data.evaluaciones;
+    },
+    enabled: modo === 'reutilizar',
+  });
+
+  const duplicar = useMutation({
+    mutationFn: () =>
+      api.post<{ evaluacion: { id: number } }>(
+        `/api/materias/${materiaId}/clases/${claseId}/evaluaciones/duplicar`,
+        { evaluacion_origen_id: origenId },
+      ),
+    onSuccess: ({ data }) => invalidarYCerrar(data.evaluacion.id),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
+  });
+
+  function manejarEnvioNueva(e: FormEvent) {
     e.preventDefault();
     crear.mutate();
   }
 
+  function manejarEnvioDuplicar(e: FormEvent) {
+    e.preventDefault();
+    duplicar.mutate();
+  }
+
+  const evaluacionesFiltradas = (misEvaluaciones ?? []).filter((ev) => {
+    const texto = `${ev.materia.nombre_materia} ${ev.tema}`.toLowerCase();
+    return texto.includes(busqueda.toLowerCase());
+  });
+
   return (
-    <Modal onCerrar={onCerrar} eyebrow="Nueva evaluación" titulo="Datos generales">
-      <p className="mb-4 text-sm text-text-secondary">
-        Queda en <span className="font-medium text-text">Borrador</span>, invisible para los
-        estudiantes, hasta que la guardes.
-      </p>
-      <form onSubmit={manejarEnvio} className="space-y-4">
-        <Campo etiqueta="Clase">
-          <Select required value={claseId} onChange={(e) => setClaseId(e.target.value)}>
-            <option value="" disabled>
-              Elige la clase…
-            </option>
-            {clases.map((c) => (
-              <option key={c.id} value={c.id}>
-                {fechaClaseCorta(c.fecha)} · {c.hora} · {c.tema}
-              </option>
-            ))}
-          </Select>
-        </Campo>
-        <Campo etiqueta="Título / tema">
-          <Input
-            required
-            value={tema}
-            onChange={(e) => setTema(e.target.value)}
-            placeholder="p. ej. Examen parcial 1"
-          />
-        </Campo>
-        <Campo etiqueta="Nota total" ayuda="Cada pregunta valdrá nota total ÷ n° de preguntas.">
-          <Input
-            type="number"
-            min={1}
-            required
-            value={nota}
-            onChange={(e) => setNota(e.target.value)}
-            className="w-32"
-          />
-        </Campo>
-        <div className="flex items-center gap-3 pt-1">
-          <Button type="submit" disabled={crear.isPending || !claseId}>
-            {crear.isPending ? 'Creando…' : 'Crear evaluación'}
-          </Button>
-          <Button type="button" variante="ghost" onClick={onCerrar}>
-            Cancelar
-          </Button>
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </form>
+    <Modal
+      onCerrar={onCerrar}
+      eyebrow="Nueva evaluación"
+      titulo="Datos generales"
+      maxWidth={modo === 'reutilizar' ? 'max-w-2xl' : 'max-w-lg'}
+    >
+      <Tabs
+        value={modo}
+        onValueChange={(v) => {
+          setModo(v as 'nueva' | 'reutilizar');
+          setError('');
+        }}
+      >
+        <TabsList className="mb-4">
+          <TabsTrigger value="nueva">Desde cero</TabsTrigger>
+          <TabsTrigger value="reutilizar">Reutilizar existente</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="nueva">
+          <p className="mb-4 text-sm text-text-secondary">
+            Queda en <span className="font-medium text-text">Borrador</span>, invisible para los
+            estudiantes, hasta que la guardes.
+          </p>
+          <form onSubmit={manejarEnvioNueva} className="space-y-4">
+            <Campo etiqueta="Clase">
+              <Select required value={claseId} onChange={(e) => setClaseId(e.target.value)}>
+                <option value="" disabled>
+                  Elige la clase…
+                </option>
+                {clases.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {fechaClaseCorta(c.fecha)} · {c.hora} · {c.tema}
+                  </option>
+                ))}
+              </Select>
+            </Campo>
+            <Campo etiqueta="Título / tema">
+              <Input
+                required
+                value={tema}
+                onChange={(e) => setTema(e.target.value)}
+                placeholder="p. ej. Examen parcial 1"
+              />
+            </Campo>
+            <Campo etiqueta="Nota total" ayuda="Cada pregunta valdrá nota total ÷ n° de preguntas.">
+              <Input
+                type="number"
+                min={1}
+                required
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                className="w-32"
+              />
+            </Campo>
+            <div className="flex items-center gap-3 pt-1">
+              <Button type="submit" disabled={crear.isPending || !claseId}>
+                {crear.isPending ? 'Creando…' : 'Crear evaluación'}
+              </Button>
+              <Button type="button" variante="ghost" onClick={onCerrar}>
+                Cancelar
+              </Button>
+            </div>
+            {error && modo === 'nueva' && <p className="text-sm text-red-600">{error}</p>}
+          </form>
+        </TabsContent>
+
+        <TabsContent value="reutilizar">
+          <p className="mb-4 text-sm text-text-secondary">
+            Se copian el tema, la nota y todas las preguntas de la evaluación elegida; la copia
+            queda en <span className="font-medium text-text">Borrador</span> para que la revises
+            antes de lanzarla.
+          </p>
+          <form onSubmit={manejarEnvioDuplicar} className="space-y-4">
+            <Campo etiqueta="Buscar evaluación">
+              <Input
+                iconoIzq={<Search size={16} />}
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Por materia o tema…"
+              />
+            </Campo>
+
+            <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-border p-1">
+              {cargandoMisEvaluaciones && (
+                <div className="flex items-center gap-2 p-3 text-sm text-text-secondary">
+                  <Spinner /> Cargando…
+                </div>
+              )}
+              {!cargandoMisEvaluaciones && evaluacionesFiltradas.length === 0 && (
+                <p className="p-3 text-sm text-text-secondary">
+                  No se encontraron evaluaciones para reutilizar.
+                </p>
+              )}
+              {evaluacionesFiltradas.map((ev) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  onClick={() => setOrigenId(ev.id)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition',
+                    origenId === ev.id
+                      ? 'bg-primary-50 ring-1 ring-primary-200'
+                      : 'hover:bg-surface-hover',
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-text">{ev.tema}</p>
+                    <p className="truncate text-xs text-text-secondary">
+                      {ev.materia.nombre_materia} · {fechaClaseCorta(ev.clase.fecha)}
+                    </p>
+                  </div>
+                  <Badge tone={ESTADO_TONO[ev.estado].tono}>{ESTADO_TONO[ev.estado].texto}</Badge>
+                </button>
+              ))}
+            </div>
+
+            <Campo etiqueta="Clase destino">
+              <Select required value={claseId} onChange={(e) => setClaseId(e.target.value)}>
+                <option value="" disabled>
+                  Elige la clase…
+                </option>
+                {clases.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {fechaClaseCorta(c.fecha)} · {c.hora} · {c.tema}
+                  </option>
+                ))}
+              </Select>
+            </Campo>
+
+            <div className="flex items-center gap-3 pt-1">
+              <Button type="submit" disabled={duplicar.isPending || !claseId || !origenId}>
+                {duplicar.isPending ? 'Duplicando…' : 'Duplicar evaluación'}
+              </Button>
+              <Button type="button" variante="ghost" onClick={onCerrar}>
+                Cancelar
+              </Button>
+            </div>
+            {error && modo === 'reutilizar' && <p className="text-sm text-red-600">{error}</p>}
+          </form>
+        </TabsContent>
+      </Tabs>
     </Modal>
   );
 }

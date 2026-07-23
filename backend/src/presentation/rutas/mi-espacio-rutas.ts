@@ -7,12 +7,15 @@ import {
   materiaRepositorio,
   sesionRepositorio,
   tokenService,
+  verEvaluacionesDocente,
 } from '../dependencias';
 import { crearAutenticar } from '../middlewares/autenticar';
+import { autorizarContexto } from '../middlewares/autorizar';
 
 export const miEspacioRouter = Router();
 
 const autenticar = crearAutenticar(tokenService, sesionRepositorio);
+const soloDocente = autorizarContexto('docente');
 
 // GET /api/mi-espacio
 miEspacioRouter.get('/', autenticar, async (req, res, next) => {
@@ -32,6 +35,17 @@ miEspacioRouter.get('/', autenticar, async (req, res, next) => {
         materia: i.materia,
       })),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/mi-espacio/evaluaciones — todas las evaluaciones del docente en
+// cualquiera de sus materias, para el selector de "Reutilizar evaluación".
+miEspacioRouter.get('/evaluaciones', autenticar, soloDocente, async (req, res, next) => {
+  try {
+    const evaluaciones = await verEvaluacionesDocente.ejecutar({ docente_id: req.auth!.sub });
+    res.json({ evaluaciones });
   } catch (error) {
     next(error);
   }

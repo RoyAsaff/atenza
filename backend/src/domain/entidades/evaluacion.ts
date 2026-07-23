@@ -15,6 +15,7 @@ export interface Evaluacion {
   /** E8 (HU-26): el docente decide cuándo el estudiante ve su nota. */
   publicada: boolean;
   fecha_publicacion: Date | null;
+  creado_en: Date;
 }
 
 export interface Opcion {
@@ -46,6 +47,21 @@ export interface EvaluacionConClase extends Evaluacion {
     fecha: Date;
     hora: string;
     tema: string;
+  };
+}
+
+/** "Reutilizar evaluación": todas las evaluaciones del docente en cualquiera
+ * de sus materias, con el dato de la materia — para el selector cross-materia. */
+export interface EvaluacionConMateria extends Evaluacion {
+  clase: {
+    id: number;
+    fecha: Date;
+    hora: string;
+    tema: string;
+  };
+  materia: {
+    id: number;
+    nombre_materia: string;
   };
 }
 

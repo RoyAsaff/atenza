@@ -103,6 +103,32 @@ function expandirListasWordAParrafos(html: string): string {
   return resultado;
 }
 
+/** Si una línea ya arranca como una opción ("a) ...") pero el docente
+ * escribió varias seguidas sin salto de línea — muy común en preguntas de
+ * Verdadero/Falso tecleadas rápido: "a) Verdadero b) Falso" — la separa en
+ * una opción por cada marcador de letra, conservando qué tramo estaba en
+ * negrita para no perder cuál es la correcta. */
+function dividirOpcionesEnUnaLinea(lineaHtml: string): string[] {
+  const textoPlano = decodificarEntidades(lineaHtml.replace(/<[^>]+>/g, '')).trim();
+  if (!REGEX_OPCION.test(textoPlano)) return [lineaHtml];
+
+  const regexMarcadorEmbebido = /(^|[\s>])([a-dA-D][.)])\s/g;
+  const cortes: number[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = regexMarcadorEmbebido.exec(lineaHtml))) {
+    const inicioMarcador = m.index + m[1].length;
+    if (inicioMarcador > 0) cortes.push(inicioMarcador);
+  }
+  if (cortes.length === 0) return [lineaHtml];
+
+  const limites = [0, ...cortes, lineaHtml.length];
+  const partes: string[] = [];
+  for (let i = 0; i < limites.length - 1; i++) {
+    partes.push(lineaHtml.slice(limites[i], limites[i + 1]));
+  }
+  return partes;
+}
+
 /** Separa el HTML de mammoth en párrafos (una línea de Word = un <p>) — y
  * dentro de cada <p>, también por <br> (Mayús+Enter dentro del mismo
  * párrafo, en vez de Enter = párrafo nuevo): es común que un docente ponga
@@ -114,9 +140,11 @@ function extraerParrafos(html: string): ParrafoHtml[] {
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html))) {
     for (const linea of match[1].split(/<br\s*\/?>/i)) {
-      const texto = decodificarEntidades(linea.replace(/<[^>]+>/g, '')).trim();
-      if (!texto) continue;
-      parrafos.push({ texto, tieneNegrita: /<(strong|b)[\s>]/i.test(linea) });
+      for (const fragmento of dividirOpcionesEnUnaLinea(linea)) {
+        const texto = decodificarEntidades(fragmento.replace(/<[^>]+>/g, '')).trim();
+        if (!texto) continue;
+        parrafos.push({ texto, tieneNegrita: /<(strong|b)[\s>]/i.test(fragmento) });
+      }
     }
   }
   return parrafos;

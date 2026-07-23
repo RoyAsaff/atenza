@@ -544,6 +544,11 @@ function ModalImportarPreguntas({
               opción correcta en <strong>negrita</strong>. Funciona tanto si escribes los números
               a mano como si usas la numeración automática de Word.
             </p>
+            <p className="mt-2">
+              También reconoce preguntas de <strong>Verdadero/Falso</strong> (se marcan solas con
+              la etiqueta <Badge tone="neutral">V/F</Badge>), incluso si escribiste "a) Verdadero
+              b) Falso" en la misma línea.
+            </p>
           </div>
           <input
             type="file"
@@ -593,6 +598,11 @@ function ModalImportarPreguntas({
                     <div className="flex items-start justify-between gap-3">
                       <p className="font-medium text-text">
                         {i + 1}. {p.pregunta}
+                        {esVerdaderoFalso(p.opciones) && (
+                          <Badge tone="neutral" className="ml-2 align-middle">
+                            V/F
+                          </Badge>
+                        )}
                       </p>
                       <button
                         type="button"
@@ -691,7 +701,8 @@ Diseña los ítems siguiendo buenas prácticas de evaluación educativa:
 •\tLas cuatro opciones deben parecer igualmente posibles.
 •\tEvita patrones en la ubicación de la respuesta correcta.
 •\tNo reutilices frases del enunciado en la respuesta correcta.
-•\tSi una pregunta mide razonamiento, evita que pueda responderse únicamente por definición.`;
+•\tSi una pregunta mide razonamiento, evita que pueda responderse únicamente por definición.
+Antes de entregar el resultado, revisa pregunta por pregunta: cuenta los caracteres de cada una de las cuatro opciones. Si la respuesta correcta queda como la más larga (o notoriamente más corta), reescríbela o ajusta los distractores hasta emparejar las longitudes, para no caer en el sesgo de que la opción correcta se note por su tamaño.`;
 }
 
 function ModalPromptIA({

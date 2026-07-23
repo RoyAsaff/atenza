@@ -128,6 +128,7 @@ export interface Evaluacion {
   fecha_lanzamiento: string | null;
   publicada: boolean;
   fecha_publicacion: string | null;
+  creado_en: string;
 }
 
 export interface Opcion {
@@ -158,6 +159,21 @@ export interface EvaluacionConClase extends Evaluacion {
     fecha: string;
     hora: string;
     tema: string;
+  };
+}
+
+// "Reutilizar evaluación": todas las evaluaciones del docente en cualquiera
+// de sus materias, con el dato de la materia — para el selector cross-materia.
+export interface EvaluacionConMateria extends Evaluacion {
+  clase: {
+    id: number;
+    fecha: string;
+    hora: string;
+    tema: string;
+  };
+  materia: {
+    id: number;
+    nombre_materia: string;
   };
 }
 
