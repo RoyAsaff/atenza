@@ -115,9 +115,14 @@ function dividirOpcionesEnUnaLinea(lineaHtml: string): string[] {
   const regexMarcadorEmbebido = /(^|[\s>])([a-dA-D][.)])\s/g;
   const cortes: number[] = [];
   let m: RegExpExecArray | null;
+  let esPrimerMarcador = true;
   while ((m = regexMarcadorEmbebido.exec(lineaHtml))) {
-    const inicioMarcador = m.index + m[1].length;
-    if (inicioMarcador > 0) cortes.push(inicioMarcador);
+    // El primer marcador es siempre el de esta misma opción (aunque venga
+    // corrido por un <strong> de apertura si la opción entera está en
+    // negrita, p. ej. "<strong>c) ...</strong>") — nunca corta ahí. Solo los
+    // marcadores siguientes indican una opción nueva pegada en la misma línea.
+    if (!esPrimerMarcador) cortes.push(m.index + m[1].length);
+    esPrimerMarcador = false;
   }
   if (cortes.length === 0) return [lineaHtml];
 
@@ -127,6 +132,28 @@ function dividirOpcionesEnUnaLinea(lineaHtml: string): string[] {
     partes.push(lineaHtml.slice(limites[i], limites[i + 1]));
   }
   return partes;
+}
+
+const REGEX_ES_FALSO_VERDADERO = /^(falso|verdadero)\s*[/\-–—]?\s*(falso|verdadero)$/i;
+
+/** Preguntas de Verdadero/Falso muy comunes en exámenes en papel: el docente
+ * escribe "Falso     /     Verdadero" en una sola línea, sin letras a)/b), y
+ * pone en negrita la palabra que corresponde a la respuesta correcta. Esto
+ * no matchea REGEX_OPCION (no hay prefijo de letra), así que sin este caso
+ * especial la línea se ignora entera y la pregunta queda sin opciones. Se
+ * sintetizan "a) Falso" / "b) Verdadero" (mismo truco que
+ * expandirListasWordAParrafos) para que el resto del parser los trate igual
+ * que cualquier otra opción. */
+function dividirFalsoVerdadero(lineaHtml: string): string[] | null {
+  const textoPlano = decodificarEntidades(lineaHtml.replace(/<[^>]+>/g, '')).trim();
+  if (!REGEX_ES_FALSO_VERDADERO.test(textoPlano)) return null;
+
+  const negritaFalso = /<(strong|b)[^>]*>\s*falso\s*<\/\1>/i.test(lineaHtml);
+  const negritaVerdadero = /<(strong|b)[^>]*>\s*verdadero\s*<\/\1>/i.test(lineaHtml);
+  const falso = negritaFalso ? '<strong>Falso</strong>' : 'Falso';
+  const verdadero = negritaVerdadero ? '<strong>Verdadero</strong>' : 'Verdadero';
+
+  return /^falso/i.test(textoPlano) ? [`a) ${falso}`, `b) ${verdadero}`] : [`a) ${verdadero}`, `b) ${falso}`];
 }
 
 /** Separa el HTML de mammoth en párrafos (una línea de Word = un <p>) — y
@@ -140,7 +167,8 @@ function extraerParrafos(html: string): ParrafoHtml[] {
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html))) {
     for (const linea of match[1].split(/<br\s*\/?>/i)) {
-      for (const fragmento of dividirOpcionesEnUnaLinea(linea)) {
+      const fragmentos = dividirFalsoVerdadero(linea) ?? dividirOpcionesEnUnaLinea(linea);
+      for (const fragmento of fragmentos) {
         const texto = decodificarEntidades(fragmento.replace(/<[^>]+>/g, '')).trim();
         if (!texto) continue;
         parrafos.push({ texto, tieneNegrita: /<(strong|b)[\s>]/i.test(fragmento) });
