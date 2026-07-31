@@ -663,28 +663,28 @@ function ModalImportarPreguntas({
 // correcta en negrita) que espera "Importar de Word" ───────────────────
 
 function construirPromptIA({
-  numPreguntas,
   materia,
   tema,
   semestre,
 }: {
-  numPreguntas: string;
   materia: string;
   tema: string;
   semestre: string;
 }): string {
-  const nPreguntas = numPreguntas || '[poner aquí el número de preguntas]';
   const nMateria = materia || '[poner aquí la materia]';
   const nTema = tema || '[poner aquí el tema]';
   const nSemestre = semestre || '[poner aquí el semestre]';
 
-  return `Actúa como un docente universitario con experiencia en evaluación del aprendizaje y diseño de ítems de selección múltiple.
-Elabora una evaluación con ${nPreguntas} preguntas para la materia de ${nMateria} sobre el tema ${nTema} para estudiantes universitarios de ${nSemestre}.
+  return `Actúa como un docente universitario con experiencia en evaluación del aprendizaje, diseño de ítems de selección múltiple y diseño de ítems de verdadero/falso.
+Elabora una evaluación de 20 preguntas para la materia de ${nMateria} sobre el tema ${nTema} para estudiantes universitarios de ${nSemestre}: las primeras 15 preguntas deben ser de selección múltiple y las últimas 5 de verdadero/falso.
 Las preguntas deben evaluar tanto conocimientos como razonamiento y aplicación.
 Cumple estrictamente las siguientes reglas:
-•\tNumera las preguntas.
-•\tCada pregunta debe tener exactamente cuatro opciones (a, b, c y d).
-•\tLa respuesta correcta debe aparecer distribuida de forma equilibrada entre las cuatro letras; evita que siempre sea la misma.
+•\tNumera las preguntas de forma continua del 1 al 20.
+•\tPreguntas 1 a 15 (selección múltiple): cada una debe tener exactamente cuatro opciones (a, b, c y d).
+•\tPreguntas 16 a 20 (verdadero/falso): cada una debe tener exactamente dos opciones, en este orden: "a) Verdadero" y "b) Falso".
+•\tEn las preguntas de selección múltiple, la respuesta correcta debe aparecer distribuida de forma equilibrada entre las cuatro letras; evita que siempre sea la misma.
+•\tEn las preguntas de verdadero/falso, alterna cuál opción es la correcta; evita que la mayoría sea "Verdadero" o la mayoría "Falso".
+•\tLos enunciados de verdadero/falso deben ser afirmaciones claras y de una sola idea; evita dobles negaciones o ambigüedad.
 •\tTodas las opciones deben tener una longitud similar; la respuesta correcta no debe ser la más larga ni la más detallada.
 •\tTodas las opciones deben tener la misma estructura gramatical.
 •\tLos distractores deben ser plausibles y corresponder a errores comunes que cometería un estudiante de la materia.
@@ -692,17 +692,17 @@ Cumple estrictamente las siguientes reglas:
 •\tEvita pistas involuntarias como palabras absolutas (siempre, nunca, únicamente, todos) salvo que sean necesarias.
 •\tEvita que la respuesta correcta destaque por vocabulario técnico más sofisticado que las demás.
 •\tMezcla preguntas de memoria conceptual, interpretación, análisis y resolución de situaciones.
-•\tResalta únicamente la respuesta correcta utilizando negrita.
+•\tResalta únicamente la respuesta correcta utilizando negrita (en verdadero/falso, resalta "Verdadero" o "Falso", el que corresponda).
 •\tNo incluyas la explicación de las respuestas.
 Antes de generar cada pregunta, identifica mentalmente cuál es el error conceptual más probable que cometiese un estudiante. Construye cada distractor representando uno de esos errores frecuentes, de manera que todas las opciones resulten creíbles para quien no domina el tema.
 Diseña los ítems siguiendo buenas prácticas de evaluación educativa:
 •\tNinguna opción debe poder descartarse por su longitud o redacción.
 •\tLa respuesta correcta no debe contener más información que las incorrectas.
-•\tLas cuatro opciones deben parecer igualmente posibles.
+•\tEn selección múltiple, las cuatro opciones deben parecer igualmente posibles.
 •\tEvita patrones en la ubicación de la respuesta correcta.
 •\tNo reutilices frases del enunciado en la respuesta correcta.
 •\tSi una pregunta mide razonamiento, evita que pueda responderse únicamente por definición.
-Antes de entregar el resultado, revisa pregunta por pregunta: cuenta los caracteres de cada una de las cuatro opciones. Si la respuesta correcta queda como la más larga (o notoriamente más corta), reescríbela o ajusta los distractores hasta emparejar las longitudes, para no caer en el sesgo de que la opción correcta se note por su tamaño.`;
+Antes de entregar el resultado, revisa pregunta por pregunta: cuenta los caracteres de cada opción. Si la respuesta correcta queda como la más larga (o notoriamente más corta), reescríbela o ajusta las demás opciones hasta emparejar las longitudes, para no caer en el sesgo de que la opción correcta se note por su tamaño.`;
 }
 
 function ModalPromptIA({
@@ -716,12 +716,11 @@ function ModalPromptIA({
   temaSugerido: string;
   onCerrar: () => void;
 }) {
-  const [numPreguntas, setNumPreguntas] = useState('20');
   const [tema, setTema] = useState(temaSugerido);
   const [semestre, setSemestre] = useState(semestreSugerido);
   const [copiado, setCopiado] = useState(false);
 
-  const prompt = construirPromptIA({ numPreguntas, materia: materiaNombre, tema, semestre });
+  const prompt = construirPromptIA({ materia: materiaNombre, tema, semestre });
 
   async function copiar() {
     await navigator.clipboard.writeText(prompt);
@@ -737,20 +736,14 @@ function ModalPromptIA({
       maxWidth="max-w-2xl"
     >
       <p className="mb-4 text-sm text-text-secondary">
-        Cópialo y pégalo en tu IA favorita (ChatGPT, Claude, Gemini…). Ya pide el mismo formato
-        que entiende "Importar de Word": preguntas numeradas, 4 opciones (a-d) y la correcta en{' '}
-        <strong>negrita</strong> — solo pega el resultado en un documento Word y luego impórtalo.
+        Cópialo y pégalo en tu IA favorita (ChatGPT, Claude, Gemini…). Pide 20 preguntas
+        numeradas: 15 de selección múltiple (4 opciones a-d) y 5 de verdadero/falso (opciones
+        "a) Verdadero" / "b) Falso"), con la correcta siempre en <strong>negrita</strong> — el
+        mismo formato que entiende "Importar de Word", solo pega el resultado en un documento
+        Word y luego impórtalo.
       </p>
 
       <div className="mb-4 flex flex-wrap gap-3">
-        <Campo etiqueta="N° de preguntas" className="w-32">
-          <Input
-            type="number"
-            min={1}
-            value={numPreguntas}
-            onChange={(e) => setNumPreguntas(e.target.value)}
-          />
-        </Campo>
         <Campo etiqueta="Tema" className="min-w-48 flex-1">
           <Input
             value={tema}
