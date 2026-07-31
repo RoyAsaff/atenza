@@ -238,7 +238,14 @@ export function MonitoreoPage() {
 
   useEffect(() => {
     const socket = obtenerSocket();
-    socket.emit('monitorear-evaluacion', evaluacionId);
+
+    const unirseASala = () => {
+      socket.emit('monitorear-evaluacion', evaluacionId);
+      // el socket pudo reconectar mientras estaba caído: refrescamos por si nos perdimos algo
+      queryClient.invalidateQueries({ queryKey: ['monitoreo', String(evaluacionId)] });
+    };
+    unirseASala();
+    socket.on('connect', unirseASala);
 
     const refrescar = () => {
       queryClient.invalidateQueries({ queryKey: ['monitoreo', String(evaluacionId)] });
@@ -271,6 +278,7 @@ export function MonitoreoPage() {
     socket.on('estado-actualizado', refrescar);
 
     return () => {
+      socket.off('connect', unirseASala);
       socket.off('progreso', refrescar);
       socket.off('incidente', alIncidente);
       socket.off('intento-actualizado', refrescar);

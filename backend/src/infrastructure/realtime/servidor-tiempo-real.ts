@@ -25,7 +25,14 @@ export function crearServidorTiempoReal(
   httpServer: HttpServer,
   deps: Dependencias,
 ): SocketIOServer {
-  const io = new SocketIOServer(httpServer, { cors: { origin: '*' } });
+  const io = new SocketIOServer(httpServer, {
+    cors: { origin: '*' },
+    // Defaults de Socket.IO (25s/20s) tardaban hasta ~45s en notar una
+    // desconexión real (sin evento `disconnect` limpio); lo bajamos para
+    // que el panel de monitoreo del docente refleje el corte antes.
+    pingInterval: 10000,
+    pingTimeout: 8000,
+  });
 
   io.use(async (socket, next) => {
     try {
