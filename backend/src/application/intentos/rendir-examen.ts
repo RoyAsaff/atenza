@@ -15,14 +15,27 @@ import { IntentoRepositorio } from '../../domain/repositorios/intento-repositori
 import { TiempoRealEmisor } from '../../domain/repositorios/tiempo-real';
 import { BitacoraRepositorio } from '../../domain/repositorios/bitacora-repositorio';
 
-/** HU-24 Esc. 1: si ya pasó fecha_limite y el intento sigue activo, se autofinaliza. */
+/** HU-24 Esc. 1: si ya pasó fecha_limite y el intento sigue activo, se autofinaliza.
+ * Este es el único de los tres call-sites de aplicarExpiracionSiToca que no
+ * dispara ninguna otra acción del propio flujo (a diferencia de GuardarRespuesta,
+ * que ya emite 'progreso'): sin este emit, el panel de monitoreo del docente
+ * quedaba esperando hasta el próximo refetchInterval (15s) para notar que un
+ * estudiante venció por tiempo. */
 async function aplicarExpiracionSiToca(
   intentos: IntentoRepositorio,
+  tiempoReal: TiempoRealEmisor,
   intento: Intento,
 ): Promise<Intento> {
   const sigueActivo = intento.estado === 'en_curso' || intento.estado === 'desconectado';
   if (sigueActivo && intento.fecha_limite && intento.fecha_limite.getTime() <= Date.now()) {
-    return intentos.cambiarEstado(intento.id, 'finalizado', { fecha_fin: new Date() });
+    const actualizado = await intentos.cambiarEstado(intento.id, 'finalizado', {
+      fecha_fin: new Date(),
+    });
+    tiempoReal.emitirAEvaluacion(actualizado.evaluacion_id, 'intento-actualizado', {
+      intento_id: actualizado.id,
+      estado: actualizado.estado,
+    });
+    return actualizado;
   }
   return intento;
 }
@@ -46,13 +59,14 @@ export class VerIntentoActual {
   constructor(
     private readonly intentos: IntentoRepositorio,
     private readonly evaluaciones: EvaluacionRepositorio,
+    private readonly tiempoReal: TiempoRealEmisor,
   ) {}
 
   async ejecutar(entrada: { estudiante_id: number }): Promise<IntentoParaRendir | null> {
     const activo = await this.intentos.buscarActivoPorEstudiante(entrada.estudiante_id);
     if (!activo) return null;
 
-    const intento = await aplicarExpiracionSiToca(this.intentos, activo);
+    const intento = await aplicarExpiracionSiToca(this.intentos, this.tiempoReal, activo);
 
     const conPreguntas = await this.evaluaciones.buscarConPreguntas(intento.evaluacion_id);
     if (!conPreguntas) throw new NoEncontradoError('Evaluación');
@@ -112,7 +126,7 @@ export class GuardarRespuesta {
       entrada.intento_id,
       entrada.estudiante_id,
     );
-    const intento = await aplicarExpiracionSiToca(this.intentos, propio);
+    const intento = await aplicarExpiracionSiToca(this.intentos, this.tiempoReal, propio);
     if (intento.estado !== 'en_curso' && intento.estado !== 'desconectado') {
       throw new EstadoInvalidoError('El examen no está en curso');
     }
@@ -192,7 +206,7 @@ export class FinalizarIntento {
       entrada.intento_id,
       entrada.estudiante_id,
     );
-    const intento = await aplicarExpiracionSiToca(this.intentos, propio);
+    const intento = await aplicarExpiracionSiToca(this.intentos, this.tiempoReal, propio);
     if (intento.estado !== 'en_curso' && intento.estado !== 'desconectado') {
       throw new EstadoInvalidoError('El examen ya no está en curso');
     }

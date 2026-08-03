@@ -118,8 +118,18 @@ export async function finalizarSiCorresponde(
   if (evaluacion.estado !== 'lanzada') return evaluacion;
 
   // HU-24: aplica vencimientos pendientes sin depender de que cada
-  // estudiante vuelva a abrir la app para autofinalizar el suyo.
-  await intentos.finalizarVencidos(evaluacion.id);
+  // estudiante vuelva a abrir la app para autofinalizar el suyo. Esto se
+  // dispara típicamente desde el propio poll del docente (VerMonitoreo);
+  // sin este emit el cambio quedaba solo en la respuesta HTTP de ese poll
+  // y otras pestañas/sesiones del panel no se enteraban hasta su propio
+  // refetchInterval (15s).
+  const vencidos = await intentos.finalizarVencidos(evaluacion.id);
+  for (const intento of vencidos) {
+    tiempoReal.emitirAEvaluacion(evaluacion.id, 'intento-actualizado', {
+      intento_id: intento.id,
+      estado: intento.estado,
+    });
+  }
 
   const convocados = await intentos.listarPorEvaluacion(evaluacion.id);
   const todosTerminaron =

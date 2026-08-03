@@ -452,7 +452,11 @@ export const reactivarIntento = new ReactivarIntento(
   socketIoEmisor,
 );
 
-export const verIntentoActual = new VerIntentoActual(intentoRepositorio, evaluacionRepositorio);
+export const verIntentoActual = new VerIntentoActual(
+  intentoRepositorio,
+  evaluacionRepositorio,
+  socketIoEmisor,
+);
 export const guardarRespuesta = new GuardarRespuesta(
   intentoRepositorio,
   evaluacionRepositorio,
