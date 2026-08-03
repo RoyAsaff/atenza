@@ -115,6 +115,52 @@ const ESTADO_INTENTO_TONO: Record<
   cancelado: { texto: 'Cancelado', tono: 'neutral' },
 };
 
+const ESTADOS_TIEMPO_DETENIDO: EstadoIntento[] = ['finalizado', 'cancelado'];
+
+function formatearTiempo(segundos: number): string {
+  const h = Math.floor(segundos / 3600);
+  const m = String(Math.floor((segundos % 3600) / 60)).padStart(2, '0');
+  const s = String(segundos % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`;
+}
+
+/** Cuenta regresiva hasta fecha_limite (HU-24) si la evaluación tiene tiempo
+ * límite, o cronómetro ascendente desde fecha_inicio si no lo tiene. El
+ * vencimiento en sí lo autofinaliza el servidor (ver HU-24 Esc. 1); acá solo
+ * se muestra, nunca se decide nada por el lado del cliente. */
+function TiempoFila({ fila }: { fila: FilaMonitoreo }) {
+  const [, forzarTick] = useState(0);
+  const detenido = ESTADOS_TIEMPO_DETENIDO.includes(fila.estado);
+
+  useEffect(() => {
+    if (detenido) return;
+    const id = setInterval(() => forzarTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [detenido]);
+
+  if (detenido) {
+    return <span className="text-text-disabled">—</span>;
+  }
+
+  if (fila.fecha_limite) {
+    const restante = Math.max(
+      0,
+      Math.round((new Date(fila.fecha_limite).getTime() - Date.now()) / 1000),
+    );
+    return (
+      <span className={restante < 60 ? 'font-medium text-red-600' : 'text-text-secondary'}>
+        {formatearTiempo(restante)}
+      </span>
+    );
+  }
+
+  const transcurrido = Math.max(
+    0,
+    Math.round((Date.now() - new Date(fila.fecha_inicio).getTime()) / 1000),
+  );
+  return <span className="text-text-secondary">{formatearTiempo(transcurrido)}</span>;
+}
+
 function FilaEstudiante({
   fila,
   materiaId,
@@ -163,6 +209,9 @@ function FilaEstudiante({
       </Td>
       <Td className="text-text-secondary">
         {fila.respondidas} / {fila.total_preguntas}
+      </Td>
+      <Td>
+        <TiempoFila fila={fila} />
       </Td>
       <Td>
         {fila.incidentes > 0 ? (
@@ -399,6 +448,7 @@ export function MonitoreoPage() {
                   <Th>Estudiante</Th>
                   <Th>Estado</Th>
                   <Th>Progreso</Th>
+                  <Th>Tiempo</Th>
                   <Th>Incidentes</Th>
                   <Th />
                 </Tr>

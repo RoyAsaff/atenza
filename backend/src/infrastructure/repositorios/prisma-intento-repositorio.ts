@@ -86,6 +86,8 @@ export class PrismaIntentoRepositorio implements IntentoRepositorio {
       respondidas: f._count.respuestas,
       total_preguntas: totalPreguntas,
       incidentes: f._count.incidentes,
+      fecha_inicio: f.fecha_inicio,
+      fecha_limite: f.fecha_limite,
     }));
   }
 

@@ -244,6 +244,8 @@ export interface FilaMonitoreo {
   respondidas: number;
   total_preguntas: number;
   incidentes: number;
+  fecha_inicio: string;
+  fecha_limite: string | null;
 }
 
 // E8: resultados (HU-25), publicar notas (HU-26), centralizador (HU-27)

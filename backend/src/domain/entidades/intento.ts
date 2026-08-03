@@ -46,6 +46,9 @@ export interface FilaMonitoreo {
   respondidas: number;
   total_preguntas: number;
   incidentes: number;
+  fecha_inicio: Date;
+  /** Si es null, HU-24 no aplica: el panel muestra cronómetro en vez de cuenta regresiva. */
+  fecha_limite: Date | null;
 }
 
 /** Pregunta tal como la ve el estudiante rindiendo el examen: sin
