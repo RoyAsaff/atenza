@@ -1,178 +1,64 @@
-// "Inicio" (08/08): las materias en sí viven en el sidebar (no se repiten
-// acá como directorio) — el cuerpo es un resumen de actividad: próxima
-// clase, última evaluación y última guía, una tarjeta por materia. Si la
-// cuenta no tiene ninguna materia (ni dicta ni está inscrita), un mensaje
-// de bienvenida invitando a usar el "+" del topbar en vez de tarjetas vacías.
-//
-// Solo aparece la ficha de una materia si tiene una próxima clase
-// programada (pedido de Roy, 08/08) — una materia sin clases futuras (p.
-// ej. terminó el semestre, o el docente todavía no armó el calendario) no
-// aporta nada útil acá y solo agrega ruido.
+// "Inicio" (13/08, reemplaza el resumen anterior): el pedido de Roy es ver
+// de un vistazo únicamente las clases de HOY — nada de "próxima clase" a
+// futuro ni resumen de última evaluación/última guía — con acceso directo
+// a las acciones del momento (pasar lista, evaluaciones, guías de esa
+// clase puntual). Las materias en sí siguen viviendo en el sidebar, acá
+// solo el agenda del día.
 
-import { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import {
-  BookOpen,
-  Calendar,
-  CheckCircle2,
-  ClipboardList,
-  GraduationCap,
-} from 'lucide-react';
+import { BookOpen, ClipboardCheck, ClipboardList, GraduationCap } from 'lucide-react';
 import { useAuth } from '../../core/auth/AuthContext';
 import { api } from '../../core/api/cliente';
-import {
-  EstadoEvaluacion,
-  Materia,
-  MateriaInscrita,
-  ResumenMateriaDocente,
-  ResumenMateriaEstudiante,
-  ResumenMiEspacio,
-} from '../../core/tipos';
-import { Badge, Card, CardBody, CardHeader, EmptyState, Spinner } from '../../core/ui/ui';
+import { ClaseDeHoy, ClasesDeHoy, Materia, MateriaInscrita } from '../../core/tipos';
+import { botonClases } from '../../core/ui/Button';
+import { Card, EmptyState, Spinner } from '../../core/ui/ui';
 
-const ESTADO_TONO: Record<EstadoEvaluacion, { texto: string; tono: 'neutral' | 'success' | 'info' | 'dark' }> = {
-  borrador: { texto: 'Borrador', tono: 'neutral' },
-  lista: { texto: 'Lista', tono: 'success' },
-  lanzada: { texto: 'Lanzada', tono: 'info' },
-  finalizada: { texto: 'Finalizada', tono: 'dark' },
-};
-
-function fechaClaseLegible(fecha: string): string {
-  // La fecha viaja como medianoche UTC (ver esquemaFecha en el backend) —
-  // sin forzar UTC acá, en husos negativos se corre un día para atrás.
-  return new Date(fecha).toLocaleDateString('es-BO', {
-    day: 'numeric',
-    month: 'short',
-    timeZone: 'UTC',
-  });
-}
-
-function fechaLegible(fecha: string): string {
-  return new Date(fecha).toLocaleDateString('es-BO', { day: 'numeric', month: 'short' });
-}
-
-function FilaResumen({
-  icono,
-  etiqueta,
-  children,
-}: {
-  icono: ReactNode;
-  etiqueta: string;
-  children: ReactNode;
-}) {
+function ClaseHoyDictada({ clase }: { clase: ClaseDeHoy }) {
   return (
-    <div className="flex items-start gap-2.5 text-sm">
-      <span className="mt-0.5 shrink-0 text-text-disabled">{icono}</span>
+    <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
       <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-text-disabled">{etiqueta}</p>
-        <div className="text-text-secondary">{children}</div>
+        <p className="font-semibold text-text">{clase.nombre_materia}</p>
+        <p className="text-sm text-text-secondary">
+          {clase.hora} · {clase.tema}
+        </p>
       </div>
-    </div>
-  );
-}
-
-function TarjetaMateriaDictada({ resumen }: { resumen: ResumenMateriaDocente }) {
-  return (
-    <Card>
-      <CardHeader title={resumen.nombre_materia} />
-      <CardBody className="space-y-3">
-        {/* proxima_clase siempre está presente acá — la ficha ni se */}
-        {/* renderiza si no la tiene, ver filtro en InicioPage. */}
-        <FilaResumen icono={<Calendar size={16} />} etiqueta="Próxima clase">
-          <p>
-            {resumen.proxima_clase!.tema} · {fechaClaseLegible(resumen.proxima_clase!.fecha)} ·{' '}
-            {resumen.proxima_clase!.hora}
-          </p>
-        </FilaResumen>
-
-        <FilaResumen icono={<ClipboardList size={16} />} etiqueta="Última evaluación">
-          {resumen.ultima_evaluacion ? (
-            <p className="flex flex-wrap items-center gap-1.5">
-              {resumen.ultima_evaluacion.tema}
-              <Badge tone={ESTADO_TONO[resumen.ultima_evaluacion.estado].tono}>
-                {ESTADO_TONO[resumen.ultima_evaluacion.estado].texto}
-              </Badge>
-            </p>
-          ) : (
-            <p className="text-text-disabled">Todavía no creaste ninguna.</p>
-          )}
-        </FilaResumen>
-
-        <FilaResumen icono={<BookOpen size={16} />} etiqueta="Última guía">
-          {resumen.ultima_guia ? (
-            <p>
-              {resumen.ultima_guia.tema}{' '}
-              <span className="text-text-disabled">· clase {resumen.ultima_guia.clase_tema}</span>
-            </p>
-          ) : (
-            <p className="text-text-disabled">Todavía no creaste ninguna.</p>
-          )}
-        </FilaResumen>
-      </CardBody>
-      <div className="border-t border-border px-5 py-3">
+      <div className="flex flex-wrap gap-2">
         <Link
-          to={`/materias/${resumen.materia_id}`}
-          className="text-sm font-semibold text-primary-700 hover:underline"
+          to={`/materias/${clase.materia_id}/clases/${clase.clase_id}/asistencia`}
+          className={botonClases('secondary', 'sm')}
         >
-          Ver materia →
+          <ClipboardCheck size={15} /> Pasar lista
+        </Link>
+        <Link
+          to={`/materias/${clase.materia_id}/clases/${clase.clase_id}/evaluaciones`}
+          className={botonClases('secondary', 'sm')}
+        >
+          <ClipboardList size={15} /> Evaluaciones
+        </Link>
+        <Link
+          to={`/materias/${clase.materia_id}/clases/${clase.clase_id}/guias`}
+          className={botonClases('secondary', 'sm')}
+        >
+          <BookOpen size={15} /> Guías
         </Link>
       </div>
     </Card>
   );
 }
 
-function TarjetaMateriaInscrita({ resumen }: { resumen: ResumenMateriaEstudiante }) {
+function ClaseHoyInscrita({ clase }: { clase: ClaseDeHoy }) {
   return (
-    <Card>
-      <CardHeader title={resumen.nombre_materia} />
-      <CardBody className="space-y-3">
-        {/* proxima_clase siempre está presente acá — la ficha ni se */}
-        {/* renderiza si no la tiene, ver filtro en InicioPage. */}
-        <FilaResumen icono={<Calendar size={16} />} etiqueta="Próxima clase">
-          <p>
-            {resumen.proxima_clase!.tema} · {fechaClaseLegible(resumen.proxima_clase!.fecha)} ·{' '}
-            {resumen.proxima_clase!.hora}
-          </p>
-        </FilaResumen>
-
-        <FilaResumen icono={<ClipboardList size={16} />} etiqueta="Última evaluación">
-          {resumen.ultima_evaluacion ? (
-            <p>
-              {resumen.ultima_evaluacion.tema}: {resumen.ultima_evaluacion.nota_obtenida}/
-              {resumen.ultima_evaluacion.nota_total} pts{' '}
-              <span className="text-text-disabled">
-                · publicada el {fechaLegible(resumen.ultima_evaluacion.fecha_publicacion)}
-              </span>
-            </p>
-          ) : (
-            <p className="text-text-disabled">Todavía no rindes ninguna.</p>
-          )}
-        </FilaResumen>
-
-        <FilaResumen icono={<BookOpen size={16} />} etiqueta="Última guía">
-          {resumen.ultima_guia ? (
-            <p className="flex flex-wrap items-center gap-1.5">
-              {resumen.ultima_guia.tema}
-              {resumen.ultima_guia.completado && (
-                <Badge tone="success" punto>
-                  <CheckCircle2 size={12} /> Completada
-                </Badge>
-              )}
-            </p>
-          ) : (
-            <p className="text-text-disabled">Todavía no tienes ninguna.</p>
-          )}
-        </FilaResumen>
-      </CardBody>
-      <div className="border-t border-border px-5 py-3">
-        <Link
-          to={`/inscrito/${resumen.materia_id}`}
-          className="text-sm font-semibold text-primary-700 hover:underline"
-        >
-          Ver materia →
-        </Link>
+    <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <div className="min-w-0">
+        <p className="font-semibold text-text">{clase.nombre_materia}</p>
+        <p className="text-sm text-text-secondary">
+          {clase.hora} · {clase.tema}
+        </p>
       </div>
+      <Link to={`/inscrito/${clase.materia_id}`} className={botonClases('secondary', 'sm')}>
+        Ver materia →
+      </Link>
     </Card>
   );
 }
@@ -191,17 +77,16 @@ export function InicioPage() {
     },
   });
 
-  const hayMaterias =
-    (miEspacio?.materias_que_dicto.length ?? 0) > 0 ||
-    (miEspacio?.materias_inscrito.length ?? 0) > 0;
+  const hayDictadas = (miEspacio?.materias_que_dicto.length ?? 0) > 0;
+  const hayInscritas = (miEspacio?.materias_inscrito.length ?? 0) > 0;
+  const hayMaterias = hayDictadas || hayInscritas;
 
-  // Solo se pide el resumen (próxima clase / última evaluación / última
-  // guía, ver-resumen.ts) si de verdad hay alguna materia — evita un
-  // roundtrip innecesario para una cuenta recién creada.
-  const { data: resumen, isLoading: cargandoResumen } = useQuery({
-    queryKey: ['mi-espacio-resumen'],
+  // Solo se pide si de verdad hay alguna materia — evita un roundtrip
+  // innecesario para una cuenta recién creada.
+  const { data: clasesHoy, isLoading: cargandoClasesHoy } = useQuery({
+    queryKey: ['clases-hoy'],
     queryFn: async () => {
-      const { data } = await api.get<ResumenMiEspacio>('/api/mi-espacio/resumen');
+      const { data } = await api.get<ClasesDeHoy>('/api/mi-espacio/clases-hoy');
       return data;
     },
     enabled: hayMaterias,
@@ -225,11 +110,6 @@ export function InicioPage() {
     );
   }
 
-  // Solo se muestra la ficha de una materia si tiene una próxima clase
-  // programada — sin eso, no hay nada útil que resumir acá.
-  const dictadasConClase = resumen?.dictadas.filter((r) => r.proxima_clase) ?? [];
-  const inscritasConClase = resumen?.inscritas.filter((r) => r.proxima_clase) ?? [];
-
   return (
     <div className="space-y-8">
       <div>
@@ -237,40 +117,48 @@ export function InicioPage() {
           Hola, {sesion?.usuario.nombres} 👋
         </h1>
         <p className="mt-1 text-sm text-text-secondary">
-          Elige una materia en el menú de la izquierda para entrar, o revisa el resumen de acá
+          Elige una materia en el menú de la izquierda para entrar, o revisa tus clases de hoy acá
           abajo.
         </p>
       </div>
 
-      {cargandoResumen && (
+      {cargandoClasesHoy && (
         <div className="flex items-center gap-2 text-text-secondary">
-          <Spinner /> Cargando resumen…
+          <Spinner /> Cargando clases de hoy…
         </div>
       )}
 
-      {dictadasConClase.length > 0 && (
+      {!cargandoClasesHoy && hayDictadas && (
         <section>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">
             Enseño
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {dictadasConClase.map((r) => (
-              <TarjetaMateriaDictada key={r.materia_id} resumen={r} />
-            ))}
-          </div>
+          {clasesHoy && clasesHoy.dictadas.length > 0 ? (
+            <div className="space-y-3">
+              {clasesHoy.dictadas.map((c) => (
+                <ClaseHoyDictada key={c.clase_id} clase={c} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-text-disabled">No tienes clases hoy.</p>
+          )}
         </section>
       )}
 
-      {inscritasConClase.length > 0 && (
+      {!cargandoClasesHoy && hayInscritas && (
         <section>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">
             Inscrito
           </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {inscritasConClase.map((r) => (
-              <TarjetaMateriaInscrita key={r.materia_id} resumen={r} />
-            ))}
-          </div>
+          {clasesHoy && clasesHoy.inscritas.length > 0 ? (
+            <div className="space-y-3">
+              {clasesHoy.inscritas.map((c) => (
+                <ClaseHoyInscrita key={c.clase_id} clase={c} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-text-disabled">No tienes clases hoy.</p>
+          )}
         </section>
       )}
     </div>

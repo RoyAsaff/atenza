@@ -102,7 +102,7 @@ import {
   PrevisualizarImportacionPreguntas,
 } from '../application/evaluaciones/importar-preguntas';
 import { extraerHtmlDocx } from '../infrastructure/parsers/extraer-html-docx';
-import { VerResumenMiEspacio } from '../application/mi-espacio/ver-resumen';
+import { VerClasesDeHoy } from '../application/mi-espacio/ver-clases-hoy';
 import { PrismaGuiaRepositorio } from '../infrastructure/repositorios/prisma-guia-repositorio';
 import { PrismaGuiaCompletadaRepositorio } from '../infrastructure/repositorios/prisma-guia-completada-repositorio';
 import {
@@ -571,14 +571,10 @@ export const registrarCompletado = new RegistrarCompletado(guiaRepositorio, guia
 // en PaginaGuias pueda reportar "completada" — ver verificar-token-guia.ts.
 export const verificarTokenGuia = crearVerificarTokenGuia(tokenService);
 
-// "Inicio" (08/08): próxima clase, última evaluación y última guía por
-// materia — dictada e inscrita, en una sola llamada (ver-resumen.ts).
-export const verResumenMiEspacio = new VerResumenMiEspacio(
+// "Inicio" (13/08): clases de HOY — dictadas e inscritas, en una sola
+// llamada (ver-clases-hoy.ts).
+export const verClasesDeHoy = new VerClasesDeHoy(
   materiaRepositorio,
   inscripcionRepositorio,
   claseRepositorio,
-  evaluacionRepositorio,
-  guiaRepositorio,
-  verMisNotas,
-  verMisGuias,
 );

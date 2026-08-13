@@ -342,36 +342,17 @@ export interface MateriaInscrita {
 
 // Resumen de "Inicio" (08/08): próxima clase, última evaluación y última
 // guía por cada materia — dictada e inscrita (GET /api/mi-espacio/resumen).
-export interface ProximaClase {
-  fecha: string;
+export interface ClaseDeHoy {
+  clase_id: number;
+  materia_id: number;
+  nombre_materia: string;
   hora: string;
   tema: string;
 }
 
-export interface ResumenMateriaDocente {
-  materia_id: number;
-  nombre_materia: string;
-  proxima_clase: ProximaClase | null;
-  ultima_evaluacion: { tema: string; estado: EstadoEvaluacion; creado_en: string } | null;
-  ultima_guia: { tema: string; clase_tema: string } | null;
-}
-
-export interface ResumenMateriaEstudiante {
-  materia_id: number;
-  nombre_materia: string;
-  proxima_clase: ProximaClase | null;
-  ultima_evaluacion: {
-    tema: string;
-    nota_obtenida: number;
-    nota_total: number;
-    fecha_publicacion: string;
-  } | null;
-  ultima_guia: { tema: string; url_acceso: string; completado: boolean } | null;
-}
-
-export interface ResumenMiEspacio {
-  dictadas: ResumenMateriaDocente[];
-  inscritas: ResumenMateriaEstudiante[];
+export interface ClasesDeHoy {
+  dictadas: ClaseDeHoy[];
+  inscritas: ClaseDeHoy[];
 }
 
 // Guías de pre-clase (fusión con PaginaGuias, 05/08) — vista del estudiante:

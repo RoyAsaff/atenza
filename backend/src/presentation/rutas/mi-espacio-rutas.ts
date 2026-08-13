@@ -7,8 +7,8 @@ import {
   materiaRepositorio,
   sesionRepositorio,
   tokenService,
+  verClasesDeHoy,
   verEvaluacionesDocente,
-  verResumenMiEspacio,
 } from '../dependencias';
 import { crearAutenticar } from '../middlewares/autenticar';
 import { autorizarContexto } from '../middlewares/autorizar';
@@ -41,12 +41,12 @@ miEspacioRouter.get('/', autenticar, async (req, res, next) => {
   }
 });
 
-// GET /api/mi-espacio/resumen — "Inicio" (08/08): próxima clase, última
-// evaluación y última guía por cada materia (dictada e inscrita).
-miEspacioRouter.get('/resumen', autenticar, async (req, res, next) => {
+// GET /api/mi-espacio/clases-hoy — "Inicio" (13/08): clases de HOY,
+// dictadas e inscritas, para pasar lista/evaluaciones/guías al toque.
+miEspacioRouter.get('/clases-hoy', autenticar, async (req, res, next) => {
   try {
-    const resumen = await verResumenMiEspacio.ejecutar({ usuario_id: req.auth!.sub });
-    res.json(resumen);
+    const clases = await verClasesDeHoy.ejecutar({ usuario_id: req.auth!.sub });
+    res.json(clases);
   } catch (error) {
     next(error);
   }
