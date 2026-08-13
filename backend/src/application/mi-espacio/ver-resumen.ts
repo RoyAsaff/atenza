@@ -41,10 +41,22 @@ interface ResumenMateriaEstudiante {
   ultima_guia: { tema: string; url_acceso: string; completado: boolean } | null;
 }
 
+// Bolivia no tiene horario de verano — offset fijo UTC-4.
+const OFFSET_BOLIVIA_MINUTOS = 4 * 60;
+
 /** `fecha` es solo el día (medianoche UTC, ver esquemaFecha en
- * materias-rutas.ts) y `hora` es un string "HH:MM" sin huso propio — se
- * combinan tomando ambos como literales, mismo criterio con el que ya se
- * guardan (sin conversión de zona horaria de por medio). */
+ * materias-rutas.ts) y `hora` es un string "HH:MM" sin huso propio — el
+ * docente la tipea tal cual (hora Bolivia) y se guarda literal, sin
+ * conversión (mismo criterio con el que ya se guarda `fecha`). Por eso acá
+ * "ahora" tiene que vivir en ese mismo marco literal — si se comparara
+ * contra un `new Date()` real (UTC de verdad), el desfase de 4h hacía que
+ * una clase de HOY que todavía no pasaba en Bolivia ya apareciera como
+ * "pasada" (bug reportado 13/08: clases futuras registradas que no
+ * aparecían en "Próxima clase"). */
+function ahoraBolivia(): Date {
+  return new Date(Date.now() - OFFSET_BOLIVIA_MINUTOS * 60 * 1000);
+}
+
 function esFutura(clase: { fecha: Date; hora: string }, ahora: Date): boolean {
   const [horas, minutos] = clase.hora.split(':').map(Number);
   const limite = new Date(clase.fecha);
@@ -86,7 +98,7 @@ export class VerResumenMiEspacio {
 
   private async proximaClase(materia_id: number): Promise<ProximaClase | null> {
     const clases = await this.clases.listarPorMateria(materia_id); // ya viene ordenado por fecha, hora
-    const ahora = new Date();
+    const ahora = ahoraBolivia();
     const futura = clases.find((c) => esFutura(c, ahora));
     return futura ? { fecha: futura.fecha, hora: futura.hora, tema: futura.tema } : null;
   }
