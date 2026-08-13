@@ -283,19 +283,29 @@ export function MonitoreoPage() {
       return data.monitoreo;
     },
     refetchInterval: 15000, // respaldo si el socket se cae un momento
+    // Sin esto, el navegador frena este timer apenas la pestaña pierde el
+    // foco (típico: el docente camina por el salón) — el respaldo dejaba
+    // de respaldar justo cuando más hacía falta.
+    refetchIntervalInBackground: true,
   });
+
+  const [conectado, setConectado] = useState(false);
 
   useEffect(() => {
     const socket = obtenerSocket();
     const claveMonitoreo = ['monitoreo', String(evaluacionId)];
 
     const unirseASala = () => {
+      setConectado(true);
       socket.emit('monitorear-evaluacion', evaluacionId);
       // el socket pudo reconectar mientras estaba caído: refrescamos por si nos perdimos algo
       queryClient.invalidateQueries({ queryKey: claveMonitoreo });
     };
     unirseASala();
     socket.on('connect', unirseASala);
+
+    const alDesconectar = () => setConectado(false);
+    socket.on('disconnect', alDesconectar);
 
     // 13/08: los eventos por intento ya traen el dato — se parchea esa
     // fila puntual directo en el cache, sin pedir de vuelta toda la tabla
@@ -357,6 +367,7 @@ export function MonitoreoPage() {
 
     return () => {
       socket.off('connect', unirseASala);
+      socket.off('disconnect', alDesconectar);
       socket.off('progreso', alProgreso);
       socket.off('incidente', alIncidente);
       socket.off('intento-actualizado', alIntentoActualizado);
@@ -423,6 +434,13 @@ export function MonitoreoPage() {
                   {ESTADO_EVALUACION_TONO[evaluacion.estado].texto}
                 </Badge>
               )}
+              {/* Para que el docente confíe en lo que ve sin tener que
+                  refrescar "por las dudas": si dice Reconectando, sabe que
+                  lo que ve puede estar viejo; el respaldo de 15s lo cubre
+                  mientras tanto. */}
+              <Badge tone={conectado ? 'success' : 'warning'} punto>
+                {conectado ? 'En vivo' : 'Reconectando…'}
+              </Badge>
             </span>
           }
           description="Progreso, estado e incidentes de cada estudiante, actualizados en vivo."
