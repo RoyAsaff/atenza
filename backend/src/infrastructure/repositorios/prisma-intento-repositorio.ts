@@ -152,6 +152,12 @@ export class PrismaIntentoRepositorio implements IntentoRepositorio {
     });
   }
 
+  // Monitoreo en vivo (13/08): el evento de socket 'progreso' lleva este
+  // conteo para que el docente lo vea sin pedir de vuelta toda la tabla.
+  async contarRespuestas(intento_id: number): Promise<number> {
+    return this.prisma.respuesta.count({ where: { intento_id } });
+  }
+
   async registrarIncidente(
     intento_id: number,
     tipo: TipoIncidente,
@@ -162,10 +168,18 @@ export class PrismaIntentoRepositorio implements IntentoRepositorio {
     });
   }
 
-  async finalizarVencidos(evaluacion_id: number): Promise<Intento[]> {
+  // Mismo motivo que contarRespuestas: el evento 'incidente' lleva el
+  // conteo actualizado, sin obligar a un refetch de toda la tabla.
+  async contarIncidentes(intento_id: number): Promise<number> {
+    return this.prisma.incidente.count({ where: { intento_id } });
+  }
+
+  private async finalizarVencidosDonde(where: {
+    evaluacion_id?: number;
+  }): Promise<Intento[]> {
     const vencidos = await this.prisma.intento.findMany({
       where: {
-        evaluacion_id,
+        ...where,
         estado: { in: ['en_curso', 'desconectado'] },
         fecha_limite: { lte: new Date() },
       },
@@ -179,6 +193,18 @@ export class PrismaIntentoRepositorio implements IntentoRepositorio {
       actualizados.push(aIntento(fila));
     }
     return actualizados;
+  }
+
+  async finalizarVencidos(evaluacion_id: number): Promise<Intento[]> {
+    return this.finalizarVencidosDonde({ evaluacion_id });
+  }
+
+  // Barrido periódico (13/08, ver barrer-vencimientos.ts): mismo chequeo
+  // que finalizarVencidos, pero sin acotar a una evaluación — recorre
+  // todas de una, para el job en segundo plano que no depende de que el
+  // docente esté mirando una evaluación puntual.
+  async finalizarVencidosGlobal(): Promise<Intento[]> {
+    return this.finalizarVencidosDonde({});
   }
 
   async contarAciertos(intento_id: number): Promise<number> {

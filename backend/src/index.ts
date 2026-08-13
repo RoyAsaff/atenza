@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { createApp } from './presentation/app';
 import { crearServidorTiempoReal } from './infrastructure/realtime/servidor-tiempo-real';
 import {
+  barrerVencimientos,
   claseRepositorio,
   evaluacionRepositorio,
   intentoRepositorio,
@@ -13,6 +14,10 @@ import {
 } from './presentation/dependencias';
 
 const PORT = Number(process.env.PORT ?? 3000);
+// Monitoreo en vivo (13/08): cada cuánto se barre por vencimientos por
+// tiempo límite y cierres automáticos, sin depender de que el docente
+// esté mirando la pantalla — ver barrer-vencimientos.ts.
+const INTERVALO_BARRIDO_MS = 8000;
 
 const app = createApp();
 const httpServer = createServer(app);
@@ -27,6 +32,12 @@ const io = crearServidorTiempoReal(httpServer, {
   materiaRepositorio,
 });
 socketIoEmisor.conectar(io);
+
+setInterval(() => {
+  barrerVencimientos.ejecutar().catch((error) => {
+    console.error('[atenza-api] error en el barrido de vencimientos:', error);
+  });
+}, INTERVALO_BARRIDO_MS);
 
 httpServer.listen(PORT, () => {
   console.log(`[atenza-api] escuchando en http://localhost:${PORT}`);

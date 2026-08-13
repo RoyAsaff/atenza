@@ -138,9 +138,13 @@ export class GuardarRespuesta {
     if (!opcionValida) throw new NoEncontradoError('Opción');
 
     await this.intentos.guardarRespuesta(intento.id, entrada.pregunta_id, entrada.opcion_id);
+    // 13/08: el conteo va en el propio evento — antes solo mandaba el id y
+    // el docente tenía que pedir de vuelta toda la tabla para verlo.
+    const respondidas = await this.intentos.contarRespuestas(intento.id);
 
     this.tiempoReal.emitirAEvaluacion(intento.evaluacion_id, 'progreso', {
       intento_id: intento.id,
+      respondidas,
     });
   }
 }
@@ -171,6 +175,8 @@ export class ReportarIncidente {
       entrada.tipo,
       entrada.detalle,
     );
+    // 13/08: mismo criterio que 'progreso' — el conteo va en el evento.
+    const incidentes = await this.intentos.contarIncidentes(intento.id);
 
     // La decisión sobre consecuencias siempre es manual del docente
     // (HU-21 Esc. 2): acá solo se notifica en vivo, nada se bloquea solo.
@@ -178,6 +184,7 @@ export class ReportarIncidente {
       intento_id: intento.id,
       tipo: incidente.tipo,
       fecha_hora: incidente.fecha_hora,
+      incidentes,
     });
 
     await this.bitacora.registrar({
@@ -212,8 +219,12 @@ export class FinalizarIntento {
     }
 
     await this.intentos.cambiarEstado(intento.id, 'finalizado', { fecha_fin: new Date() });
-    this.tiempoReal.emitirAEvaluacion(intento.evaluacion_id, 'estado-actualizado', {
+    // 'intento-actualizado' (no 'estado-actualizado'): esto es un cambio de
+    // UN intento puntual, no de la evaluación — el panel parchea esa fila
+    // sola en vez de refetchear toda la tabla (13/08).
+    this.tiempoReal.emitirAEvaluacion(intento.evaluacion_id, 'intento-actualizado', {
       intento_id: intento.id,
+      estado: 'finalizado',
     });
 
     await this.bitacora.registrar({

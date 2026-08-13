@@ -46,15 +46,22 @@ export interface IntentoRepositorio {
   respuestasDe(intento_id: number): Promise<Respuesta[]>;
   /** Crea la respuesta o la corrige si ya existía para esa pregunta (D-06). */
   guardarRespuesta(intento_id: number, pregunta_id: number, opcion_id: number): Promise<Respuesta>;
+  /** Monitoreo en vivo: conteo para el payload del evento 'progreso'. */
+  contarRespuestas(intento_id: number): Promise<number>;
   registrarIncidente(
     intento_id: number,
     tipo: TipoIncidente,
     detalle?: string,
   ): Promise<Incidente>;
+  /** Monitoreo en vivo: conteo para el payload del evento 'incidente'. */
+  contarIncidentes(intento_id: number): Promise<number>;
 
   /** E8: autofinaliza (perezoso, como ExpirarMateriasVencidas) los intentos
    * en_curso/desconectado de la evaluación cuyo tiempo límite ya pasó. */
   finalizarVencidos(evaluacion_id: number): Promise<Intento[]>;
+  /** Barrido en segundo plano (ver barrer-vencimientos.ts): igual que
+   * finalizarVencidos pero de todas las evaluaciones a la vez. */
+  finalizarVencidosGlobal(): Promise<Intento[]>;
   /** E8 (HU-25): respuestas correctas guardadas en el intento. */
   contarAciertos(intento_id: number): Promise<number>;
   /** E8 (D-12): inserta una nueva versión, nunca actualiza una existente. */

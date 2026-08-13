@@ -287,21 +287,50 @@ export function MonitoreoPage() {
 
   useEffect(() => {
     const socket = obtenerSocket();
+    const claveMonitoreo = ['monitoreo', String(evaluacionId)];
 
     const unirseASala = () => {
       socket.emit('monitorear-evaluacion', evaluacionId);
       // el socket pudo reconectar mientras estaba caído: refrescamos por si nos perdimos algo
-      queryClient.invalidateQueries({ queryKey: ['monitoreo', String(evaluacionId)] });
+      queryClient.invalidateQueries({ queryKey: claveMonitoreo });
     };
     unirseASala();
     socket.on('connect', unirseASala);
 
-    const refrescar = () => {
-      queryClient.invalidateQueries({ queryKey: ['monitoreo', String(evaluacionId)] });
+    // 13/08: los eventos por intento ya traen el dato — se parchea esa
+    // fila puntual directo en el cache, sin pedir de vuelta toda la tabla
+    // (antes cualquier evento hacía invalidateQueries = un refetch HTTP
+    // completo, con el delay de ese viaje redondo para ver el cambio).
+    const parcharFila = (intento_id: number, cambios: Partial<FilaMonitoreo>) => {
+      queryClient.setQueryData<FilaMonitoreo[]>(claveMonitoreo, (prev) =>
+        prev?.map((f) => (f.intento_id === intento_id ? { ...f, ...cambios } : f)),
+      );
     };
 
-    const alIncidente = (payload: { intento_id: number; tipo: string; fecha_hora: string }) => {
-      const filas = queryClient.getQueryData<FilaMonitoreo[]>(['monitoreo', String(evaluacionId)]);
+    const alProgreso = (payload: { intento_id: number; respondidas: number }) => {
+      parcharFila(payload.intento_id, { respondidas: payload.respondidas });
+    };
+
+    const alIntentoActualizado = (payload: { intento_id: number; estado: FilaMonitoreo['estado'] }) => {
+      parcharFila(payload.intento_id, { estado: payload.estado });
+    };
+
+    // Este sí es un cambio a nivel EVALUACIÓN (se finalizó/canceló sola),
+    // no de un intento puntual — ahí un refetch completo está bien, es
+    // poco frecuente. También refresca la insignia de estado del
+    // encabezado (evaluacion.estado), que antes se quedaba desactualizada.
+    const alEstadoActualizado = () => {
+      queryClient.invalidateQueries({ queryKey: claveMonitoreo });
+      queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
+    };
+
+    const alIncidente = (payload: {
+      intento_id: number;
+      tipo: string;
+      fecha_hora: string;
+      incidentes: number;
+    }) => {
+      const filas = queryClient.getQueryData<FilaMonitoreo[]>(claveMonitoreo);
       const fila = filas?.find((f) => f.intento_id === payload.intento_id);
       const alertaId = ++alertaIdRef.current;
       setAlertas((prev) => [
@@ -318,20 +347,20 @@ export function MonitoreoPage() {
         () => setAlertas((prev) => prev.filter((a) => a.id !== alertaId)),
         DURACION_ALERTA_MS,
       );
-      refrescar();
+      parcharFila(payload.intento_id, { incidentes: payload.incidentes });
     };
 
-    socket.on('progreso', refrescar);
+    socket.on('progreso', alProgreso);
     socket.on('incidente', alIncidente);
-    socket.on('intento-actualizado', refrescar);
-    socket.on('estado-actualizado', refrescar);
+    socket.on('intento-actualizado', alIntentoActualizado);
+    socket.on('estado-actualizado', alEstadoActualizado);
 
     return () => {
       socket.off('connect', unirseASala);
-      socket.off('progreso', refrescar);
+      socket.off('progreso', alProgreso);
       socket.off('incidente', alIncidente);
-      socket.off('intento-actualizado', refrescar);
-      socket.off('estado-actualizado', refrescar);
+      socket.off('intento-actualizado', alIntentoActualizado);
+      socket.off('estado-actualizado', alEstadoActualizado);
     };
   }, [evaluacionId, queryClient]);
 

@@ -102,6 +102,42 @@ export async function calificarPendientes(
   return calificados;
 }
 
+/** Común a finalizarSiCorresponde (perezoso, disparado por el propio
+ * docente al abrir Monitoreo/Resultados) y a BarrerVencimientos
+ * (barrer-vencimientos.ts, corre solo en segundo plano): si ya todos los
+ * convocados llegaron a un estado terminal, cierra la evaluación sola
+ * (E8) y califica lo pendiente. No-op barato si todavía falta alguien. */
+export async function cerrarSiTerminaron(
+  evaluaciones: EvaluacionRepositorio,
+  intentos: IntentoRepositorio,
+  bitacora: BitacoraRepositorio,
+  tiempoReal: TiempoRealEmisor,
+  evaluacion: Evaluacion,
+): Promise<Evaluacion> {
+  const convocados = await intentos.listarPorEvaluacion(evaluacion.id);
+  const todosTerminaron =
+    convocados.length > 0 &&
+    convocados.every((i) => i.estado === 'finalizado' || i.estado === 'cancelado');
+  if (!todosTerminaron) return evaluacion;
+
+  const calificados = await calificarPendientes(evaluaciones, intentos, evaluacion);
+
+  const finalizada = await evaluaciones.cambiarEstado(evaluacion.id, 'finalizada');
+  // Evento a nivel evaluación (no de un intento puntual): acá sí vale la
+  // pena que el cliente refresque todo, incluida la insignia de estado.
+  tiempoReal.emitirAEvaluacion(evaluacion.id, 'estado-actualizado', {});
+
+  await bitacora.registrar({
+    rol_contexto: 'sistema',
+    accion: 'evaluacion_finalizada_automaticamente',
+    entidad: 'evaluacion',
+    entidad_id: String(evaluacion.id),
+    valor_nuevo: { estudiantes_calificados: calificados },
+  });
+
+  return finalizada;
+}
+
 export async function finalizarSiCorresponde(
   evaluaciones: EvaluacionRepositorio,
   intentos: IntentoRepositorio,
@@ -122,7 +158,8 @@ export async function finalizarSiCorresponde(
   // dispara típicamente desde el propio poll del docente (VerMonitoreo);
   // sin este emit el cambio quedaba solo en la respuesta HTTP de ese poll
   // y otras pestañas/sesiones del panel no se enteraban hasta su propio
-  // refetchInterval (15s).
+  // refetchInterval (15s). BarrerVencimientos (13/08) cubre el caso de
+  // que nadie esté mirando esta pantalla en absoluto.
   const vencidos = await intentos.finalizarVencidos(evaluacion.id);
   for (const intento of vencidos) {
     tiempoReal.emitirAEvaluacion(evaluacion.id, 'intento-actualizado', {
@@ -131,26 +168,7 @@ export async function finalizarSiCorresponde(
     });
   }
 
-  const convocados = await intentos.listarPorEvaluacion(evaluacion.id);
-  const todosTerminaron =
-    convocados.length > 0 &&
-    convocados.every((i) => i.estado === 'finalizado' || i.estado === 'cancelado');
-  if (!todosTerminaron) return evaluacion;
-
-  const calificados = await calificarPendientes(evaluaciones, intentos, evaluacion);
-
-  const finalizada = await evaluaciones.cambiarEstado(evaluacion.id, 'finalizada');
-  tiempoReal.emitirAEvaluacion(evaluacion.id, 'estado-actualizado', {});
-
-  await bitacora.registrar({
-    rol_contexto: 'sistema',
-    accion: 'evaluacion_finalizada_automaticamente',
-    entidad: 'evaluacion',
-    entidad_id: String(evaluacion.id),
-    valor_nuevo: { estudiantes_calificados: calificados },
-  });
-
-  return finalizada;
+  return cerrarSiTerminaron(evaluaciones, intentos, bitacora, tiempoReal, evaluacion);
 }
 
 /** Baraja el arreglo (Fisher-Yates) sin mutar el original. */
@@ -351,8 +369,14 @@ abstract class AccionGlobalIntentos {
       this.tiempoReal.emitirAEstudiante(intento.estudiante_id, this.eventoEstudiante, {
         intento_id: intento.id,
       });
+      // Un evento por intento en vez de un 'estado-actualizado' genérico:
+      // el panel de Monitoreo parchea esa fila puntual sin pedir de vuelta
+      // toda la tabla (13/08, aunque sea una acción masiva).
+      this.tiempoReal.emitirAEvaluacion(evaluacion.id, 'intento-actualizado', {
+        intento_id: intento.id,
+        estado: this.estadoDestino,
+      });
     }
-    this.tiempoReal.emitirAEvaluacion(evaluacion.id, 'estado-actualizado', {});
 
     await this.bitacora.registrar({
       usuario_id: entrada.docente_id,
@@ -413,9 +437,15 @@ export class CancelarEvaluacion {
       this.tiempoReal.emitirAEstudiante(intento.estudiante_id, 'examen-cancelado', {
         intento_id: intento.id,
       });
+      this.tiempoReal.emitirAEvaluacion(evaluacion.id, 'intento-actualizado', {
+        intento_id: intento.id,
+        estado: 'cancelado',
+      });
     }
 
     const actualizada = await this.evaluaciones.cambiarEstado(evaluacion.id, 'finalizada');
+    // Acá sí cambió el estado de la EVALUACIÓN (no solo de sus intentos) —
+    // vale la pena el refetch completo, incluida la insignia de estado.
     this.tiempoReal.emitirAEvaluacion(evaluacion.id, 'estado-actualizado', {});
 
     await this.bitacora.registrar({
@@ -482,7 +512,10 @@ export class PausarIntento {
     this.tiempoReal.emitirAEstudiante(intento.estudiante_id, 'examen-pausado', {
       intento_id: intento.id,
     });
-    this.tiempoReal.emitirAEvaluacion(evaluacion.id, 'estado-actualizado', {});
+    this.tiempoReal.emitirAEvaluacion(evaluacion.id, 'intento-actualizado', {
+      intento_id: intento.id,
+      estado: 'pausado',
+    });
 
     await this.bitacora.registrar({
       usuario_id: entrada.docente_id,
@@ -531,7 +564,10 @@ export class ReactivarIntento {
     this.tiempoReal.emitirAEstudiante(intento.estudiante_id, 'examen-reactivado', {
       intento_id: intento.id,
     });
-    this.tiempoReal.emitirAEvaluacion(evaluacion.id, 'estado-actualizado', {});
+    this.tiempoReal.emitirAEvaluacion(evaluacion.id, 'intento-actualizado', {
+      intento_id: intento.id,
+      estado: 'en_curso',
+    });
 
     await this.bitacora.registrar({
       usuario_id: entrada.docente_id,

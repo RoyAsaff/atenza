@@ -48,6 +48,9 @@ export interface EvaluacionRepositorio {
   listarFinalizadasPorMateria(materia_id: number): Promise<Evaluacion[]>;
   /** HU-26: solo las publicadas de la materia, para "mis notas" del estudiante. */
   listarPublicadasPorMateria(materia_id: number): Promise<Evaluacion[]>;
+  /** Barrido en segundo plano (ver barrer-vencimientos.ts): todas las
+   * evaluaciones lanzadas ahora mismo, de cualquier docente/materia. */
+  listarLanzadas(): Promise<Evaluacion[]>;
 
   contarPreguntas(evaluacion_id: number): Promise<number>;
   buscarPregunta(pregunta_id: number): Promise<Pregunta | null>;

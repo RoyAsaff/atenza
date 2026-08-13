@@ -80,6 +80,7 @@ import {
   ReactivarIntento,
   VerMonitoreo,
 } from '../application/evaluaciones/gestionar-examen';
+import { BarrerVencimientos } from '../application/evaluaciones/barrer-vencimientos';
 import {
   FinalizarIntento,
   GuardarRespuesta,
@@ -419,6 +420,14 @@ export const verMonitoreo = new VerMonitoreo(
   evaluacionRepositorio,
   claseRepositorio,
   materiaRepositorio,
+  intentoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+// Barrido en segundo plano (13/08, ver barrer-vencimientos.ts) — index.ts
+// lo corre en un setInterval, no depende de ninguna petición HTTP.
+export const barrerVencimientos = new BarrerVencimientos(
+  evaluacionRepositorio,
   intentoRepositorio,
   bitacoraRepositorio,
   socketIoEmisor,

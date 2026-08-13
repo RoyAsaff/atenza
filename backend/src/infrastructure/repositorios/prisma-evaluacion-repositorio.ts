@@ -110,6 +110,10 @@ export class PrismaEvaluacionRepositorio implements EvaluacionRepositorio {
     });
   }
 
+  async listarLanzadas(): Promise<Evaluacion[]> {
+    return this.prisma.evaluacion.findMany({ where: { estado: 'lanzada' } });
+  }
+
   async contarPreguntas(evaluacion_id: number): Promise<number> {
     return this.prisma.pregunta.count({ where: { evaluacion_id } });
   }
