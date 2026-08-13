@@ -322,3 +322,86 @@ export interface SesionActiva {
   contexto: Contexto;
   usuario: Usuario;
 }
+
+// Materia donde el estudiante está inscrito (GET /api/mi-espacio, contexto
+// estudiante) — espejo de mobile/lib/features/materias/domain/entidades/materia_inscrita.dart
+export interface MateriaInscrita {
+  inscripcion_id: number;
+  codigo_estudiante: string;
+  fecha_inscripcion: string;
+  materia: {
+    id: number;
+    nombre_materia: string;
+    sigla: string | null;
+    carrera: string;
+    semestre: string;
+    universidad: string;
+    docente: { nombres: string; apellidos: string } | null;
+  };
+}
+
+// Resumen de "Inicio" (08/08): próxima clase, última evaluación y última
+// guía por cada materia — dictada e inscrita (GET /api/mi-espacio/resumen).
+export interface ProximaClase {
+  fecha: string;
+  hora: string;
+  tema: string;
+}
+
+export interface ResumenMateriaDocente {
+  materia_id: number;
+  nombre_materia: string;
+  proxima_clase: ProximaClase | null;
+  ultima_evaluacion: { tema: string; estado: EstadoEvaluacion; creado_en: string } | null;
+  ultima_guia: { tema: string; clase_tema: string } | null;
+}
+
+export interface ResumenMateriaEstudiante {
+  materia_id: number;
+  nombre_materia: string;
+  proxima_clase: ProximaClase | null;
+  ultima_evaluacion: {
+    tema: string;
+    nota_obtenida: number;
+    nota_total: number;
+    fecha_publicacion: string;
+  } | null;
+  ultima_guia: { tema: string; url_acceso: string; completado: boolean } | null;
+}
+
+export interface ResumenMiEspacio {
+  dictadas: ResumenMateriaDocente[];
+  inscritas: ResumenMateriaEstudiante[];
+}
+
+// Guías de pre-clase (fusión con PaginaGuias, 05/08) — vista del estudiante:
+// la guía sigue siendo el HTML de PaginaGuias, acá solo vive el link de
+// acceso (con el token de alcance acotado ya incluido) y si ya la completó.
+export interface Guia {
+  id: number;
+  tema: string;
+  orden: number;
+  url_acceso: string;
+  completado: boolean;
+  clase_id: number;
+  clase_tema: string;
+  clase_fecha: string;
+}
+
+// Vista del docente (GET /:id/clases/:claseId/guias, contexto docente): la
+// guía + quién de la nómina ya la completó — el dato nuevo pedido por Roy.
+export interface FilaCompletadoGuia {
+  estudiante_id: number;
+  nombres: string;
+  apellidos: string;
+  completado_en: string;
+}
+
+export interface GuiaDocente {
+  id: number;
+  clase_id: number;
+  tema: string;
+  url: string;
+  orden: number;
+  completados: FilaCompletadoGuia[];
+}

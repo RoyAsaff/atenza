@@ -14,7 +14,11 @@ import { autorizarContexto } from '../middlewares/autorizar';
 export const inscripcionesRouter = Router();
 
 const autenticar = crearAutenticar(tokenService, sesionRepositorio);
-const soloEstudiante = autorizarContexto('estudiante');
+// Ampliado (05/08, unificación de identidad en web): permite que la web
+// también ofrezca "unirme con un código" (paridad con Classroom) — los
+// casos de uso ya scopean por `estudiante_id: req.auth!.sub`, y
+// UnirseAMateria ya bloquea inscribirse en la materia propia.
+const soloEstudiante = autorizarContexto('docente', 'estudiante');
 
 const esquemaUnirse = z.object({
   codigo_materia: z.string().min(1),

@@ -18,7 +18,11 @@ import { autorizarContexto } from '../middlewares/autorizar';
 export const intentosRouter = Router();
 
 const autenticar = crearAutenticar(tokenService, sesionRepositorio);
-const soloEstudiante = autorizarContexto('estudiante');
+// Ampliado (05/08, unificación de identidad en web): una sesión web
+// regular queda con contexto 'docente' aunque el usuario esté rindiendo
+// un examen como estudiante en otra materia — cada ruta ya scopea por
+// `estudiante_id: req.auth!.sub`, no confía en el contexto para eso.
+const soloEstudiante = autorizarContexto('docente', 'estudiante');
 const idNumerico = z.coerce.number().int().positive();
 
 // GET /api/intentos/actual — abrir o reanudar el examen vigente (o null)

@@ -30,10 +30,7 @@ api.interceptors.response.use(
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       limpiarSesion();
-      // "Rendir examen" (contexto estudiante) vive en /examen/*, con su
-      // propio login — no mandarlo al login de docentes.
-      const esExamen = window.location.pathname.startsWith('/examen');
-      const destino = esExamen ? '/examen/login' : '/login';
+      const destino = '/login';
       if (window.location.pathname !== destino) {
         window.location.href = `${destino}?motivo=sesion_terminada`;
       }

@@ -12,6 +12,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import esLocale from '@fullcalendar/core/locales/es';
 import type { EventClickArg } from '@fullcalendar/core';
 import {
+  BookOpen,
   ClipboardCheck,
   ClipboardList,
   FileSpreadsheet,
@@ -511,6 +512,14 @@ function PanelClase({
             className={botonClases('secondary', 'md') + ' mt-2 w-full'}
           >
             <ListChecks size={16} /> Evaluaciones
+          </Link>
+
+          <Link
+            to={`/materias/${materiaId}/clases/${clase.id}/guias`}
+            onClick={onCerrar}
+            className={botonClases('secondary', 'md') + ' mt-2 w-full'}
+          >
+            <BookOpen size={16} /> Guías
           </Link>
 
           <div className="mt-3 flex gap-3">

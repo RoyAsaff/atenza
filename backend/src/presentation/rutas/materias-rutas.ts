@@ -381,7 +381,9 @@ materiasRouter.get(
 materiasRouter.get(
   '/:id/mi-asistencia',
   autenticar,
-  autorizarContexto('estudiante'),
+  // Ampliado (05/08, unificación de identidad en web): el caso de uso ya
+  // scopea por inscripción del `sub`, no por contexto.
+  autorizarContexto('docente', 'estudiante'),
   async (req, res, next) => {
     try {
       const lista = await verMiAsistencia.ejecutar({
@@ -399,7 +401,9 @@ materiasRouter.get(
 materiasRouter.get(
   '/:id/mis-notas',
   autenticar,
-  autorizarContexto('estudiante'),
+  // Ampliado (05/08, unificación de identidad en web): el caso de uso ya
+  // scopea por inscripción del `sub`, no por contexto.
+  autorizarContexto('docente', 'estudiante'),
   async (req, res, next) => {
     try {
       const notas = await verMisNotas.ejecutar({

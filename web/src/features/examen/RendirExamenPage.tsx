@@ -17,6 +17,13 @@
 // mostrarse — bug que se corrigió ahí saliendo del kiosco en dispose()),
 // acá las pantallas de "enviado" y "cancelado" son estado LOCAL de React,
 // no dependen de que el servidor siga devolviendo el intento.
+//
+// Unificación de identidad en web (05/08): `Layout` monta esta pantalla a
+// pantalla completa (sin sidebar) apenas detecta un intento activo, sin
+// importar en qué parte del panel estuviera el docente/estudiante — mismo
+// criterio que `_Raiz`/`ExamenController` en mobile. `onTerminado` le avisa
+// a `Layout` cuándo es seguro volver al panel normal (recién al aceptar la
+// pantalla de "enviado"/"cancelado", nunca antes — por la razón de arriba).
 
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -280,7 +287,7 @@ function VistaPreguntas({
 
 // ── Página principal ────────────────────────────────────────────────
 
-export function RendirExamenPage() {
+export function RendirExamenPage({ onTerminado }: { onTerminado?: () => void } = {}) {
   const { logout } = useAuth();
   const queryClient = useQueryClient();
   const [respuestas, setRespuestas] = useState<Record<number, number | null>>({});
@@ -510,11 +517,13 @@ export function RendirExamenPage() {
     salirDeModoSeguro();
     setCancelado(false);
     queryClient.invalidateQueries({ queryKey: ['intento-actual'] });
+    onTerminado?.();
   }
 
   function aceptarEnviado() {
     setEnviado(false);
     setError('');
+    onTerminado?.();
   }
 
   if (enviado) return <PantallaEnviado onAceptar={aceptarEnviado} />;

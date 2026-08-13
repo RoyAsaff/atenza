@@ -17,6 +17,7 @@ dependencies:
   socket_io_client: ^3.1.6
   flutter_windowmanager_plus: ^1.0.1
   wakelock_plus: ^1.6.1
+  webview_flutter: ^4.9.0
 
 dev_dependencies:
   flutter_test:

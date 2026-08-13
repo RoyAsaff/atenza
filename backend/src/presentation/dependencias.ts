@@ -102,6 +102,18 @@ import {
   PrevisualizarImportacionPreguntas,
 } from '../application/evaluaciones/importar-preguntas';
 import { extraerHtmlDocx } from '../infrastructure/parsers/extraer-html-docx';
+import { VerResumenMiEspacio } from '../application/mi-espacio/ver-resumen';
+import { PrismaGuiaRepositorio } from '../infrastructure/repositorios/prisma-guia-repositorio';
+import { PrismaGuiaCompletadaRepositorio } from '../infrastructure/repositorios/prisma-guia-completada-repositorio';
+import {
+  ActualizarGuia,
+  CrearGuia,
+  EliminarGuia,
+  RegistrarCompletado,
+  VerGuias,
+  VerMisGuias,
+} from '../application/guias/gestionar-guias';
+import { crearVerificarTokenGuia } from './middlewares/verificar-token-guia';
 
 /** Convierte duraciones tipo "8h", "30d", "45m" a segundos. */
 export function duracionASegundos(duracion: string): number {
@@ -514,3 +526,59 @@ export const verCentralizador = new VerCentralizador(
   intentoRepositorio,
 );
 export const exportarCentralizador = new ExportarCentralizador(verCentralizador);
+
+// Guías de pre-clase (fusión con PaginaGuias, 05/08) — no está en el
+// diagrama. Sin ciclo borrador/lanzada como Evaluación (ver gestionar-guias.ts).
+export const guiaRepositorio = new PrismaGuiaRepositorio(prisma);
+export const guiaCompletadaRepositorio = new PrismaGuiaCompletadaRepositorio(prisma);
+
+export const crearGuia = new CrearGuia(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const actualizarGuia = new ActualizarGuia(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const eliminarGuia = new EliminarGuia(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const verGuias = new VerGuias(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  inscripcionRepositorio,
+  guiaCompletadaRepositorio,
+  tokenService,
+);
+export const verMisGuias = new VerMisGuias(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  inscripcionRepositorio,
+  guiaCompletadaRepositorio,
+  tokenService,
+);
+export const registrarCompletado = new RegistrarCompletado(guiaRepositorio, guiaCompletadaRepositorio);
+// Middleware de acceso acotado (sin sesión real) para que la propia guía
+// en PaginaGuias pueda reportar "completada" — ver verificar-token-guia.ts.
+export const verificarTokenGuia = crearVerificarTokenGuia(tokenService);
+
+// "Inicio" (08/08): próxima clase, última evaluación y última guía por
+// materia — dictada e inscrita, en una sola llamada (ver-resumen.ts).
+export const verResumenMiEspacio = new VerResumenMiEspacio(
+  materiaRepositorio,
+  inscripcionRepositorio,
+  claseRepositorio,
+  evaluacionRepositorio,
+  guiaRepositorio,
+  verMisNotas,
+  verMisGuias,
+);

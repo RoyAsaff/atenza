@@ -1,7 +1,8 @@
-name: Deploy web a GitHub Pages
+name: Deploy web a Hetzner
 
-# El web/ es un sitio 100% estático (Vite) — GitHub Pages lo sirve gratis.
-# Solo el backend (Node + Postgres + Socket.IO) necesita un servidor real.
+# El web/ es un sitio 100% estático (Vite) — se buildea acá y se sube por
+# rsync al server, donde nginx lo sirve directo del filesystem (sin
+# contenedor propio, sin necesidad de reiniciar nada).
 
 on:
   push:
@@ -11,17 +12,12 @@ on:
       - '.github/workflows/deploy-web.yml'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: pages
+  group: deploy-web
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,23 +31,20 @@ jobs:
         run: npm ci
       - name: Build
         working-directory: web
-        # VITE_API_URL: se define como "Repository variable" en GitHub
-        # (Settings → Secrets and variables → Actions → Variables) — la
-        # URL pública del backend (Railway, Coolify, etc).
+        # VITE_API_URL: "Repository variable" en GitHub (Settings →
+        # Secrets and variables → Actions → Variables) — la URL pública
+        # del backend en Hetzner.
         run: npm run build
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - name: Cargar clave de deploy
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          path: web/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - name: Confiar en el host del server
+        run: ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+      - name: Subir dist/ al server
+        run: |
+          rsync -avz --delete \
+            web/dist/ \
+            ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:~/stack/atenza-web/dist/

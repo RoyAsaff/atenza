@@ -1,8 +1,29 @@
+// Sidebar (08/08): las materias (dictadas + inscritas) pasan a vivir acá,
+// como en Classroom/Moodle, en vez de solo en tarjetas dentro de "Inicio" —
+// así cambiar de materia no obliga a volver siempre al home. Van en dos
+// grupos colapsables (rol dual, HU-03): "Enseño" e "Inscrito"; si un grupo
+// está vacío, no se muestra (el mensaje de bienvenida en "Inicio" ya cubre
+// el caso sin ninguna materia). "Mi suscripción" se movió al ícono de
+// perfil (UserMenu) — ya no va acá para no duplicarla.
+
+import { ReactNode, useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { CreditCard, LayoutDashboard, Layers, NotebookText, Receipt, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  BookOpen,
+  ChevronDown,
+  GraduationCap,
+  LayoutDashboard,
+  Layers,
+  NotebookText,
+  Receipt,
+  X,
+} from 'lucide-react';
 import { LogoLockup } from '../core/ui/Logo';
 import { cn } from '../core/ui/cn';
 import { IconButton } from '../core/ui/IconButton';
+import { api } from '../core/api/cliente';
+import { Materia, MateriaInscrita } from '../core/tipos';
 
 const enlaceClase = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -11,6 +32,92 @@ const enlaceClase = ({ isActive }: { isActive: boolean }) =>
       ? 'border-primary-700 bg-primary-50 text-primary-800'
       : 'border-transparent text-text-secondary hover:bg-surface-hover hover:text-text',
   );
+
+const enlaceMateria = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    'block rounded-md border-l-2 px-3 py-1.5 text-sm leading-snug transition',
+    isActive
+      ? 'border-primary-700 bg-primary-50 font-medium text-primary-800'
+      : 'border-transparent text-text-secondary hover:bg-surface-hover hover:text-text',
+  );
+
+function GrupoMaterias({
+  titulo,
+  icono,
+  children,
+}: {
+  titulo: string;
+  icono: ReactNode;
+  children: ReactNode;
+}) {
+  const [abierto, setAbierto] = useState(true);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setAbierto((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-text-disabled transition hover:text-text-secondary"
+      >
+        {icono}
+        <span className="flex-1 text-left">{titulo}</span>
+        <ChevronDown size={13} className={cn('transition', !abierto && '-rotate-90')} />
+      </button>
+      {abierto && <div className="flex flex-col gap-0.5">{children}</div>}
+    </div>
+  );
+}
+
+function MateriasDelSidebar() {
+  const { data } = useQuery({
+    queryKey: ['mi-espacio'],
+    queryFn: async () => {
+      const { data } = await api.get<{
+        materias_que_dicto: Materia[];
+        materias_inscrito: MateriaInscrita[];
+      }>('/api/mi-espacio');
+      return data;
+    },
+  });
+
+  const dictadas = data?.materias_que_dicto ?? [];
+  const inscritas = data?.materias_inscrito ?? [];
+
+  if (dictadas.length === 0 && inscritas.length === 0) return null;
+
+  return (
+    <div className="mt-2 flex flex-col gap-3 border-t border-border pt-3">
+      {dictadas.length > 0 && (
+        <GrupoMaterias titulo="Enseño" icono={<GraduationCap size={14} />}>
+          {dictadas.map((m) => (
+            <NavLink
+              key={m.id}
+              to={`/materias/${m.id}`}
+              className={enlaceMateria}
+              title={m.nombre_materia}
+            >
+              <span className="line-clamp-2 break-words">{m.nombre_materia}</span>
+            </NavLink>
+          ))}
+        </GrupoMaterias>
+      )}
+      {inscritas.length > 0 && (
+        <GrupoMaterias titulo="Inscrito" icono={<BookOpen size={14} />}>
+          {inscritas.map((m) => (
+            <NavLink
+              key={m.materia.id}
+              to={`/inscrito/${m.materia.id}`}
+              className={enlaceMateria}
+              title={m.materia.nombre_materia}
+            >
+              <span className="line-clamp-2 break-words">{m.materia.nombre_materia}</span>
+            </NavLink>
+          ))}
+        </GrupoMaterias>
+      )}
+    </div>
+  );
+}
 
 export function Sidebar({
   esAdmin,
@@ -39,7 +146,7 @@ export function Sidebar({
             <X size={18} />
           </IconButton>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 px-3" onClick={onCerrar}>
+        <nav className="flex flex-1 flex-col gap-1 px-3 pb-4" onClick={onCerrar}>
           {esAdmin ? (
             <>
               <NavLink to="/admin/solicitudes" className={enlaceClase}>
@@ -55,11 +162,12 @@ export function Sidebar({
           ) : (
             <>
               <NavLink to="/" end className={enlaceClase}>
-                <NotebookText size={17} /> Mis materias
+                <NotebookText size={17} /> Inicio
               </NavLink>
-              <NavLink to="/suscripcion" className={enlaceClase}>
-                <CreditCard size={17} /> Mi suscripción
-              </NavLink>
+              {/* "Mi suscripción" se movió al ícono de perfil (UserMenu,
+                  arriba a la derecha); la ruta /suscripcion sigue existiendo,
+                  solo ya no hay link directo acá para no duplicarla. */}
+              <MateriasDelSidebar />
             </>
           )}
         </nav>

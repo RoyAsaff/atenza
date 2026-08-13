@@ -4,14 +4,14 @@ import { RegistroPage } from '../features/auth/RegistroPage';
 import { OlvidePasswordPage } from '../features/auth/OlvidePasswordPage';
 import { RestablecerPasswordPage } from '../features/auth/RestablecerPasswordPage';
 import { VerificarEmailPage } from '../features/auth/VerificarEmailPage';
-import { ExamenLoginPage } from '../features/examen/ExamenLoginPage';
-import { RendirExamenPage } from '../features/examen/RendirExamenPage';
-import { MisMateriasPage } from '../features/mi-espacio/MisMateriasPage';
+import { InicioPage } from '../features/mi-espacio/InicioPage';
 import { MateriaDetallePage } from '../features/mi-espacio/MateriaDetallePage';
+import { MateriaInscritaDetallePage } from '../features/mi-espacio/MateriaInscritaDetallePage';
 import { EvaluacionesMateriaPage } from '../features/mi-espacio/EvaluacionesMateriaPage';
 import { PasarListaPage } from '../features/mi-espacio/PasarListaPage';
 import { ConsolidadoAsistenciaPage } from '../features/mi-espacio/ConsolidadoAsistenciaPage';
 import { EvaluacionesClasePage } from '../features/mi-espacio/EvaluacionesClasePage';
+import { GuiasClasePage } from '../features/mi-espacio/GuiasClasePage';
 import { EvaluacionEditorPage } from '../features/mi-espacio/EvaluacionEditorPage';
 import { MonitoreoPage } from '../features/mi-espacio/MonitoreoPage';
 import { ResultadosPage } from '../features/mi-espacio/ResultadosPage';
@@ -26,10 +26,14 @@ import { ProtegerRuta } from './ProtegerRuta';
 import { RaizPublica } from './RaizPublica';
 import { useAuth } from '../core/auth/AuthContext';
 
+// Inicio (08/08): las materias (dictadas + inscritas) ya viven en el
+// sidebar, así que acá ya no se repiten como directorio — el cuerpo es un
+// resumen de actividad por materia (ver InicioPage). Acá solo el guard de
+// admin (a esa cuenta no le corresponde este home).
 function Inicio() {
   const { sesion } = useAuth();
   if (sesion?.contexto === 'admin') return <Navigate to="/admin/solicitudes" replace />;
-  return <MisMateriasPage />;
+  return <InicioPage />;
 }
 
 export function App() {
@@ -41,18 +45,6 @@ export function App() {
         <Route path="/password/olvide" element={<OlvidePasswordPage />} />
         <Route path="/restablecer-password" element={<RestablecerPasswordPage />} />
         <Route path="/verificar-email" element={<VerificarEmailPage />} />
-
-        {/* "Rendir examen" — estudiantes sin app móvil (p. ej. solo iPhone).
-            Fuera de <Layout />: sin sidebar/topbar de docente. */}
-        <Route path="/examen/login" element={<ExamenLoginPage />} />
-        <Route
-          path="/examen"
-          element={
-            <ProtegerRuta contexto="estudiante" redirigirA="/examen/login">
-              <RendirExamenPage />
-            </ProtegerRuta>
-          }
-        />
 
         <Route
           path="/"
@@ -98,6 +90,9 @@ export function App() {
             />
             <Route path="materias/:id/evaluaciones/:evalId" element={<EvaluacionEditorPage />} />
 
+            {/* Docente: guías de pre-clase (fusión con PaginaGuias, 05/08) */}
+            <Route path="materias/:id/clases/:claseId/guias" element={<GuiasClasePage />} />
+
             {/* Docente (E7) */}
             <Route
               path="materias/:id/evaluaciones/:evalId/monitoreo"
@@ -110,6 +105,13 @@ export function App() {
               element={<ResultadosPage />}
             />
             <Route path="materias/:id/centralizador" element={<CentralizadorPage />} />
+
+            {/* Rol dual (HU-03), unificación de identidad en web (05/08):
+                la misma cuenta también puede estar inscrita como estudiante
+                en otra materia — reemplaza los silos /examen y /guias. La
+                lista de "Materias inscritas" vive en el home (Inicio),
+                arriba de "Materias que dicto"; acá solo el detalle. */}
+            <Route path="inscrito/:id" element={<MateriaInscritaDetallePage />} />
           </Route>
 
           {/* Admin (E2) */}

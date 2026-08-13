@@ -7,7 +7,11 @@ export class JwtTokenService implements TokenService {
 
   firmar(payload: PayloadToken, duracionSegundos: number): string {
     return jwt.sign(
-      { sub: String(payload.sub), contexto: payload.contexto },
+      {
+        sub: String(payload.sub),
+        contexto: payload.contexto,
+        ...(payload.guia_id !== undefined ? { guia_id: payload.guia_id } : {}),
+      },
       this.secreto,
       { expiresIn: duracionSegundos, jwtid: payload.jti },
     );
@@ -20,6 +24,7 @@ export class JwtTokenService implements TokenService {
         sub: Number(decodificado.sub),
         contexto: decodificado.contexto,
         jti: decodificado.jti as string,
+        ...(decodificado.guia_id !== undefined ? { guia_id: Number(decodificado.guia_id) } : {}),
       };
     } catch {
       throw new NoAutorizadoError('Token inválido o expirado');

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/colores.dart';
 import '../../asistencia/presentation/mi_asistencia_page.dart';
 import '../../clases/presentation/clases_page.dart';
+import '../../guias/presentation/guias_page.dart';
 import '../../resultados/presentation/mis_notas_page.dart';
 import '../domain/entidades/materia_inscrita.dart';
 
@@ -18,11 +19,12 @@ class DetalleMateriaPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: Text(materia.nombreMateria),
           bottom: const TabBar(
+            isScrollable: true,
             labelColor: AtenzaColores.primary700,
             unselectedLabelColor: AtenzaColores.textoSecundario,
             indicatorColor: AtenzaColores.primary700,
@@ -30,6 +32,7 @@ class DetalleMateriaPage extends StatelessWidget {
               Tab(text: 'Calendario'),
               Tab(text: 'Asistencia'),
               Tab(text: 'Notas'),
+              Tab(text: 'Guías'),
             ],
           ),
         ),
@@ -38,6 +41,7 @@ class DetalleMateriaPage extends StatelessWidget {
             ClasesPage(materia: materia),
             MiAsistenciaPage(materia: materia),
             MisNotasPage(materia: materia),
+            GuiasPage(materia: materia),
           ],
         ),
       ),

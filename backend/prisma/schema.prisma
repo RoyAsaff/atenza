@@ -46,9 +46,10 @@ model Usuario {
   pagos         Pago[]
   sesiones      Sesion[]
   tokens        TokenUsuario[]
-  inscripciones Inscripcion[] // materias donde está inscrito (estudiante, E3)
-  asistencias   Asistencia[] // marcajes como estudiante (E5)
-  intentos      Intento[] // exámenes rendidos como estudiante (E7)
+  inscripciones     Inscripcion[] // materias donde está inscrito (estudiante, E3)
+  asistencias       Asistencia[] // marcajes como estudiante (E5)
+  intentos          Intento[] // exámenes rendidos como estudiante (E7)
+  guias_completadas GuiaCompletada[] // guías de pre-clase completadas (estudiante)
 
   // SaaS por cuenta (reemplaza el pago por materia, decisión con Roy 17/07):
   // la prueba gratis de 30 días arranca al registrarse; plan_id es el plan
@@ -157,12 +158,47 @@ model Clase {
   materia_id   Int
   asistencias  Asistencia[]
   evaluaciones Evaluacion[]
+  guias        Guia[]
 
   // HU-14: la generación masiva no debe duplicar una clase ya creada
   // en la misma fecha y hora.
   @@unique([materia_id, fecha, hora])
   @@index([materia_id, fecha])
   @@map("clases")
+}
+
+// ── Guía de pre-clase (no está en el diagrama; fusiona PaginaGuias con
+// ATENZA — decisión con Roy 05/08). A diferencia de Evaluacion, una guía
+// no tiene ciclo borrador/lanzada: es visible para inscritos apenas el
+// docente la crea. `url` apunta a una página autocontenida publicada en
+// PaginaGuias (GitHub Pages); ATENZA solo referencia el link, no aloja
+// el contenido.
+model Guia {
+  id          Int              @id @default(autoincrement())
+  clase       Clase            @relation(fields: [clase_id], references: [id])
+  clase_id    Int
+  tema        String
+  url         String
+  orden       Int
+  completadas GuiaCompletada[]
+
+  @@index([clase_id])
+  @@map("guias")
+}
+
+// Registro de que un estudiante completó el quiz de la guía al 100%
+// (autocorregido en la propia página estática, sin nota — puramente
+// formativo). Insert vía upsert: completar dos veces no duplica.
+model GuiaCompletada {
+  id            Int      @id @default(autoincrement())
+  guia          Guia     @relation(fields: [guia_id], references: [id])
+  guia_id       Int
+  estudiante    Usuario  @relation(fields: [estudiante_id], references: [id])
+  estudiante_id Int
+  completado_en DateTime @default(now())
+
+  @@unique([guia_id, estudiante_id])
+  @@map("guias_completadas")
 }
 
 // ── Diagrama: estudiante_materia (E3) ────────────────────────────

@@ -20,6 +20,8 @@ import 'features/examen/data/examen_socket_service.dart';
 import 'features/examen/domain/repositorios/examen_repositorio.dart';
 import 'features/examen/presentation/examen_controller.dart';
 import 'features/examen/presentation/examen_page.dart';
+import 'features/guias/data/guias_repositorio_api.dart';
+import 'features/guias/domain/repositorios/guias_repositorio.dart';
 import 'features/materias/data/materias_repositorio_api.dart';
 import 'features/materias/presentation/materias_controller.dart';
 import 'features/materias/presentation/mis_materias_page.dart';
@@ -63,6 +65,9 @@ void main() async {
         ),
         Provider<ResultadosRepositorio>.value(
           value: ResultadosRepositorioApi(api),
+        ),
+        Provider<GuiasRepositorio>.value(
+          value: GuiasRepositorioApi(api),
         ),
         Provider<ExamenRepositorio>.value(value: examenRepositorio),
       ],

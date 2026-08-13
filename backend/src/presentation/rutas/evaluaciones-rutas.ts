@@ -45,7 +45,9 @@ export const evaluacionesRouter = Router();
 
 const autenticar = crearAutenticar(tokenService, sesionRepositorio);
 const soloDocente = autorizarContexto('docente');
-const soloEstudiante = autorizarContexto('estudiante');
+// Ampliado (05/08, unificación de identidad en web): VerMiDetalleIntento
+// ya scopea por `estudiante_id: req.auth!.sub`, no por contexto.
+const soloEstudiante = autorizarContexto('docente', 'estudiante');
 const idNumerico = z.coerce.number().int().positive();
 
 const esquemaOpcion = z.object({
