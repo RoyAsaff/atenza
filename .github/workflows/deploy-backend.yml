@@ -1,0 +1,72 @@
+name: Deploy backend a Hetzner
+
+# backend/ corre en Docker en el server (~/stack/atenza-backend, ver
+# docker-compose.yml del server) — acá empaquetamos el código y lo mandamos
+# por ssh/tar, después se reconstruye la imagen y se reinicia el contenedor.
+#
+# Las migraciones de Prisma quedan AFUERA a propósito: el job "migrar" solo
+# corre si el workflow se dispara a mano (workflow_dispatch), nunca en un
+# push de rutina a main. Un cambio de schema en producción siempre pasa por
+# una decisión consciente — nunca queda escondido dentro de un deploy común
+# (ver charla 13/08: no hay ambiente de staging, un solo VPS).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cargar clave de deploy
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - name: Confiar en el host del server
+        run: ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+      - name: Subir código al server
+        # rm -rf .../* no toca .env.production (dotfile, "*" no lo matchea)
+        # ni la carpeta uploads/ (vive en un volumen Docker aparte, no en
+        # este directorio — ver volumes: atenza_uploads en docker-compose.yml).
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            "rm -rf ~/stack/atenza-backend/*"
+          tar czf - --exclude=node_modules --exclude=.git --exclude=.env --exclude=uploads -C backend . \
+            | ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "tar xzf - -C ~/stack/atenza-backend"
+      - name: Reconstruir y reiniciar el contenedor
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            "cd ~/stack && docker compose build atenza-backend && docker compose up -d atenza-backend"
+      - name: Verificar que levantó
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            "cd ~/stack && sleep 3 && docker compose ps atenza-backend | grep -q 'Up' \
+             && docker compose logs atenza-backend --tail 20"
+
+  # Manual — nunca se dispara solo con un push. Correr desde la pestaña
+  # "Actions" del repo (Run workflow) cuando de verdad hay una migración
+  # nueva para aplicar en producción.
+  migrar:
+    needs: deploy
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cargar clave de deploy
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - name: Confiar en el host del server
+        run: ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+      - name: prisma migrate deploy
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            "cd ~/stack && docker compose run --rm atenza-migrate"
