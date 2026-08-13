@@ -19,9 +19,16 @@ const MENSAJE_DEMASIADOS_INTENTOS = {
 // queda como respaldo genérico contra un flood/scan real desde una sola
 // IP — el límite es generoso a propósito, ya no es la primera línea de
 // defensa.
+//
+// 100 seguía siendo poco: confirmado con Roy que hay redes con 50-100+
+// personas conectadas a la vez (laboratorio/varios cursos), y ni bien
+// alguien pega en el límite reintenta al toque — eso multiplica los
+// requests en la misma ventana y mantiene bloqueado a todo el grupo.
+// Subido a 500: sigue acotando un flood real sin ser el cuello de botella
+// de una red compartida grande.
 export const limitarLoginPorIp = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100,
+  limit: 500,
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
