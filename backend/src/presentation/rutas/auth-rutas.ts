@@ -12,7 +12,11 @@ import {
   verificarEmail,
 } from '../dependencias';
 import { crearAutenticar } from '../middlewares/autenticar';
-import { limitarLogin, limitarResetPassword } from '../middlewares/limitar-tasa';
+import {
+  limitarLoginPorCuenta,
+  limitarLoginPorIp,
+  limitarResetPassword,
+} from '../middlewares/limitar-tasa';
 import { aPublico } from '../../domain/entidades/usuario';
 
 export const authRouter = Router();
@@ -95,7 +99,7 @@ authRouter.post('/password/restablecer', async (req, res, next) => {
 });
 
 // POST /api/auth/login — HU-01
-authRouter.post('/login', limitarLogin, async (req, res, next) => {
+authRouter.post('/login', limitarLoginPorIp, limitarLoginPorCuenta, async (req, res, next) => {
   try {
     const datos = esquemaLogin.parse(req.body);
     const resultado = await iniciarSesion.ejecutar({
