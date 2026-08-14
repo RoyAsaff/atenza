@@ -97,6 +97,21 @@ export function crearServidorTiempoReal(
           // el docente simplemente no se une a la sala
         }
       });
+
+      // Igual criterio, para quién va completando las guías de pre-clase
+      // de una clase puntual (13/08).
+      socket.on('monitorear-guias-clase', async (claseId: number) => {
+        try {
+          const clase = await deps.claseRepositorio.buscarPorId(Number(claseId));
+          if (!clase) return;
+          const materia = await deps.materiaRepositorio.buscarPorId(clase.materia_id);
+          if (materia && materia.docente_id === auth.sub) {
+            socket.join(`clase:${claseId}`);
+          }
+        } catch {
+          // el docente simplemente no se une a la sala
+        }
+      });
     }
   });
 

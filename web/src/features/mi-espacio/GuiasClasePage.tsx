@@ -3,12 +3,13 @@
 // para vincularla a esta clase. Sin ciclo borrador/lanzada como
 // Evaluación: la guía es visible para inscritos apenas se crea.
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { BookOpen, CheckCircle2, Plus } from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
-import { GuiaDocente, Materia } from '../../core/tipos';
+import { obtenerSocket } from '../../core/realtime/socket';
+import { FilaCompletadoGuia, GuiaDocente, Materia } from '../../core/tipos';
 import {
   Badge,
   Button,
@@ -196,6 +197,7 @@ function TarjetaGuia({
 export function GuiasClasePage() {
   const { id, claseId } = useParams();
   const materiaId = Number(id);
+  const queryClient = useQueryClient();
   const [modalAbierto, setModalAbierto] = useState(false);
   const [guiaEditando, setGuiaEditando] = useState<GuiaDocente | null>(null);
 
@@ -215,7 +217,53 @@ export function GuiasClasePage() {
       );
       return data.guias;
     },
+    refetchInterval: 20000, // respaldo si el socket se cae un momento
+    refetchIntervalInBackground: true,
   });
+
+  // 13/08: antes no había ningún aviso en vivo cuando un estudiante
+  // completaba una guía — solo se veía refrescando la página a mano. El
+  // evento ya trae el nombre del estudiante: se agrega directo a la lista
+  // de esa guía puntual, sin pedir de vuelta toda la tabla.
+  useEffect(() => {
+    const socket = obtenerSocket();
+    const clave = ['guias', claseId];
+
+    const unirseASala = () => {
+      socket.emit('monitorear-guias-clase', Number(claseId));
+      // el socket pudo reconectar mientras estaba caído: refrescamos por si nos perdimos algo
+      queryClient.invalidateQueries({ queryKey: clave });
+    };
+    unirseASala();
+    socket.on('connect', unirseASala);
+
+    const alCompletar = (payload: FilaCompletadoGuia & { guia_id: number }) => {
+      queryClient.setQueryData<GuiaDocente[]>(clave, (prev) =>
+        prev?.map((g) => {
+          if (g.id !== payload.guia_id) return g;
+          if (g.completados.some((c) => c.estudiante_id === payload.estudiante_id)) return g;
+          return {
+            ...g,
+            completados: [
+              ...g.completados,
+              {
+                estudiante_id: payload.estudiante_id,
+                nombres: payload.nombres,
+                apellidos: payload.apellidos,
+                completado_en: payload.completado_en,
+              },
+            ],
+          };
+        }),
+      );
+    };
+    socket.on('guia-completada', alCompletar);
+
+    return () => {
+      socket.off('connect', unirseASala);
+      socket.off('guia-completada', alCompletar);
+    };
+  }, [claseId, queryClient]);
 
   return (
     <div className="space-y-6">

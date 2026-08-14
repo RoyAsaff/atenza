@@ -10,6 +10,8 @@ import { ClaseRepositorio } from '../../domain/repositorios/clase-repositorio';
 import { MateriaRepositorio } from '../../domain/repositorios/materia-repositorio';
 import { InscripcionRepositorio } from '../../domain/repositorios/inscripcion-repositorio';
 import { BitacoraRepositorio } from '../../domain/repositorios/bitacora-repositorio';
+import { UsuarioRepositorio } from '../../domain/repositorios/usuario-repositorio';
+import { TiempoRealEmisor } from '../../domain/repositorios/tiempo-real';
 import { TokenService } from '../../domain/servicios/token-service';
 
 interface Auditoria {
@@ -361,6 +363,8 @@ export class RegistrarCompletado {
   constructor(
     private readonly guias: GuiaRepositorio,
     private readonly completadas: GuiaCompletadaRepositorio,
+    private readonly usuarios: UsuarioRepositorio,
+    private readonly tiempoReal: TiempoRealEmisor,
   ) {}
 
   async ejecutar(entrada: { guia_id: number; estudiante_id: number }): Promise<void> {
@@ -368,10 +372,28 @@ export class RegistrarCompletado {
     if (!guia) throw new NoEncontradoError('Guía');
 
     // Idempotente a propósito: el estudiante puede reabrir/repasar la guía
-    // después de completarla sin que se duplique ni falle.
+    // después de completarla sin que se duplique ni falle. El chequeo
+    // previo (13/08) es para no reemitir 'guia-completada' en cada repaso
+    // — el docente ya lo vio la primera vez, reemitir duplicaría su nombre
+    // en la lista del lado del cliente.
+    const yaEstaba = await this.completadas.buscar(entrada.guia_id, entrada.estudiante_id);
+
     await this.completadas.marcarCompletada({
       guia_id: entrada.guia_id,
       estudiante_id: entrada.estudiante_id,
+    });
+
+    if (yaEstaba) return;
+
+    const estudiante = await this.usuarios.buscarPorId(entrada.estudiante_id);
+    if (!estudiante) return;
+
+    this.tiempoReal.emitirAClase(guia.clase_id, 'guia-completada', {
+      guia_id: guia.id,
+      estudiante_id: estudiante.id,
+      nombres: estudiante.nombres,
+      apellidos: estudiante.apellidos,
+      completado_en: new Date(),
     });
   }
 }

@@ -7,4 +7,6 @@ export interface TiempoRealEmisor {
   emitirAEstudiante(estudianteId: number, evento: string, datos: unknown): void;
   /** A quienes monitorean una evaluación (docente): progreso, incidentes, cambios de estado. */
   emitirAEvaluacion(evaluacionId: number, evento: string, datos: unknown): void;
+  /** A quienes monitorean las guías de una clase (docente): quién las va completando. */
+  emitirAClase(claseId: number, evento: string, datos: unknown): void;
 }

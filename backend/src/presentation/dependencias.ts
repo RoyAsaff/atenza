@@ -575,7 +575,12 @@ export const verMisGuias = new VerMisGuias(
   guiaCompletadaRepositorio,
   tokenService,
 );
-export const registrarCompletado = new RegistrarCompletado(guiaRepositorio, guiaCompletadaRepositorio);
+export const registrarCompletado = new RegistrarCompletado(
+  guiaRepositorio,
+  guiaCompletadaRepositorio,
+  usuarioRepositorio,
+  socketIoEmisor,
+);
 // Middleware de acceso acotado (sin sesión real) para que la propia guía
 // en PaginaGuias pueda reportar "completada" — ver verificar-token-guia.ts.
 export const verificarTokenGuia = crearVerificarTokenGuia(tokenService);
