@@ -5,9 +5,9 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 # Vite inyecta las variables VITE_* en el bundle en tiempo de BUILD, no de
-# runtime — por eso va como build arg. Vacío = mismo origen (Coolify con
-# proxy por path); con un valor (ej. Railway, servicios en dominios
-# separados) queda "quemado" en los archivos estáticos generados.
+# runtime — por eso va como build arg. Vacío = mismo origen (proxy por
+# path); con un valor (nuestro caso: api-atenza.atenzabo.com en un
+# subdominio separado) queda "quemado" en los archivos estáticos generados.
 ARG VITE_API_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
