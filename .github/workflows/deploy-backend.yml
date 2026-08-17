@@ -67,6 +67,14 @@ jobs:
       - name: Confiar en el host del server
         run: ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
       - name: prisma migrate deploy
+        # --build es obligatorio acá: atenza-migrate es un servicio con su
+        # propia imagen (context: ./atenza-backend, mismo código, build
+        # aparte de atenza-backend) — el job "deploy" de arriba solo
+        # reconstruye la imagen de atenza-backend, nunca la de
+        # atenza-migrate. Sin --build corre con código/migraciones viejas
+        # cacheadas en su imagen, aunque el código ya se haya subido al
+        # server (bug real, 16/08: migró "0 pendientes" con 2 migraciones
+        # nuevas sin aplicar, porque la imagen de atenza-migrate era vieja).
         run: |
           ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
-            "cd ~/stack && docker compose run --rm atenza-migrate"
+            "cd ~/stack && docker compose run --rm --build atenza-migrate"
