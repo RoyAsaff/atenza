@@ -9,7 +9,18 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { BookOpen, CheckCircle2, Plus, Rocket, Trash2, Wand2, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  BookOpen,
+  CheckCircle2,
+  Plus,
+  Rocket,
+  ShieldCheck,
+  ShieldQuestion,
+  Trash2,
+  Wand2,
+  X,
+} from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
 import { obtenerSocket } from '../../core/realtime/socket';
 import {
@@ -167,17 +178,27 @@ function ModalGuia({
   );
   const [error, setError] = useState('');
   const [errorAnalisis, setErrorAnalisis] = useState('');
+  // Nivel 1 de detección de integración (17/08): null = todavía no se
+  // corrió "Analizar link" en esta sesión de edición — arranca con lo que
+  // ya tenía guardado la guía (si es que alguna vez se analizó), no con
+  // null a ciegas, para no perder el dato al solo abrir "Editar".
+  const [integracionDetectada, setIntegracionDetectada] = useState<boolean | null>(
+    guia?.integracion_detectada ?? null,
+  );
 
   const analizar = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post<{ preguntas: GuiaPregunta[] }>(
+      const { data } = await api.post<{ preguntas: GuiaPregunta[]; integracion_detectada: boolean }>(
         `/api/materias/${materiaId}/guias/analizar`,
         { url },
       );
-      return data.preguntas;
+      return data;
     },
-    onSuccess: (detectadas) => {
+    onSuccess: ({ preguntas: detectadas, integracion_detectada }) => {
       setErrorAnalisis('');
+      // El chequeo de integración vale aunque el docente decida NO
+      // reemplazar las preguntas ya cargadas — son dos cosas independientes.
+      setIntegracionDetectada(integracion_detectada);
       const hayCargadas = preguntas.some((p) => p.referencia.trim());
       if (
         hayCargadas &&
@@ -216,6 +237,7 @@ function ModalGuia({
         nota: Number(nota),
         tiempo_limite_minutos: tiempoLimite ? Number(tiempoLimite) : undefined,
         preguntas: preguntasParaEnviar(preguntas),
+        integracion_detectada: integracionDetectada ?? undefined,
       }),
     ...alTerminar,
   });
@@ -233,6 +255,7 @@ function ModalGuia({
         nota: Number(nota),
         tiempo_limite_minutos: tiempoLimite ? Number(tiempoLimite) : undefined,
         preguntas: preguntasParaEnviar(preguntas),
+        integracion_detectada: integracionDetectada ?? undefined,
       }),
     ...alTerminar,
   });
@@ -270,7 +293,12 @@ function ModalGuia({
             type="url"
             required
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => {
+              setUrl(e.target.value);
+              // Cambió el link — lo que se haya verificado antes ya no dice
+              // nada de esta URL nueva.
+              setIntegracionDetectada(null);
+            }}
             placeholder="https://…"
           />
         </Campo>
@@ -303,7 +331,7 @@ function ModalGuia({
               etiqueta="Preguntas"
               ayuda='Una fila por cada data-quiz-id de tu página. "Automática" se autocorrige sola (opción múltiple, emparejar, clasificar); "Abierta" la revisás vos con la respuesta modelo.'
             >
-              <div className="mb-2 flex items-center gap-3">
+              <div className="mb-2 flex flex-wrap items-center gap-3">
                 <Button
                   type="button"
                   variante="secondary"
@@ -318,6 +346,29 @@ function ModalGuia({
                   Baja tu página y detecta las preguntas sola — revisá el resultado igual.
                 </span>
               </div>
+              {/* Nivel 1 de detección de integración (17/08): mismo "Analizar
+                  link" de arriba también chequea si la página tiene pegado el
+                  script que reporta a las guías nativas — sin eso, lanzar la
+                  guía no guarda ninguna respuesta aunque todo lo demás ande
+                  bien (ver DEPLOY-GUIAS-SNIPPET.md). */}
+              {integracionDetectada === true && (
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-green-700">
+                  <ShieldCheck size={14} /> Detectamos el script de ATENZA en esa página.
+                </p>
+              )}
+              {integracionDetectada === false && (
+                <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                  <AlertTriangle size={14} /> No detectamos el script de ATENZA en esa página —
+                  las respuestas no se van a guardar hasta que lo agregues (ver
+                  DEPLOY-GUIAS-SNIPPET.md).
+                </p>
+              )}
+              {integracionDetectada === null && (
+                <p className="mb-2 flex items-center gap-1.5 text-xs text-text-disabled">
+                  <ShieldQuestion size={14} /> Todavía no verificaste si esa página tiene el
+                  script de ATENZA — usá "Analizar link" para revisarlo.
+                </p>
+              )}
               {errorAnalisis && <p className="mb-2 text-sm text-red-600">{errorAnalisis}</p>}
               <EditorPreguntas preguntas={preguntas} onCambiar={setPreguntas} />
             </Campo>
@@ -383,9 +434,19 @@ function TarjetaGuia({
     }
   }
   function manejarLanzar() {
+    // Nivel 1 de detección de integración (17/08): si nunca se detectó el
+    // script en la página (false o nunca chequeado), un aviso fuerte antes
+    // de lanzar — evita el caso real del 17/08 (guía lanzada contra una
+    // página sin el script, nota 0/20 para todos sin que nadie se entere
+    // hasta el final).
+    const avisoIntegracion =
+      guia.integracion_detectada !== true
+        ? '\n\n⚠️ No se confirmó que esa página tenga el script de ATENZA — las respuestas ' +
+          'podrían no guardarse. Revisalo con "Analizar link" en Editar antes de seguir.'
+        : '';
     if (
       window.confirm(
-        `Se va a lanzar "${guia.tema}" a los estudiantes presentes en esta clase, con nota real. ¿Ya pasaste lista?`,
+        `Se va a lanzar "${guia.tema}" a los estudiantes presentes en esta clase, con nota real. ¿Ya pasaste lista?${avisoIntegracion}`,
       )
     ) {
       lanzar.mutate();
@@ -417,6 +478,28 @@ function TarjetaGuia({
             <Badge tone={estado.tono}>{estado.texto}</Badge>
             {!esLegacy && guia.nota != null && (
               <span className="shrink-0 text-xs text-text-disabled">/{guia.nota} pts</span>
+            )}
+            {/* Nivel 1 de detección de integración (17/08) — solo importa
+                mientras se puede seguir editando/lanzando; una vez cerrada
+                ya no aporta nada accionable. */}
+            {!esLegacy && (guia.estado === 'publicada' || guia.estado === 'lanzada') && (
+              <span title="Basado en el último 'Analizar link' — puede estar desactualizado si editaste la página después.">
+                {guia.integracion_detectada === true && (
+                  <Badge tone="success">
+                    <ShieldCheck size={12} /> Script OK
+                  </Badge>
+                )}
+                {guia.integracion_detectada === false && (
+                  <Badge tone="danger">
+                    <AlertTriangle size={12} /> Sin script
+                  </Badge>
+                )}
+                {guia.integracion_detectada == null && (
+                  <Badge tone="neutral">
+                    <ShieldQuestion size={12} /> Sin verificar
+                  </Badge>
+                )}
+              </span>
             )}
           </div>
           <a

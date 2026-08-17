@@ -23,6 +23,24 @@ export interface PreguntaDetectada {
   orden: number;
 }
 
+export interface ResultadoAnalisis {
+  preguntas: PreguntaDetectada[];
+  /** Nivel 1 de detección de integración (17/08): ¿la página tiene pegado
+   * el script que reporta a las guías nativas? Se busca la ruta real de
+   * los endpoints (`/api/guias/intentos/`) en vez de un comentario o
+   * versión — es lo único que realmente importa: sin ese llamado, nada de
+   * lo que conteste el estudiante se guarda, aunque la página "se vea"
+   * completa del lado del estudiante (bug real visto en producción el
+   * 17/08: una guía lanzada contra una página sin este bloque terminó
+   * calificando 0/20 pese a que el estudiante contestó todo bien). Un
+   * `false` acá no prueba que el script esté bien enganchado a
+   * marcarResuelto — para eso hace falta una prueba en vivo (Nivel 3) —
+   * pero si ni siquiera aparece la ruta, seguro no va a reportar nada. */
+  integracion_detectada: boolean;
+}
+
+const MARCADOR_INTEGRACION_NATIVA = '/api/guias/intentos/';
+
 const TIMEOUT_MS = 8000;
 const TOPE_BYTES = 5 * 1024 * 1024; // 5MB — una guía es HTML+CSS+JS, no más
 
@@ -110,7 +128,7 @@ function textoModelo($: cheerio.CheerioAPI, modelo: ReturnType<typeof $>): strin
 }
 
 export class AnalizarGuiaExterna {
-  async ejecutar(entrada: { url: string }): Promise<PreguntaDetectada[]> {
+  async ejecutar(entrada: { url: string }): Promise<ResultadoAnalisis> {
     let url: URL;
     try {
       url = new URL(entrada.url);
@@ -120,6 +138,7 @@ export class AnalizarGuiaExterna {
     await exigirUrlPublica(url);
 
     const html = await descargarConLimites(url);
+    const integracion_detectada = html.includes(MARCADOR_INTEGRACION_NATIVA);
 
     const $ = cheerio.load(html);
     const preguntas: PreguntaDetectada[] = [];
@@ -145,6 +164,6 @@ export class AnalizarGuiaExterna {
         'No se encontraron preguntas (data-quiz-id) en esa página — cargá el manifest a mano',
       );
     }
-    return preguntas;
+    return { preguntas, integracion_detectada };
   }
 }

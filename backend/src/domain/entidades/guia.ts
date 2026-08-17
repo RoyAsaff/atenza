@@ -20,6 +20,11 @@ export interface Guia {
   nota: number | null;
   estado: EstadoGuia;
   tiempo_limite_minutos: number | null;
+  /** Nivel 1 de detección de integración (17/08): resultado de la última
+   * corrida de "Analizar link" contra la página del docente — null =
+   * nunca se analizó (distinto de "no se detectó"). Ver AnalizarGuiaExterna. */
+  integracion_detectada: boolean | null;
+  integracion_verificada_en: Date | null;
 }
 
 // ── Guías nativas (16/08): manifest de preguntas ──────────────────

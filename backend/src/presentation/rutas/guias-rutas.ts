@@ -73,6 +73,10 @@ guiasRouter.post(
           nota: z.number().positive(),
           tiempo_limite_minutos: z.number().int().positive().optional(),
           preguntas: z.array(esquemaGuiaPregunta).min(1, 'Cargá al menos una pregunta'),
+          // Resultado del último "Analizar link" corrido en este mismo
+          // formulario — la marca de tiempo la pone el backend, no el
+          // cliente (ver PrismaGuiaRepositorio.crear).
+          integracion_detectada: z.boolean().optional(),
         })
         .parse(req.body);
       const guia = await crearGuia.ejecutar({
@@ -144,6 +148,7 @@ guiasRouter.patch(
           nota: z.number().positive().optional(),
           tiempo_limite_minutos: z.number().int().positive().nullable().optional(),
           preguntas: z.array(esquemaGuiaPregunta).min(1).optional(),
+          integracion_detectada: z.boolean().optional(),
         })
         .parse(req.body);
       const guia = await actualizarGuia.ejecutar({
@@ -189,8 +194,8 @@ guiasRouter.delete(
 guiasRouter.post('/:id/guias/analizar', autenticar, soloDocente, async (req, res, next) => {
   try {
     const { url } = z.object({ url: z.string().url() }).parse(req.body);
-    const preguntas = await analizarGuiaExterna.ejecutar({ url });
-    res.json({ preguntas });
+    const resultado = await analizarGuiaExterna.ejecutar({ url });
+    res.json(resultado);
   } catch (error) {
     next(error);
   }

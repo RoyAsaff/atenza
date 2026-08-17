@@ -38,6 +38,9 @@ export class PrismaGuiaRepositorio implements GuiaRepositorio {
             orden: p.orden,
           })),
         },
+        ...(datos.integracion_detectada !== undefined
+          ? { integracion_detectada: datos.integracion_detectada, integracion_verificada_en: new Date() }
+          : {}),
       },
     });
   }
@@ -68,6 +71,9 @@ export class PrismaGuiaRepositorio implements GuiaRepositorio {
                 })),
               },
             }
+          : {}),
+        ...(datos.integracion_detectada !== undefined
+          ? { integracion_detectada: datos.integracion_detectada, integracion_verificada_en: new Date() }
           : {}),
       },
     });

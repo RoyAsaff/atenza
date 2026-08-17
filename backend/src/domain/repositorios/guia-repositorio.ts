@@ -15,6 +15,9 @@ export interface DatosNuevaGuia {
   nota: number;
   tiempo_limite_minutos?: number | null;
   preguntas: DatosGuiaPregunta[];
+  /** Si vino de un "Analizar link" en el mismo formulario — la marca de
+   * tiempo la pone la capa de aplicación (`new Date()`), nunca el cliente. */
+  integracion_detectada?: boolean;
 }
 
 export interface DatosActualizarGuia {
@@ -26,6 +29,7 @@ export interface DatosActualizarGuia {
   /** Si viene, reemplaza el manifest completo (borra y crea de nuevo —
    * mismo criterio que Evaluación.actualizarPregunta con sus opciones). */
   preguntas?: DatosGuiaPregunta[];
+  integracion_detectada?: boolean;
 }
 
 export interface GuiaRepositorio {

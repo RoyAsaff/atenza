@@ -124,6 +124,7 @@ export class CrearGuia {
       nota: number;
       tiempo_limite_minutos?: number | null;
       preguntas: DatosGuiaPregunta[];
+      integracion_detectada?: boolean;
     },
   ): Promise<Guia> {
     await exigirMateriaPropia(this.materias, entrada.materia_id, entrada.docente_id);
@@ -137,6 +138,7 @@ export class CrearGuia {
       nota: entrada.nota,
       tiempo_limite_minutos: entrada.tiempo_limite_minutos,
       preguntas: entrada.preguntas,
+      integracion_detectada: entrada.integracion_detectada,
     });
 
     await this.bitacora.registrar({
@@ -179,6 +181,7 @@ export class ActualizarGuia {
       nota?: number;
       tiempo_limite_minutos?: number | null;
       preguntas?: DatosGuiaPregunta[];
+      integracion_detectada?: boolean;
     },
   ): Promise<Guia> {
     await exigirMateriaPropia(this.materias, entrada.materia_id, entrada.docente_id);
@@ -199,6 +202,7 @@ export class ActualizarGuia {
       nota: entrada.nota,
       tiempo_limite_minutos: entrada.tiempo_limite_minutos,
       preguntas: entrada.preguntas,
+      integracion_detectada: entrada.integracion_detectada,
     });
 
     await this.bitacora.registrar({

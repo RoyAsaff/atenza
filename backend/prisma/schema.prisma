@@ -202,6 +202,15 @@ model Guia {
   preguntas              GuiaPregunta[]
   intentos               GuiaIntento[]
 
+  // Nivel 1 de detección de integración (17/08): resultado de la última vez
+  // que "Analizar link" bajó la página del docente y buscó el marcador de
+  // /api/guias/intentos/ en su HTML — null = nunca se corrió el análisis
+  // (no es lo mismo que "no detectado"). Best-effort: si el docente cambia
+  // la página después sin volver a analizar, esto queda desactualizado a
+  // propósito (no hay forma de saberlo sin volver a pedir la página).
+  integracion_detectada     Boolean?
+  integracion_verificada_en DateTime?
+
   @@index([clase_id])
   @@map("guias")
 }

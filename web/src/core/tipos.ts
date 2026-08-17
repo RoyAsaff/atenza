@@ -412,6 +412,11 @@ export interface GuiaDocente {
   tiempo_limite_minutos: number | null;
   completados: FilaCompletadoGuia[];
   preguntas: GuiaPregunta[];
+  /** Nivel 1 de detección de integración (17/08): resultado de la última
+   * corrida de "Analizar link" — null = nunca se corrió (distinto de "no
+   * se detectó"). Ver AnalizarGuiaExterna en el backend. */
+  integracion_detectada: boolean | null;
+  integracion_verificada_en: string | null;
 }
 
 // ── Guías nativas: ejecución en vivo ──────────────────────────────
