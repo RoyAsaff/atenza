@@ -24,6 +24,7 @@ import { MiSuscripcionPage } from '../features/suscripcion/MiSuscripcionPage';
 import { PlanesPage } from '../features/suscripcion/PlanesPage';
 import { SolicitudesAdminPage } from '../features/admin/SolicitudesAdminPage';
 import { PlanesAdminPage } from '../features/admin/PlanesAdminPage';
+import { PromocionesAdminPage } from '../features/admin/PromocionesAdminPage';
 import { PanelPage } from '../features/admin/PanelPage';
 import { Layout } from './Layout';
 import { ProtegerRuta } from './ProtegerRuta';
@@ -144,6 +145,14 @@ export function App() {
             element={
               <ProtegerRuta contexto="admin">
                 <PlanesAdminPage />
+              </ProtegerRuta>
+            }
+          />
+          <Route
+            path="admin/promociones"
+            element={
+              <ProtegerRuta contexto="admin">
+                <PromocionesAdminPage />
               </ProtegerRuta>
             }
           />

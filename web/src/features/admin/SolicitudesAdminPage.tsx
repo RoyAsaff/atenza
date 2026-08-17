@@ -5,7 +5,16 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import { EstadoPago, Pago } from '../../core/tipos';
-import { Button, Card, CardBody, EmptyState, EstadoBadge, PageHeader, Spinner } from '../../core/ui/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  EmptyState,
+  EstadoBadge,
+  PageHeader,
+  Spinner,
+} from '../../core/ui/ui';
 
 const FILTROS: { valor: EstadoPago | ''; texto: string }[] = [
   { valor: 'en_verificacion', texto: 'En verificación' },
@@ -99,8 +108,16 @@ export function SolicitudesAdminPage() {
                   #{p.id} · Docente #{p.usuario_id} · Plan {p.plan.nombre}
                 </p>
                 <p className="text-sm text-text-secondary">
+                  {p.monto !== p.monto_lista && (
+                    <span className="mr-1 line-through">Bs. {p.monto_lista}</span>
+                  )}
                   Bs. {p.monto} · ciclo {p.ciclo} · {new Date(p.fecha).toLocaleString()}
                 </p>
+                {p.promocion && (
+                  <Badge tone="success" className="mt-1">
+                    Promo: {p.promocion.nombre}
+                  </Badge>
+                )}
                 {p.fecha_expira && (
                   <p className="text-xs text-text-disabled">
                     Vigencia hasta {new Date(p.fecha_expira).toLocaleDateString()}

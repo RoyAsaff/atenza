@@ -99,3 +99,26 @@ export class CuentaVencidaError extends ErrorDeDominio {
     );
   }
 }
+
+// ── Rediseño SaaS (17/08): Gratis permanente + Pro único + Promociones ──
+
+/** El plan del docente (Gratis: 1 materia) ya alcanzó su tope de materias. */
+export class LimiteMateriasExcedidoError extends ErrorDeDominio {
+  constructor() {
+    super(403, 'LIMITE_MATERIAS_EXCEDIDO', 'El plan actual alcanzó el límite de materias');
+  }
+}
+
+/** La función (importar Word / Guías) requiere un plan superior al actual. */
+export class FeatureNoDisponibleError extends ErrorDeDominio {
+  constructor(mensaje = 'Tu plan actual no incluye esta función') {
+    super(403, 'FEATURE_NO_DISPONIBLE', mensaje);
+  }
+}
+
+/** Código de promoción inexistente, vencido, agotado o no aplicable al ciclo elegido. */
+export class PromocionInvalidaError extends ErrorDeDominio {
+  constructor(mensaje: string) {
+    super(400, 'PROMOCION_INVALIDA', mensaje);
+  }
+}

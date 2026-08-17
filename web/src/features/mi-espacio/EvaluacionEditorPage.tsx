@@ -9,6 +9,7 @@ import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import {
   Demostracion,
   ErrorParseoPregunta,
+  EstadoCuenta,
   EstadoEvaluacion,
   EvaluacionConPreguntas,
   Materia,
@@ -839,6 +840,16 @@ export function EvaluacionEditorPage() {
     },
   });
 
+  // Rediseño SaaS (17/08): "Importar de Word" es feature del plan Pro.
+  const { data: estadoCuenta } = useQuery({
+    queryKey: ['cuenta-estado'],
+    queryFn: async () => {
+      const { data } = await api.get<{ estado: EstadoCuenta }>('/api/cuenta/estado');
+      return data.estado;
+    },
+  });
+  const permiteImportWord = estadoCuenta?.plan?.permite_import_word ?? false;
+
   const { data: materia } = useQuery({
     queryKey: ['materia', String(materiaId)],
     queryFn: async () => {
@@ -1123,9 +1134,19 @@ export function EvaluacionEditorPage() {
                 <Button variante="secondary" onClick={() => setModalPromptAbierto(true)}>
                   <Sparkles size={16} /> Sugerir prompt IA
                 </Button>
-                <Button variante="secondary" onClick={() => setModalImportarAbierto(true)}>
-                  <Upload size={16} /> Importar de Word
-                </Button>
+                {permiteImportWord ? (
+                  <Button variante="secondary" onClick={() => setModalImportarAbierto(true)}>
+                    <Upload size={16} /> Importar de Word
+                  </Button>
+                ) : (
+                  <Link
+                    to="/suscripcion/planes"
+                    className={botonClases('secondary')}
+                    title="Disponible en el plan Pro"
+                  >
+                    <Upload size={16} /> Importar de Word (plan Pro)
+                  </Link>
+                )}
                 <Button onClick={() => setModalPreguntaAbierto(true)}>
                   <Plus size={16} /> Agregar pregunta
                 </Button>

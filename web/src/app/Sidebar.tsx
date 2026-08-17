@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Layers,
   NotebookText,
+  Percent,
   Receipt,
   X,
 } from 'lucide-react';
@@ -154,6 +155,9 @@ export function Sidebar({
               </NavLink>
               <NavLink to="/admin/planes" className={enlaceClase}>
                 <Layers size={17} /> Planes
+              </NavLink>
+              <NavLink to="/admin/promociones" className={enlaceClase}>
+                <Percent size={17} /> Promociones
               </NavLink>
               <NavLink to="/admin/panel" className={enlaceClase}>
                 <LayoutDashboard size={17} /> Panel general

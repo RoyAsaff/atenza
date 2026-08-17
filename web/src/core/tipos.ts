@@ -47,8 +47,9 @@ export interface InscripcionNomina {
   };
 }
 
-// SaaS por cuenta (17/07): reemplaza el pago por materia (E2) por una
-// suscripción de cuenta con tramos por cantidad de estudiantes.
+// SaaS por cuenta (17/07, rediseñado 17/08): de 4 tramos por cantidad de
+// estudiantes a 3 roles fijos — Gratis (permanente) / Pro (único plan
+// pago) / Institucional (a medida) — más Promociones (descuentos).
 
 export type CicloPago = 'mensual' | 'anual';
 
@@ -59,20 +60,47 @@ export type EstadoPago =
   | 'rechazada'
   | 'expirada';
 
+export type TipoPlan = 'gratuito' | 'pago' | 'institucional';
+
 export interface Plan {
   id: number;
   nombre: string;
-  limite_estudiantes: number | null; // null = Institucional, "a medida"
+  tipo: TipoPlan;
+  limite_estudiantes: number | null; // null = ilimitado (Pro) / "a medida" (Institucional)
+  limite_materias: number | null; // null = ilimitado; Gratis = 1
+  permite_import_word: boolean;
+  permite_guias: boolean;
   monto_mensual: number;
   orden: number;
   activo: boolean;
+}
+
+export type TipoDescuentoPromocion = 'porcentaje' | 'monto_fijo';
+export type CicloAplicablePromocion = 'mensual' | 'anual' | 'ambos';
+
+export interface Promocion {
+  id: number;
+  nombre: string;
+  codigo: string | null; // null = automática por temporada
+  tipo_descuento: TipoDescuentoPromocion;
+  valor: number;
+  ciclo_aplicable: CicloAplicablePromocion;
+  combinable_con_anual: boolean;
+  solo_cuentas_nuevas: boolean;
+  fecha_inicio: string;
+  fecha_fin: string;
+  activo: boolean;
+  usos_maximos: number | null;
+  usos_maximos_por_cuenta: number | null;
+  usos_actuales: number;
 }
 
 export interface Pago {
   id: number;
   fecha: string;
   usuario_id: number;
-  monto: number;
+  monto_lista: number; // precio de plan sin descuento, para mostrar tachado
+  monto: number; // lo que realmente se debe/se transfirió
   comprobante: string | null;
   estado: EstadoPago;
   motivo_rechazo: string | null;
@@ -80,16 +108,29 @@ export interface Pago {
   fecha_expira: string | null;
   plan_id: number;
   plan: Plan;
+  promocion_id: number | null;
+  promocion: Promocion | null;
+}
+
+// Resultado de GET /api/cuenta/promociones/validar (también usado internamente
+// por elegir-plan) — precio final ya calculado por el backend.
+export interface PrecioPlan {
+  plan: Plan;
+  monto_lista: number;
+  monto: number;
+  promocion: Promocion | null;
 }
 
 export interface EstadoCuenta {
   plan: Plan | null;
-  vigente_hasta: string;
-  dias_restantes: number;
+  vigente_hasta: string | null; // null = plan gratuito, sin vencimiento
+  dias_restantes: number | null;
   en_aviso: boolean;
   solo_lectura: boolean;
   limite_estudiantes: number | null;
   estudiantes_activos: number;
+  limite_materias: number | null;
+  materias_activas: number;
 }
 
 // E5: asistencia (HU-15/HU-16)

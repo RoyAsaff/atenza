@@ -1,6 +1,8 @@
-// SaaS por cuenta (17/07) · Verificar pago de suscripción (admin)
-// Aprobar: fija fecha_expira de la CUENTA y actualiza el plan contratado
-// (permite upgrade/downgrade). Rechazar: motivo obligatorio.
+// SaaS por cuenta (17/07, rediseñado 17/08) · Verificar pago de suscripción
+// (admin). Aprobar: fija fecha_expira de la CUENTA y actualiza el plan
+// contratado (permite upgrade/downgrade); si el pago traía una promoción,
+// recién ACÁ se incrementa su contador de usos (no al crear el pago — evita
+// que trámites nunca aprobados consuman el cupo). Rechazar: motivo obligatorio.
 
 import { PagoConPlan } from '../../domain/entidades/pago';
 import { DIAS_PLAN } from '../../domain/entidades/plan';
@@ -8,14 +10,14 @@ import { EstadoInvalidoError, NoEncontradoError } from '../../domain/errores';
 import { PagoRepositorio } from '../../domain/repositorios/pago-repositorio';
 import { UsuarioRepositorio } from '../../domain/repositorios/usuario-repositorio';
 import { BitacoraRepositorio } from '../../domain/repositorios/bitacora-repositorio';
-
-const DIAS_PRUEBA_GRATIS = 30;
+import { PromocionRepositorio } from '../../domain/repositorios/promocion-repositorio';
 
 export class ResolverSuscripcion {
   constructor(
     private readonly pagos: PagoRepositorio,
     private readonly usuarios: UsuarioRepositorio,
     private readonly bitacora: BitacoraRepositorio,
+    private readonly promociones: PromocionRepositorio,
   ) {}
 
   async aprobar(entrada: {
@@ -30,12 +32,9 @@ export class ResolverSuscripcion {
 
     // Vigencia de la CUENTA (no de una materia): 30/365 días desde la
     // activación; si es renovación anticipada, desde el vencimiento
-    // vigente (no pierde días). La prueba gratis cuenta como primer período.
-    const finPrueba = new Date(
-      usuario.trial_inicio.getTime() + DIAS_PRUEBA_GRATIS * 24 * 3600 * 1000,
-    );
-    const vigenciaPago = await this.pagos.vigenciaActual(pago.usuario_id);
-    const vigenciaActual = vigenciaPago && vigenciaPago > finPrueba ? vigenciaPago : finPrueba;
+    // vigente (no pierde días). 17/08: sin fallback a trial_inicio
+    // (eliminado) — si nunca hubo pago aprobado, se parte de "ahora".
+    const vigenciaActual = (await this.pagos.vigenciaActual(pago.usuario_id)) ?? new Date();
 
     const ahora = new Date();
     const base = vigenciaActual > ahora ? vigenciaActual : ahora;
@@ -46,6 +45,9 @@ export class ResolverSuscripcion {
       fecha_expira,
     });
     await this.usuarios.actualizarPlan(pago.usuario_id, pago.plan_id);
+    if (pago.promocion_id) {
+      await this.promociones.incrementarUsos(pago.promocion_id);
+    }
 
     await this.bitacora.registrar({
       usuario_id: entrada.admin_id,

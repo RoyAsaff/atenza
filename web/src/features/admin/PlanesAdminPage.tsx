@@ -1,5 +1,7 @@
-// SaaS por cuenta (17/07) · Editar los 4 tramos de plan y el QR único
-// global de cobro (admin). Reemplaza a PreciosPage.
+// SaaS por cuenta (17/07, rediseñado 17/08) · Editar los 3 planes
+// (Gratis/Pro/Institucional) y el QR único global de cobro (admin).
+// Reemplaza a PreciosPage. `tipo` no es editable acá — los roles son fijos
+// por seed, solo cambian límites/features/precio.
 
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,18 +22,27 @@ import {
 
 function FilaPlan({ plan }: { plan: Plan }) {
   const queryClient = useQueryClient();
-  const [limite, setLimite] = useState(plan.limite_estudiantes?.toString() ?? '');
+  const [limiteEstudiantes, setLimiteEstudiantes] = useState(
+    plan.limite_estudiantes?.toString() ?? '',
+  );
+  const [limiteMaterias, setLimiteMaterias] = useState(plan.limite_materias?.toString() ?? '');
   const [monto, setMonto] = useState(plan.monto_mensual.toString());
+  const [permiteWord, setPermiteWord] = useState(plan.permite_import_word);
+  const [permiteGuias, setPermiteGuias] = useState(plan.permite_guias);
   const [error, setError] = useState('');
   const [exito, setExito] = useState(false);
 
-  const esInstitucional = plan.limite_estudiantes === null;
+  const esInstitucional = plan.tipo === 'institucional';
+  const esGratuito = plan.tipo === 'gratuito';
 
   const guardar = useMutation({
     mutationFn: () =>
       api.patch(`/api/admin/planes/${plan.id}`, {
-        limite_estudiantes: esInstitucional ? null : Number(limite),
-        monto_mensual: esInstitucional ? 0 : Number(monto),
+        limite_estudiantes: limiteEstudiantes === '' ? null : Number(limiteEstudiantes),
+        limite_materias: limiteMaterias === '' ? null : Number(limiteMaterias),
+        monto_mensual: esInstitucional || esGratuito ? 0 : Number(monto),
+        permite_import_word: permiteWord,
+        permite_guias: permiteGuias,
       }),
     onSuccess: () => {
       setError('');
@@ -44,29 +55,60 @@ function FilaPlan({ plan }: { plan: Plan }) {
 
   return (
     <Card>
-      <CardHeader title={plan.nombre} description={esInstitucional ? 'Contratación directa, sin self-service' : `Precio anual = ${monto ? Number(monto) * 10 : '—'} Bs (10x, 2 meses gratis)`} />
+      <CardHeader
+        title={plan.nombre}
+        description={
+          esInstitucional
+            ? 'Contratación directa, sin self-service'
+            : esGratuito
+              ? 'Permanente, sin costo'
+              : `Precio anual = ${monto ? Number(monto) * 10 : '—'} Bs (10x, 2 meses gratis)`
+        }
+      />
       <CardBody className="flex flex-wrap items-end gap-3">
-        {!esInstitucional && (
-          <>
-            <Campo etiqueta="Límite de estudiantes" className="w-40">
-              <Input
-                type="number"
-                min="1"
-                value={limite}
-                onChange={(e) => setLimite(e.target.value)}
-              />
-            </Campo>
-            <Campo etiqueta="Precio mensual (Bs.)" className="w-40">
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
-              />
-            </Campo>
-          </>
+        <Campo etiqueta="Límite de estudiantes (vacío = ilimitado)" className="w-52">
+          <Input
+            type="number"
+            min="1"
+            value={limiteEstudiantes}
+            onChange={(e) => setLimiteEstudiantes(e.target.value)}
+          />
+        </Campo>
+        <Campo etiqueta="Límite de materias (vacío = ilimitado)" className="w-52">
+          <Input
+            type="number"
+            min="1"
+            value={limiteMaterias}
+            onChange={(e) => setLimiteMaterias(e.target.value)}
+          />
+        </Campo>
+        {!esInstitucional && !esGratuito && (
+          <Campo etiqueta="Precio mensual (Bs.)" className="w-40">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={monto}
+              onChange={(e) => setMonto(e.target.value)}
+            />
+          </Campo>
         )}
+        <label className="flex items-center gap-2 text-sm text-text-secondary">
+          <input
+            type="checkbox"
+            checked={permiteWord}
+            onChange={(e) => setPermiteWord(e.target.checked)}
+          />
+          Importar de Word
+        </label>
+        <label className="flex items-center gap-2 text-sm text-text-secondary">
+          <input
+            type="checkbox"
+            checked={permiteGuias}
+            onChange={(e) => setPermiteGuias(e.target.checked)}
+          />
+          Guías
+        </label>
         <Button disabled={guardar.isPending} onClick={() => guardar.mutate()}>
           {guardar.isPending ? 'Guardando…' : exito ? 'Guardado ✓' : 'Guardar'}
         </Button>

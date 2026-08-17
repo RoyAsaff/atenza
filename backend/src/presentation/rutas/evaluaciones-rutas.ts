@@ -14,6 +14,7 @@ import {
   demostracionEvaluacion,
   duplicarEvaluacion,
   eliminarPregunta,
+  exigirImportarWord,
   exportarCentralizador,
   guardarEvaluacion,
   lanzarEvaluacion,
@@ -236,6 +237,7 @@ evaluacionesRouter.post(
   autenticar,
   soloDocente,
   cuentaActiva,
+  exigirImportarWord,
   subirDocumento.single('archivo'),
   async (req, res, next) => {
     try {
@@ -265,6 +267,7 @@ evaluacionesRouter.post(
   autenticar,
   soloDocente,
   cuentaActiva,
+  exigirImportarWord,
   async (req, res, next) => {
     try {
       const { preguntas } = z.object({ preguntas: z.array(esquemaPregunta).min(1) }).parse(req.body);

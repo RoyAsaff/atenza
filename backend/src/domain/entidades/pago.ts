@@ -3,6 +3,7 @@
 // el patrón "solicitud" (Pago + Materia inactiva) por un pago de cuenta.
 
 import { Plan, CicloPago } from './plan';
+import { Promocion } from './promocion';
 
 export type EstadoPago =
   | 'pendiente' // esperando comprobante (plazo 24 h)
@@ -15,6 +16,11 @@ export interface Pago {
   id: number;
   fecha: Date;
   usuario_id: number;
+  // 17/08: monto_lista es el precio de plan sin descuento (para mostrarlo
+  // tachado); monto sigue significando lo mismo de siempre — lo que
+  // realmente hay que transferir/se transfirió (con descuento aplicado,
+  // si hubo promo) — el admin valida el comprobante contra `monto`.
+  monto_lista: number;
   monto: number;
   comprobante: string | null;
   estado: EstadoPago;
@@ -22,9 +28,10 @@ export interface Pago {
   ciclo: CicloPago;
   fecha_expira: Date | null; // se fija al aprobar
   plan_id: number;
+  promocion_id: number | null; // 17/08: promo aplicada al elegir el plan, si hubo alguna
 }
 
-/** Vista completa de un pago con su plan. */
-export type PagoConPlan = Pago & { plan: Plan };
+/** Vista completa de un pago con su plan y, si aplica, la promoción usada. */
+export type PagoConPlan = Pago & { plan: Plan; promocion: Promocion | null };
 
 export const PLAZO_COMPROBANTE_HORAS = 24; // HU-06, Escenario 2 y 3

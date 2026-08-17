@@ -25,13 +25,16 @@ import {
 import { PrismaPlanRepositorio } from '../infrastructure/repositorios/prisma-plan-repositorio';
 import { PrismaPagoRepositorio } from '../infrastructure/repositorios/prisma-pago-repositorio';
 import { PrismaConfiguracionPagoRepositorio } from '../infrastructure/repositorios/prisma-configuracion-pago-repositorio';
+import { PrismaPromocionRepositorio } from '../infrastructure/repositorios/prisma-promocion-repositorio';
 import { ObtenerEstadoCuenta } from '../application/cuenta/obtener-estado-cuenta';
+import { CalcularPrecioPlan } from '../application/cuenta/calcular-precio-plan';
 import { ElegirPlan } from '../application/cuenta/elegir-plan';
 import { SubirComprobanteSuscripcion } from '../application/cuenta/subir-comprobante-suscripcion';
 import { ResolverSuscripcion } from '../application/cuenta/resolver-suscripcion';
 import { ExpirarComprobantesPendientes } from '../application/cuenta/expirar-comprobantes-pendientes';
 import { CrearMateria } from '../application/materias/crear-materia';
 import { crearVerificarCuentaActiva } from './middlewares/verificar-cuenta-activa';
+import { crearExigirFeaturePlan } from './middlewares/exigir-feature-plan';
 import { PrismaInscripcionRepositorio } from '../infrastructure/repositorios/prisma-inscripcion-repositorio';
 import { UnirseAMateria } from '../application/inscripciones/unirse-materia';
 import { GestionarCodigoMateria } from '../application/inscripciones/gestionar-codigo';
@@ -180,6 +183,7 @@ export const emailService = process.env.RESEND_API_KEY
 export const planRepositorio = new PrismaPlanRepositorio(prisma);
 export const pagoRepositorio = new PrismaPagoRepositorio(prisma);
 export const configuracionPagoRepositorio = new PrismaConfiguracionPagoRepositorio(prisma);
+export const promocionRepositorio = new PrismaPromocionRepositorio(prisma); // 17/08
 export const inscripcionRepositorio = new PrismaInscripcionRepositorio(prisma);
 
 export const registrarUsuario = new RegistrarUsuario(
@@ -225,18 +229,24 @@ export const restablecerPassword = new RestablecerPassword(
   passwordHasher,
 );
 
-// SaaS por cuenta (17/07): reemplaza a E2 (pago/precio por materia)
+// SaaS por cuenta (17/07, rediseñado 17/08): reemplaza a E2 (pago/precio por materia)
 export const estadoCuenta = new ObtenerEstadoCuenta(
   usuarioRepositorio,
   planRepositorio,
   pagoRepositorio,
   inscripcionRepositorio,
+  materiaRepositorio, // 17/08: para materias_activas/limite_materias
 );
+export const calcularPrecioPlan = new CalcularPrecioPlan(
+  planRepositorio,
+  pagoRepositorio,
+  promocionRepositorio,
+); // 17/08: precio (con o sin promo) compartido entre ElegirPlan y la previsualización
 export const elegirPlan = new ElegirPlan(
   pagoRepositorio,
-  planRepositorio,
   configuracionPagoRepositorio,
   bitacoraRepositorio,
+  calcularPrecioPlan,
 );
 export const subirComprobanteSuscripcion = new SubirComprobanteSuscripcion(
   pagoRepositorio,
@@ -246,13 +256,17 @@ export const resolverSuscripcion = new ResolverSuscripcion(
   pagoRepositorio,
   usuarioRepositorio,
   bitacoraRepositorio,
+  promocionRepositorio, // 17/08: incrementa usos_actuales al aprobar
 );
 export const expirarComprobantesPendientes = new ExpirarComprobantesPendientes(
   pagoRepositorio,
   bitacoraRepositorio,
 );
 export const cuentaActiva = crearVerificarCuentaActiva(estadoCuenta);
-export const crearMateria = new CrearMateria(materiaRepositorio, bitacoraRepositorio);
+// 17/08: gating de features premium (Word/Guías) — mismo molde que cuentaActiva
+export const exigirImportarWord = crearExigirFeaturePlan(estadoCuenta, 'permite_import_word');
+export const exigirGuias = crearExigirFeaturePlan(estadoCuenta, 'permite_guias');
+export const crearMateria = new CrearMateria(materiaRepositorio, bitacoraRepositorio, estadoCuenta);
 
 // E3
 export const unirseAMateria = new UnirseAMateria(

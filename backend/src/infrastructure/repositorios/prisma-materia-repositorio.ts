@@ -88,4 +88,11 @@ export class PrismaMateriaRepositorio implements MateriaRepositorio {
       orderBy: { nombre_materia: 'asc' },
     });
   }
+
+  async contarPorDocente(docente_id: number): Promise<number> {
+    // Materia no tiene soft-delete (sin campo activo/retirada) — el conteo
+    // es simple y el tope del plan Gratis (1) es, en la práctica,
+    // permanente: no hay forma de "liberar" el cupo salvo subir a Pro.
+    return this.prisma.materia.count({ where: { docente_id } });
+  }
 }

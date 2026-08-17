@@ -7,6 +7,14 @@ export interface PlanRepositorio {
   buscarPorDefecto(): Promise<Plan | null>;
   actualizar(
     id: number,
-    datos: { nombre?: string; limite_estudiantes?: number | null; monto_mensual?: number },
+    datos: {
+      nombre?: string;
+      limite_estudiantes?: number | null;
+      limite_materias?: number | null;
+      permite_import_word?: boolean;
+      permite_guias?: boolean;
+      monto_mensual?: number;
+      // tipo NO es editable desde el admin: los 3 planes tienen roles fijos por seed.
+    },
   ): Promise<Plan>;
 }

@@ -114,7 +114,9 @@ export function MiSuscripcionPage() {
                 <Badge tone="success">Vigente</Badge>
               )}
               <p className="mt-1 text-xs text-text-disabled">
-                Hasta {new Date(estado.data.vigente_hasta).toLocaleDateString()}
+                {estado.data.vigente_hasta === null
+                  ? 'Plan Gratis — sin vencimiento'
+                  : `Hasta ${new Date(estado.data.vigente_hasta).toLocaleDateString()}`}
               </p>
             </div>
           </CardBody>
@@ -132,7 +134,7 @@ export function MiSuscripcionPage() {
 
       {pagos.data && pagos.data.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center text-text-secondary shadow-xs">
-          Todavía no hiciste ningún pago; estás en tu prueba gratis de 30 días.
+          Todavía no hiciste ningún pago; estás en el plan Gratis.
         </div>
       )}
 
@@ -146,8 +148,16 @@ export function MiSuscripcionPage() {
               <div>
                 <p className="font-bold text-text">{p.plan.nombre}</p>
                 <p className="text-sm text-text-secondary">
+                  {p.monto !== p.monto_lista && (
+                    <span className="mr-1 line-through">Bs. {p.monto_lista}</span>
+                  )}
                   Bs. {p.monto} · {p.ciclo} · {new Date(p.fecha).toLocaleString()}
                 </p>
+                {p.promocion && (
+                  <Badge tone="success" className="mt-1">
+                    {p.promocion.nombre}
+                  </Badge>
+                )}
                 {p.estado === 'aprobada' && p.fecha_expira && (
                   <p className="text-xs text-text-disabled">
                     Vigencia hasta {new Date(p.fecha_expira).toLocaleDateString()}

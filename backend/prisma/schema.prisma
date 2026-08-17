@@ -53,30 +53,86 @@ model Usuario {
   guia_intentos     GuiaIntento[] // guías nativas rendidas como estudiante (16/08)
   guias_revisadas   GuiaRespuesta[] @relation("GuiaRespuestasRevisadas") // preguntas abiertas que calificó como docente
 
-  // SaaS por cuenta (reemplaza el pago por materia, decisión con Roy 17/07):
-  // la prueba gratis de 30 días arranca al registrarse; plan_id es el plan
-  // contratado actualmente (Básico por defecto), se actualiza al aprobar un pago.
-  trial_inicio DateTime @default(now())
-  plan         Plan?    @relation(fields: [plan_id], references: [id])
-  plan_id      Int?
+  // SaaS por cuenta (reemplaza el pago por materia, decisión con Roy 17/07;
+  // pasa a Gratis permanente + Pro único + Institucional el 17/08 — ver Plan.tipo):
+  // plan_id es el plan contratado actualmente (Gratis por defecto al
+  // registrarse), se actualiza al aprobar un pago.
+  // trial_inicio ELIMINADO (17/08): el plan Gratis es permanente, no hay
+  // nada que cronometrar desde el registro — ver ObtenerEstadoCuenta.
+  plan    Plan? @relation(fields: [plan_id], references: [id])
+  plan_id Int?
 
   @@map("usuarios")
 }
 
-// ── SaaS por cuenta (17/07): tramos de precio por cantidad de
-// estudiantes activos en toda la cuenta del docente, no por materia.
+// ── SaaS por cuenta (17/07, rediseñado 17/08) ───────────────────
+// 17/08: de 4 tramos pagos por cantidad de estudiantes a 3 roles fijos:
+// Gratis (permanente, 1 materia/50 alumnos), Pro (único plan pago,
+// ilimitado + features premium), Institucional (a medida, sin autoservicio).
+enum TipoPlan {
+  gratuito
+  pago
+  institucional
+}
+
 // Tabla editable por el admin (mismo espíritu que el viejo Precio).
 model Plan {
-  id                 Int       @id @default(autoincrement())
-  nombre             String // Básico, Intermedio, Avanzado, Institucional
-  limite_estudiantes Int? // null = sin límite / "a medida" (Institucional)
-  monto_mensual      Decimal   @db.Decimal(10, 2) // precio anual = monto_mensual * 10 (2 meses gratis)
-  orden              Int // orden de presentación / plan por defecto = menor orden
-  activo             Boolean   @default(true)
-  usuarios           Usuario[]
-  pagos              Pago[]
+  id     Int      @id @default(autoincrement())
+  nombre String // Gratis, Pro, Institucional
+  // 17/08: reemplaza la señal vieja "limite_estudiantes === null" para
+  // detectar Institucional — ya no sirve porque Pro también es ilimitado.
+  tipo                TipoPlan @default(pago)
+  limite_estudiantes  Int? // null = sin límite (Pro) / "a medida" (Institucional)
+  limite_materias     Int? // null = sin límite; Gratis = 1 (17/08)
+  permite_import_word Boolean  @default(false) // 17/08: feature premium (Pro/Institucional)
+  permite_guias       Boolean  @default(false) // 17/08: feature premium (Pro/Institucional)
+  monto_mensual       Decimal  @db.Decimal(10, 2) // precio anual = monto_mensual * 10 (2 meses gratis)
+  orden               Int // orden de presentación / plan por defecto = menor orden
+  activo              Boolean  @default(true)
+  usuarios            Usuario[]
+  pagos               Pago[]
 
   @@map("planes")
+}
+
+// ── Promociones (17/08): descuento de temporada (automático, sin
+// código) o cupón (con código), configurables por el admin. Afectan el
+// monto que el docente debe transferir por QR ANTES de subir el
+// comprobante — Pago.monto ya sale con el descuento aplicado.
+enum TipoDescuentoPromocion {
+  porcentaje
+  monto_fijo
+}
+
+enum CicloAplicablePromocion {
+  mensual
+  anual
+  ambos
+}
+
+model Promocion {
+  id             Int                     @id @default(autoincrement())
+  nombre         String
+  codigo         String?                 @unique // null = automática por temporada
+  tipo_descuento TipoDescuentoPromocion
+  valor          Decimal                 @db.Decimal(10, 2)
+  ciclo_aplicable CicloAplicablePromocion @default(ambos)
+  // Un pago anual ya trae su propio descuento estructural (10x, 2 meses
+  // gratis) — este flag decide si el descuento de la promo se suma encima.
+  combinable_con_anual Boolean  @default(true)
+  solo_cuentas_nuevas  Boolean  @default(false) // true = nunca tuvo un pago aprobado
+  fecha_inicio         DateTime
+  fecha_fin            DateTime
+  activo               Boolean  @default(true) // kill switch manual del admin
+  usos_maximos            Int? // null = ilimitado (tope global de canjes)
+  usos_maximos_por_cuenta Int? // null = ilimitado
+  // Se incrementa solo al APROBAR un pago (no al crearlo) — ver ResolverSuscripcion.
+  usos_actuales Int    @default(0)
+  pagos         Pago[]
+
+  @@index([codigo])
+  @@index([activo, fecha_inicio, fecha_fin])
+  @@map("promociones")
 }
 
 // Un solo QR global de cobro (fila única, patrón singleton) — no hay uno
@@ -105,11 +161,16 @@ enum CicloPago {
 }
 
 model Pago {
-  id             Int        @id @default(autoincrement())
-  fecha          DateTime   @default(now())
-  usuario        Usuario    @relation(fields: [usuario_id], references: [id])
-  usuario_id     Int
-  monto          Decimal    @db.Decimal(10, 2) // conserva el precio mostrado (D-09)
+  id          Int      @id @default(autoincrement())
+  fecha       DateTime @default(now())
+  usuario     Usuario  @relation(fields: [usuario_id], references: [id])
+  usuario_id  Int
+  // 17/08: monto_lista es el precio de plan sin descuento (para mostrarlo
+  // tachado); monto sigue significando lo mismo que siempre — lo que
+  // realmente hay que transferir/se transfirió (con descuento ya aplicado,
+  // si hubo promo) — el admin valida el comprobante contra `monto`.
+  monto_lista Decimal @db.Decimal(10, 2)
+  monto       Decimal @db.Decimal(10, 2) // conserva el precio mostrado (D-09)
   comprobante    String? // ruta/URL de imagen o PDF; null hasta subirlo
   estado         EstadoPago @default(pendiente)
   // HU-08 Esc. 2 (acordado 12/07): motivo visible para el docente al rechazar
@@ -121,6 +182,9 @@ model Pago {
   fecha_expira   DateTime?
   plan           Plan       @relation(fields: [plan_id], references: [id])
   plan_id        Int
+  // 17/08: promo aplicada al elegir el plan, si hubo alguna (código o automática).
+  promocion    Promocion? @relation(fields: [promocion_id], references: [id])
+  promocion_id Int?
 
   @@index([usuario_id, estado])
   @@map("pagos")

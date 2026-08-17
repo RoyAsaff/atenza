@@ -7,6 +7,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import {
+  calcularPrecioPlan,
   configuracionPagoRepositorio,
   elegirPlan,
   estadoCuenta,
@@ -48,6 +49,7 @@ cuentaRouter.get('/planes', autenticar, soloDocente, async (_req, res, next) => 
 const esquemaElegirPlan = z.object({
   plan_id: z.coerce.number().int().positive(),
   ciclo: z.enum(['mensual', 'anual']),
+  codigo_promocion: z.string().optional(), // 17/08: cupón opcional
 });
 
 // POST /api/cuenta/elegir-plan
@@ -61,6 +63,30 @@ cuentaRouter.post('/elegir-plan', autenticar, soloDocente, async (req, res, next
       dispositivo: req.headers['user-agent'],
     });
     res.status(201).json(resultado);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/cuenta/promociones/validar — 17/08: previsualiza el precio final
+// (con o sin promo) ANTES de elegir el plan. Sin `codigo` también sirve
+// para detectar una promo automática de temporada activa.
+const esquemaValidarPromo = z.object({
+  plan_id: z.coerce.number().int().positive(),
+  ciclo: z.enum(['mensual', 'anual']),
+  codigo: z.string().optional(),
+});
+
+cuentaRouter.get('/promociones/validar', autenticar, soloDocente, async (req, res, next) => {
+  try {
+    const datos = esquemaValidarPromo.parse(req.query);
+    const resultado = await calcularPrecioPlan.ejecutar({
+      usuario_id: req.auth!.sub,
+      plan_id: datos.plan_id,
+      ciclo: datos.ciclo,
+      codigo_promocion: datos.codigo,
+    });
+    res.json(resultado);
   } catch (error) {
     next(error);
   }

@@ -7,7 +7,7 @@ export interface DatosNuevoUsuario {
   passwordHash: string;
   whatsapp?: string;
   rol_nombre: 'admin' | 'docente_estudiante';
-  /** SaaS por cuenta (17/07): plan Básico asignado al registrarse (prueba gratis). */
+  /** SaaS por cuenta (17/07, rediseñado 17/08): plan Gratis asignado al registrarse. */
   plan_id?: number;
 }
 

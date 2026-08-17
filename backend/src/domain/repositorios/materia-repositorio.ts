@@ -21,4 +21,6 @@ export interface MateriaRepositorio {
   /** HU-11: abre o cierra las inscripciones sin cambiar el código. */
   establecerCodigoActivo(id: number, activo: boolean): Promise<void>;
   listar(buscar?: string): Promise<Materia[]>;
+  /** 17/08: cuenta materias del docente contra Plan.limite_materias (Gratis = 1). */
+  contarPorDocente(docente_id: number): Promise<number>;
 }

@@ -24,6 +24,7 @@ import {
 import { api, mensajeDeError } from '../../core/api/cliente';
 import { obtenerSocket } from '../../core/realtime/socket';
 import {
+  EstadoCuenta,
   FilaCompletadoGuia,
   GuiaDocente,
   GuiaPregunta,
@@ -32,6 +33,7 @@ import {
 } from '../../core/tipos';
 import {
   Badge,
+  botonClases,
   Button,
   Campo,
   Card,
@@ -606,6 +608,16 @@ export function GuiasClasePage() {
     },
   });
 
+  // Rediseño SaaS (17/08): Guías es feature del plan Pro.
+  const { data: estadoCuenta } = useQuery({
+    queryKey: ['cuenta-estado'],
+    queryFn: async () => {
+      const { data } = await api.get<{ estado: EstadoCuenta }>('/api/cuenta/estado');
+      return data.estado;
+    },
+  });
+  const permiteGuias = estadoCuenta?.plan?.permite_guias ?? false;
+
   const { data: guias, isLoading, isError } = useQuery({
     queryKey: ['guias', claseId],
     queryFn: async () => {
@@ -674,9 +686,19 @@ export function GuiasClasePage() {
           title="Guías de pre-clase"
           description="Tu contenido sigue viviendo en tu propia página — acá cargás el link, la nota y qué preguntas cuentan."
           actions={
-            <Button onClick={() => setModalAbierto(true)}>
-              <Plus size={16} /> Nueva guía
-            </Button>
+            permiteGuias ? (
+              <Button onClick={() => setModalAbierto(true)}>
+                <Plus size={16} /> Nueva guía
+              </Button>
+            ) : (
+              <Link
+                to="/suscripcion/planes"
+                className={botonClases('primary')}
+                title="Disponible en el plan Pro"
+              >
+                <Plus size={16} /> Nueva guía (plan Pro)
+              </Link>
+            )
           }
         />
       </div>
@@ -696,9 +718,15 @@ export function GuiasClasePage() {
               title="Aún no hay guías vinculadas a esta clase"
               description='Vincula la primera con el botón "Nueva guía".'
               action={
-                <Button onClick={() => setModalAbierto(true)}>
-                  <Plus size={16} /> Nueva guía
-                </Button>
+                permiteGuias ? (
+                  <Button onClick={() => setModalAbierto(true)}>
+                    <Plus size={16} /> Nueva guía
+                  </Button>
+                ) : (
+                  <Link to="/suscripcion/planes" className={botonClases('primary')}>
+                    <Plus size={16} /> Nueva guía (plan Pro)
+                  </Link>
+                )
               }
             />
           </div>

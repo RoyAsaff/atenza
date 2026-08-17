@@ -15,7 +15,6 @@ type UsuarioConRol = {
   rol_id: number;
   activo: boolean;
   email_verificado: boolean;
-  trial_inicio: Date;
   plan_id: number | null;
   rol: { nombre_rol: 'admin' | 'docente_estudiante' };
 };
@@ -32,7 +31,6 @@ function aDominio(u: UsuarioConRol): Usuario {
     rol_nombre: u.rol.nombre_rol,
     activo: u.activo,
     email_verificado: u.email_verificado,
-    trial_inicio: u.trial_inicio,
     plan_id: u.plan_id,
   };
 }

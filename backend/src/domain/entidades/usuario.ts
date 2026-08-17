@@ -12,9 +12,10 @@ export interface Usuario {
   rol_nombre: 'admin' | 'docente_estudiante';
   activo: boolean;
   email_verificado: boolean;
-  // SaaS por cuenta (17/07): prueba gratis de 30 días desde el registro;
-  // plan_id es el plan contratado actualmente (null solo en cuentas admin).
-  trial_inicio: Date;
+  // SaaS por cuenta (17/07, rediseñado 17/08): plan_id es el plan
+  // contratado actualmente (Gratis por defecto al registrarse, null solo
+  // en cuentas admin). trial_inicio ELIMINADO (17/08): el plan Gratis es
+  // permanente, no hay nada que cronometrar — ver ObtenerEstadoCuenta.
   plan_id: number | null;
 }
 

@@ -34,14 +34,58 @@ async function main() {
   });
   console.log(`[seed] admin creado/verificado: ${adminEmail}`);
 
-  // Planes SaaS por cuenta (acordado con Roy 17/07): tramos por cantidad
-  // de estudiantes activos. monto_mensual en Bs; el anual se calcula al
-  // vuelo como monto_mensual * 10 (2 meses gratis), no se guarda aparte.
+  // Planes SaaS por cuenta (17/07, rediseñado 17/08): de 4 tramos por
+  // cantidad de estudiantes a 3 roles fijos — Gratis (permanente, 1
+  // materia/50 alumnos), Pro (único plan pago, ilimitado + features
+  // premium), Institucional (a medida, sin autoservicio). monto_mensual en
+  // Bs; el anual se calcula al vuelo como monto_mensual * 10 (2 meses
+  // gratis), no se guarda aparte.
+  //
+  // Los 3 tramos viejos (Básico/Intermedio/Avanzado) se desactivan en vez
+  // de borrarse — evita romper FKs de pagos/usuarios de prueba que ya los
+  // referencien (no hay clientes reales todavía, pero no cuesta nada ser
+  // cuidadoso).
+  await prisma.plan.updateMany({
+    where: { nombre: { in: ['Básico', 'Intermedio', 'Avanzado'] } },
+    data: { activo: false },
+  });
+
   const planes = [
-    { nombre: 'Básico', limite_estudiantes: 50, monto_mensual: 60, orden: 1 },
-    { nombre: 'Intermedio', limite_estudiantes: 120, monto_mensual: 120, orden: 2 },
-    { nombre: 'Avanzado', limite_estudiantes: 250, monto_mensual: 220, orden: 3 },
-    { nombre: 'Institucional', limite_estudiantes: null, monto_mensual: 0, orden: 4 },
+    {
+      nombre: 'Gratis',
+      tipo: 'gratuito' as const,
+      limite_estudiantes: 50,
+      limite_materias: 1,
+      permite_import_word: false,
+      permite_guias: false,
+      monto_mensual: 0,
+      orden: 1,
+      activo: true,
+    },
+    {
+      nombre: 'Pro',
+      tipo: 'pago' as const,
+      limite_estudiantes: null,
+      limite_materias: null,
+      permite_import_word: true,
+      permite_guias: true,
+      monto_mensual: 99,
+      orden: 2,
+      activo: true,
+    },
+    {
+      // Ya existía (orden 4 legado) — se actualiza el registro existente
+      // en vez de crear uno nuevo, para no romper referencias previas.
+      nombre: 'Institucional',
+      tipo: 'institucional' as const,
+      limite_estudiantes: null,
+      limite_materias: null,
+      permite_import_word: true,
+      permite_guias: true,
+      monto_mensual: 0,
+      orden: 3,
+      activo: true,
+    },
   ];
   for (const plan of planes) {
     const existente = await prisma.plan.findFirst({ where: { nombre: plan.nombre } });
@@ -51,7 +95,7 @@ async function main() {
       await prisma.plan.create({ data: plan });
     }
   }
-  console.log('[seed] planes creados/verificados: Básico, Intermedio, Avanzado, Institucional');
+  console.log('[seed] planes creados/verificados: Gratis, Pro, Institucional (legados desactivados)');
 }
 
 main()

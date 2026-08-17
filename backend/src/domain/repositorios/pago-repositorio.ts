@@ -4,8 +4,10 @@ import { CicloPago } from '../entidades/plan';
 export interface DatosNuevoPago {
   usuario_id: number;
   plan_id: number;
+  monto_lista: number;
   monto: number;
   ciclo: CicloPago;
+  promocion_id?: number | null;
 }
 
 export interface PagoRepositorio {
@@ -29,4 +31,6 @@ export interface PagoRepositorio {
   tieneTramiteAbierto(usuario_id: number): Promise<boolean>;
   /** Vigencia actual de la cuenta: el mayor fecha_expira de sus pagos aprobados. */
   vigenciaActual(usuario_id: number): Promise<Date | null>;
+  /** 17/08: "cuenta nueva" para Promocion.solo_cuentas_nuevas = nunca tuvo un pago aprobado. */
+  tieneAlgunPagoAprobado(usuario_id: number): Promise<boolean>;
 }

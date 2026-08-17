@@ -32,9 +32,9 @@ export class RegistrarUsuario {
 
     const passwordHash = await this.hasher.hashear(entrada.password);
 
-    // SaaS por cuenta (17/07): la prueba gratis de 30 días arranca aquí
-    // (Usuario.trial_inicio = ahora, por defecto en el schema) con el plan
-    // de menor orden (Básico) — así el docente ya tiene un tope desde el día 1.
+    // SaaS por cuenta (17/07, rediseñado 17/08): toda cuenta nueva cae en
+    // el plan de menor orden, que ahora es Gratis (permanente, sin trial
+    // que cronometrar) — así el docente ya tiene un tope desde el día 1.
     const planPorDefecto = await this.planes.buscarPorDefecto();
 
     // D-02: toda cuenta auto-registrada es docente_estudiante;

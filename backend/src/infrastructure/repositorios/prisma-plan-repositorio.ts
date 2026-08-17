@@ -1,11 +1,15 @@
 import { PrismaClient } from '@prisma/client';
-import { Plan } from '../../domain/entidades/plan';
+import { Plan, TipoPlan } from '../../domain/entidades/plan';
 import { PlanRepositorio } from '../../domain/repositorios/plan-repositorio';
 
 function aDominio(p: {
   id: number;
   nombre: string;
+  tipo: string;
   limite_estudiantes: number | null;
+  limite_materias: number | null;
+  permite_import_word: boolean;
+  permite_guias: boolean;
   monto_mensual: unknown;
   orden: number;
   activo: boolean;
@@ -13,7 +17,11 @@ function aDominio(p: {
   return {
     id: p.id,
     nombre: p.nombre,
+    tipo: p.tipo as TipoPlan,
     limite_estudiantes: p.limite_estudiantes,
+    limite_materias: p.limite_materias,
+    permite_import_word: p.permite_import_word,
+    permite_guias: p.permite_guias,
     monto_mensual: Number(p.monto_mensual),
     orden: p.orden,
     activo: p.activo,
@@ -46,7 +54,14 @@ export class PrismaPlanRepositorio implements PlanRepositorio {
 
   async actualizar(
     id: number,
-    datos: { nombre?: string; limite_estudiantes?: number | null; monto_mensual?: number },
+    datos: {
+      nombre?: string;
+      limite_estudiantes?: number | null;
+      limite_materias?: number | null;
+      permite_import_word?: boolean;
+      permite_guias?: boolean;
+      monto_mensual?: number;
+    },
   ): Promise<Plan> {
     const p = await this.prisma.plan.update({ where: { id }, data: datos });
     return aDominio(p);
