@@ -9,10 +9,16 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { BookOpen, CheckCircle2, Plus, Rocket, Trash2, X } from 'lucide-react';
+import { BookOpen, CheckCircle2, Plus, Rocket, Trash2, Wand2, X } from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
 import { obtenerSocket } from '../../core/realtime/socket';
-import { FilaCompletadoGuia, GuiaDocente, Materia, TipoGuiaPregunta } from '../../core/tipos';
+import {
+  FilaCompletadoGuia,
+  GuiaDocente,
+  GuiaPregunta,
+  Materia,
+  TipoGuiaPregunta,
+} from '../../core/tipos';
 import {
   Badge,
   Button,
@@ -148,6 +154,37 @@ function ModalGuia({
       : [preguntaVacia()],
   );
   const [error, setError] = useState('');
+  const [errorAnalisis, setErrorAnalisis] = useState('');
+
+  const analizar = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<{ preguntas: GuiaPregunta[] }>(
+        `/api/materias/${materiaId}/guias/analizar`,
+        { url },
+      );
+      return data.preguntas;
+    },
+    onSuccess: (detectadas) => {
+      setErrorAnalisis('');
+      const hayCargadas = preguntas.some((p) => p.referencia.trim());
+      if (
+        hayCargadas &&
+        !window.confirm(
+          `Se detectaron ${detectadas.length} preguntas — esto reemplaza las que ya cargaste. ¿Continuar?`,
+        )
+      ) {
+        return;
+      }
+      setPreguntas(
+        detectadas.map((p) => ({
+          referencia: p.referencia,
+          tipo: p.tipo,
+          respuesta_modelo: p.respuesta_modelo ?? '',
+        })),
+      );
+    },
+    onError: (err: unknown) => setErrorAnalisis(mensajeDeError(err)),
+  });
 
   const alTerminar = {
     onSuccess: () => {
@@ -254,6 +291,22 @@ function ModalGuia({
               etiqueta="Preguntas"
               ayuda='Una fila por cada data-quiz-id de tu página. "Automática" se autocorrige sola (opción múltiple, emparejar, clasificar); "Abierta" la revisás vos con la respuesta modelo.'
             >
+              <div className="mb-2 flex items-center gap-3">
+                <Button
+                  type="button"
+                  variante="secondary"
+                  tamano="sm"
+                  onClick={() => analizar.mutate()}
+                  disabled={!url.trim() || analizar.isPending}
+                >
+                  <Wand2 size={14} />
+                  {analizar.isPending ? 'Analizando…' : 'Analizar link'}
+                </Button>
+                <span className="text-xs text-text-disabled">
+                  Baja tu página y detecta las preguntas sola — revisá el resultado igual.
+                </span>
+              </div>
+              {errorAnalisis && <p className="mb-2 text-sm text-red-600">{errorAnalisis}</p>}
               <EditorPreguntas preguntas={preguntas} onCambiar={setPreguntas} />
             </Campo>
           </>

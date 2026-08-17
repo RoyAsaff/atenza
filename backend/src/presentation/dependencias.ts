@@ -117,6 +117,7 @@ import {
   VerMisGuias,
 } from '../application/guias/gestionar-guias';
 import { LanzarGuia } from '../application/guias/lanzar-guia';
+import { AnalizarGuiaExterna } from '../application/guias/analizar-guia-externa';
 import {
   CancelarGuiaLanzamiento,
   PausarGuiaIntento,
@@ -572,6 +573,7 @@ export const eliminarGuia = new EliminarGuia(
   bitacoraRepositorio,
 );
 export const verGuiaDetalle = new VerGuiaDetalle(guiaRepositorio, claseRepositorio, materiaRepositorio);
+export const analizarGuiaExterna = new AnalizarGuiaExterna();
 export const verGuias = new VerGuias(
   guiaRepositorio,
   claseRepositorio,

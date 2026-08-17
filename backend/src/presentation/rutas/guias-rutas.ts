@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import {
   actualizarGuia,
+  analizarGuiaExterna,
   cancelarGuiaLanzamiento,
   crearGuia,
   cuentaActiva,
@@ -175,6 +176,19 @@ guiasRouter.delete(
     }
   },
 );
+
+// POST /api/materias/:id/guias/analizar — pre-llena el manifest de
+// preguntas bajando y parseando el HTML del link (mismo espíritu que
+// Importar de Word en evaluaciones).
+guiasRouter.post('/:id/guias/analizar', autenticar, soloDocente, async (req, res, next) => {
+  try {
+    const { url } = z.object({ url: z.string().url() }).parse(req.body);
+    const preguntas = await analizarGuiaExterna.ejecutar({ url });
+    res.json({ preguntas });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // GET /api/materias/:id/guias/:guiaId — detalle de una guía puntual
 // (Resultados/Revisión/Lanzamiento no tienen el clase_id a mano).
