@@ -128,6 +128,7 @@ import {
   GuardarRespuestaGuia,
   IniciarOReanudarGuiaIntento,
   ReportarIncidenteGuia,
+  VerGuiaOficialActivo,
 } from '../application/guias/rendir-guia';
 import { RevisarRespuestaGuia, VerRevisionGuia } from '../application/guias/revisar-respuestas-guia';
 import { VerMonitoreoGuia, VerResultadosGuia } from '../application/guias/ver-resultados-guia';
@@ -638,6 +639,11 @@ export const cancelarGuiaLanzamiento = new CancelarGuiaLanzamiento(
   socketIoEmisor,
 );
 export const iniciarOReanudarGuiaIntento = new IniciarOReanudarGuiaIntento(
+  guiaRepositorio,
+  guiaIntentoRepositorio,
+  tokenService,
+);
+export const verGuiaOficialActivo = new VerGuiaOficialActivo(
   guiaRepositorio,
   guiaIntentoRepositorio,
   tokenService,

@@ -81,6 +81,9 @@ export class PausarGuiaIntento {
     }
 
     await this.guiaIntentos.cambiarEstado(intento.id, 'pausado');
+    this.tiempoReal.emitirAEstudiante(intento.estudiante_id, 'guia-pausada', {
+      intento_id: intento.id,
+    });
     this.tiempoReal.emitirAGuia(guia.id, 'intento-actualizado', {
       intento_id: intento.id,
       estado: 'pausado',
@@ -130,6 +133,9 @@ export class ReactivarGuiaIntento {
     }
 
     await this.guiaIntentos.cambiarEstado(intento.id, 'en_curso');
+    this.tiempoReal.emitirAEstudiante(intento.estudiante_id, 'guia-reactivada', {
+      intento_id: intento.id,
+    });
     this.tiempoReal.emitirAGuia(guia.id, 'intento-actualizado', {
       intento_id: intento.id,
       estado: 'en_curso',
@@ -183,6 +189,9 @@ export class CancelarGuiaLanzamiento {
         fecha_fin: new Date(),
       });
       await calcularNotaSiCorresponde(this.guias, this.guiaIntentos, cancelado);
+      this.tiempoReal.emitirAEstudiante(intento.estudiante_id, 'guia-cancelada', {
+        intento_id: intento.id,
+      });
       this.tiempoReal.emitirAGuia(guia.id, 'intento-actualizado', {
         intento_id: intento.id,
         estado: 'cancelado',

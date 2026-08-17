@@ -10,6 +10,7 @@ import {
   reportarIncidente,
   sesionRepositorio,
   tokenService,
+  verGuiaOficialActivo,
   verIntentoActual,
 } from '../dependencias';
 import { crearAutenticar } from '../middlewares/autenticar';
@@ -29,6 +30,18 @@ const idNumerico = z.coerce.number().int().positive();
 intentosRouter.get('/actual', autenticar, soloEstudiante, async (req, res, next) => {
   try {
     const intento = await verIntentoActual.ejecutar({ estudiante_id: req.auth!.sub });
+    res.json({ intento });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/intentos/guia-actual — auto-push de guías nativas (Layout):
+// ¿hay un lanzamiento oficial esperándome en cualquier materia? Mismo
+// espíritu que /actual (exámenes), consultado por el mismo shell global.
+intentosRouter.get('/guia-actual', autenticar, soloEstudiante, async (req, res, next) => {
+  try {
+    const intento = await verGuiaOficialActivo.ejecutar({ estudiante_id: req.auth!.sub });
     res.json({ intento });
   } catch (error) {
     next(error);

@@ -30,6 +30,12 @@ export interface GuiaIntentoRepositorio {
     guia_id: number,
     estudiante_id: number,
   ): Promise<GuiaIntento | null>;
+  /** El intento OFICIAL vigente (en_curso, pausado o desconectado) de ese
+   * estudiante en CUALQUIER guía — para el auto-push del Layout, mismo
+   * espíritu que IntentoRepositorio.buscarActivoPorEstudiante en exámenes.
+   * Los repasos (es_oficial: false) no interrumpen nada: ya los inició el
+   * propio estudiante a mano. */
+  buscarOficialActivoPorEstudiante(estudiante_id: number): Promise<GuiaIntento | null>;
   /** Para calcular el próximo numero_intento (repaso). */
   contarPorEstudianteYGuia(guia_id: number, estudiante_id: number): Promise<number>;
   listarPorGuia(guia_id: number): Promise<GuiaIntento[]>;

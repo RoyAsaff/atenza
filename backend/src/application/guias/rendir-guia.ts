@@ -4,7 +4,7 @@
 // acotado a ESE intento puntual. La página externa reporta cada pregunta
 // contestada y cada incidencia con ese token — ver verificar-token-guia.ts.
 
-import { GuiaIntento, GuiaIntentoParaRendir } from '../../domain/entidades/guia';
+import { Guia, GuiaIntento, GuiaIntentoParaRendir } from '../../domain/entidades/guia';
 import { EstadoInvalidoError, NoEncontradoError } from '../../domain/errores';
 import { BitacoraRepositorio } from '../../domain/repositorios/bitacora-repositorio';
 import { GuiaIntentoRepositorio } from '../../domain/repositorios/guia-intento-repositorio';
@@ -15,6 +15,37 @@ import { TokenService } from '../../domain/servicios/token-service';
 // Vigencia del token de acceso a un intento — generosa: cubre una clase
 // entera o un repaso tranquilo sin que expire a mitad de camino.
 const ACCESO_INTENTO_SEGUNDOS = 6 * 3600;
+
+/** Arma el token acotado al intento + la url_acceso final — compartido por
+ * IniciarOReanudarGuiaIntento (el estudiante pide entrar) y
+ * VerGuiaOficialActivo (el Layout empuja el aviso solo). */
+function armarParaRendir(
+  guia: Guia,
+  intento: GuiaIntento,
+  tokens: TokenService,
+): GuiaIntentoParaRendir {
+  const token = tokens.firmar(
+    {
+      sub: intento.estudiante_id,
+      contexto: 'estudiante',
+      guia_id: guia.id,
+      guia_intento_id: intento.id,
+      jti: `guia-intento-${intento.id}`,
+    },
+    ACCESO_INTENTO_SEGUNDOS,
+  );
+  const separador = guia.url.includes('?') ? '&' : '?';
+  const url_acceso = `${guia.url}${separador}atenza_token=${token}&guia=${guia.id}&guia_intento=${intento.id}`;
+
+  return {
+    intento_id: intento.id,
+    guia_id: guia.id,
+    tema: guia.tema,
+    url_acceso,
+    estado: intento.estado,
+    fecha_limite: intento.fecha_limite,
+  };
+}
 
 /** Calcula la nota del intento OFICIAL si ya se puede: sin preguntas
  * abiertas pendientes de revisión. Idempotente — no recalcula si ya tiene
@@ -89,27 +120,32 @@ export class IniciarOReanudarGuiaIntento {
       });
     }
 
-    const token = this.tokens.firmar(
-      {
-        sub: entrada.estudiante_id,
-        contexto: 'estudiante',
-        guia_id: guia.id,
-        guia_intento_id: intento.id,
-        jti: `guia-intento-${intento.id}`,
-      },
-      ACCESO_INTENTO_SEGUNDOS,
-    );
-    const separador = guia.url.includes('?') ? '&' : '?';
-    const url_acceso = `${guia.url}${separador}atenza_token=${token}&guia=${guia.id}&guia_intento=${intento.id}`;
+    return armarParaRendir(guia, intento, this.tokens);
+  }
+}
 
-    return {
-      intento_id: intento.id,
-      guia_id: guia.id,
-      tema: guia.tema,
-      url_acceso,
-      estado: intento.estado,
-      fecha_limite: intento.fecha_limite,
-    };
+// ── Auto-push (Layout): ¿hay un lanzamiento oficial esperándome AHORA
+// mismo, en cualquier materia? Mismo espíritu que VerIntentoActual de
+// exámenes — un repaso (es_oficial: false) nunca dispara esto, porque ya
+// lo inició el propio estudiante a mano. ────────────────────────────
+
+export class VerGuiaOficialActivo {
+  constructor(
+    private readonly guias: GuiaRepositorio,
+    private readonly guiaIntentos: GuiaIntentoRepositorio,
+    private readonly tokens: TokenService,
+  ) {}
+
+  async ejecutar(entrada: { estudiante_id: number }): Promise<GuiaIntentoParaRendir | null> {
+    const intento = await this.guiaIntentos.buscarOficialActivoPorEstudiante(
+      entrada.estudiante_id,
+    );
+    if (!intento) return null;
+
+    const guia = await this.guias.buscarPorId(intento.guia_id);
+    if (!guia) return null; // no debería pasar — intento huérfano, ignorar en vez de tirar 500
+
+    return armarParaRendir(guia, intento, this.tokens);
   }
 }
 

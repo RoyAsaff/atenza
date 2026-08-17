@@ -60,6 +60,14 @@ export class PrismaGuiaIntentoRepositorio implements GuiaIntentoRepositorio {
     return fila ? aGuiaIntento(fila) : null;
   }
 
+  async buscarOficialActivoPorEstudiante(estudiante_id: number): Promise<GuiaIntento | null> {
+    const fila = await this.prisma.guiaIntento.findFirst({
+      where: { estudiante_id, es_oficial: true, estado: { in: [...ESTADOS_ACTIVOS] } },
+      orderBy: { fecha_inicio: 'desc' },
+    });
+    return fila ? aGuiaIntento(fila) : null;
+  }
+
   async contarPorEstudianteYGuia(guia_id: number, estudiante_id: number): Promise<number> {
     return this.prisma.guiaIntento.count({ where: { guia_id, estudiante_id } });
   }

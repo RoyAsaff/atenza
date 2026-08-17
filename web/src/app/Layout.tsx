@@ -14,8 +14,9 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../core/auth/AuthContext';
 import { api } from '../core/api/cliente';
 import { obtenerSocket } from '../core/realtime/socket';
-import { IntentoParaRendir, Materia, MateriaInscrita } from '../core/tipos';
+import { GuiaIntentoParaRendir, IntentoParaRendir, Materia, MateriaInscrita } from '../core/tipos';
 import { RendirExamenPage } from '../features/examen/RendirExamenPage';
+import { GuiaAvisoOverlay } from '../features/mi-espacio/GuiaAvisoOverlay';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { UserMenu } from './UserMenu';
@@ -27,6 +28,16 @@ const EVENTOS_SOCKET_EXAMEN = [
   'examen-pausado',
   'examen-reactivado',
   'examen-cancelado',
+] as const;
+
+// Guías nativas (17/08): el mismo criterio de auto-push que exámenes, pero
+// sin "enGuia" pegajoso — el overlay se apaga solo cuando el servidor deja
+// de devolver el intento (ver GuiaAvisoOverlay).
+const EVENTOS_SOCKET_GUIA = [
+  'guia-lanzada',
+  'guia-pausada',
+  'guia-reactivada',
+  'guia-cancelada',
 ] as const;
 
 export function Layout() {
@@ -75,13 +86,32 @@ export function Layout() {
     enabled: !!sesion && !esAdmin,
   });
 
+  // Guías nativas (17/08): mismo query key que usa cualquier otra pantalla
+  // que pida "hay algo esperándome ahora" — acá solo el lanzamiento
+  // OFICIAL de una guía (un repaso que el propio estudiante ya inició no
+  // dispara esto, ver VerGuiaOficialActivo).
+  const { data: intentoGuia } = useQuery({
+    queryKey: ['guia-actual'],
+    queryFn: async () => {
+      const { data } = await api.get<{ intento: GuiaIntentoParaRendir | null }>(
+        '/api/intentos/guia-actual',
+      );
+      return data.intento;
+    },
+    refetchInterval: 15000, // respaldo si el socket se cae un momento
+    enabled: !!sesion && !esAdmin,
+  });
+
   useEffect(() => {
     if (!sesion || esAdmin) return;
     const socket = obtenerSocket();
     const refrescar = () => queryClient.invalidateQueries({ queryKey: ['intento-actual'] });
+    const refrescarGuia = () => queryClient.invalidateQueries({ queryKey: ['guia-actual'] });
     EVENTOS_SOCKET_EXAMEN.forEach((e) => socket.on(e, refrescar));
+    EVENTOS_SOCKET_GUIA.forEach((e) => socket.on(e, refrescarGuia));
     return () => {
       EVENTOS_SOCKET_EXAMEN.forEach((e) => socket.off(e, refrescar));
+      EVENTOS_SOCKET_GUIA.forEach((e) => socket.off(e, refrescarGuia));
     };
   }, [sesion, esAdmin, queryClient]);
 
@@ -97,6 +127,11 @@ export function Layout() {
 
   if (enExamen) {
     return <RendirExamenPage onTerminado={() => setEnExamen(false)} />;
+  }
+
+  // Un examen en curso siempre gana — más en juego que una guía de repaso.
+  if (intentoGuia) {
+    return <GuiaAvisoOverlay intento={intentoGuia} />;
   }
 
   function salir() {
