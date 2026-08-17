@@ -101,8 +101,15 @@ revisás vos en Atenza.
     if (comenzado) { e.preventDefault(); e.returnValue = ''; }
   });
 
-  // ── Finalizar: llamalo cuando el estudiante termina el 100% del
+  // ── Finalizar: llamalo cuando el estudiante TERMINÓ DE CONTESTAR el
   // cuestionario (mismo lugar donde antes llamabas al /completar viejo).
+  // ⚠️ "Terminó de contestar" NO es lo mismo que "contestó todo bien" —
+  // si tu criterio de "100%" cuenta solo las correctas, un estudiante que
+  // se equivoca en una sola pregunta de un solo intento nunca llega al
+  // 100% y esto no se llama nunca (bug real, 17/08: la guía se quedaba
+  // "en curso" para siempre, el docente tenía que cancelar el
+  // lanzamiento a mano). Contá preguntas RESPONDIDAS (acertadas o no),
+  // no preguntas acertadas.
   // A diferencia de las otras dos, esta SÍ le muestra algo al estudiante
   // y reintenta si falla — es la única señal de que la guía quedó
   // registrada de verdad, no la des por sentada.
