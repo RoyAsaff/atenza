@@ -244,9 +244,17 @@ export function GuiaResultadosPage() {
           description="Nota del intento oficial, intentos totales e incidencias por estudiante."
           actions={
             puedeGestionar ? (
-              <Button variante="danger" onClick={manejarCancelar} disabled={cancelar.isPending}>
-                Cancelar lanzamiento
-              </Button>
+              <>
+                <Link
+                  to={`/materias/${id}/guias/${guiaId}/monitoreo`}
+                  className="inline-flex items-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-hover"
+                >
+                  Monitoreo en vivo
+                </Link>
+                <Button variante="danger" onClick={manejarCancelar} disabled={cancelar.isPending}>
+                  Cancelar lanzamiento
+                </Button>
+              </>
             ) : undefined
           }
         />

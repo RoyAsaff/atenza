@@ -523,6 +523,15 @@ function TarjetaGuia({
               <Rocket size={14} /> Lanzar
             </Button>
           )}
+          {guia.estado === 'lanzada' && (
+            <Button
+              variante="secondary"
+              tamano="sm"
+              onClick={() => navigate(`/materias/${materiaId}/guias/${guia.id}/monitoreo`)}
+            >
+              Monitorear
+            </Button>
+          )}
           {(guia.estado === 'lanzada' || guia.estado === 'cerrada') && (
             <Button
               variante="secondary"

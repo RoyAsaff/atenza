@@ -13,6 +13,7 @@ import { ConsolidadoAsistenciaPage } from '../features/mi-espacio/ConsolidadoAsi
 import { EvaluacionesClasePage } from '../features/mi-espacio/EvaluacionesClasePage';
 import { GuiasClasePage } from '../features/mi-espacio/GuiasClasePage';
 import { TomarGuiaPage } from '../features/mi-espacio/TomarGuiaPage';
+import { GuiaMonitoreoPage } from '../features/mi-espacio/GuiaMonitoreoPage';
 import { GuiaResultadosPage } from '../features/mi-espacio/GuiaResultadosPage';
 import { RevisarGuiaPage } from '../features/mi-espacio/RevisarGuiaPage';
 import { EvaluacionEditorPage } from '../features/mi-espacio/EvaluacionEditorPage';
@@ -97,6 +98,10 @@ export function App() {
                 guías nativas 16/08 — lanzamiento/resultados/revisión). */}
             <Route path="materias/:id/clases/:claseId/guias" element={<GuiasClasePage />} />
             <Route path="materias/:id/guias/:guiaId/tomar" element={<TomarGuiaPage />} />
+            <Route
+              path="materias/:id/guias/:guiaId/monitoreo"
+              element={<GuiaMonitoreoPage />}
+            />
             <Route
               path="materias/:id/guias/:guiaId/resultados"
               element={<GuiaResultadosPage />}
