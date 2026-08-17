@@ -91,6 +91,13 @@ function FilaResultado({
         )}
       </Td>
       <Td className="text-text-secondary">
+        {fila.aciertos !== null ? (
+          `${fila.aciertos}/${fila.total_preguntas}`
+        ) : (
+          <span className="text-text-disabled">—</span>
+        )}
+      </Td>
+      <Td className="text-text-secondary">
         {fila.nota_obtenida !== null ? (
           `${fila.nota_obtenida}/${fila.nota_total}`
         ) : (
@@ -303,6 +310,7 @@ export function GuiaResultadosPage() {
                 <Tr>
                   <Th>Estudiante</Th>
                   <Th>Estado</Th>
+                  <Th>Aciertos</Th>
                   <Th>Nota</Th>
                   <Th>Intentos</Th>
                   <Th>Incidencias</Th>

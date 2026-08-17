@@ -523,7 +523,7 @@ function TarjetaGuia({
               <Rocket size={14} /> Lanzar
             </Button>
           )}
-          {guia.estado === 'lanzada' && (
+          {(guia.estado === 'lanzada' || guia.estado === 'cerrada') && (
             <Button
               variante="secondary"
               tamano="sm"

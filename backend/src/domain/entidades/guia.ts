@@ -171,6 +171,11 @@ export interface FilaResultadoGuia {
    * lanzar) — para poder pausar/reactivar desde la misma pantalla. */
   intento_id: number | null;
   estado_oficial: EstadoIntento | null;
+  /** Cuántas de las preguntas contestó bien el oficial — null si todavía
+   * no tiene intento oficial, o si tiene abiertas sin revisar (mismo
+   * momento en que nota_obtenida también es null). */
+  aciertos: number | null;
+  total_preguntas: number;
   /** null si el oficial todavía tiene preguntas abiertas sin revisar. */
   nota_obtenida: number | null;
   nota_total: number;

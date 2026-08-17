@@ -105,7 +105,7 @@ export class PrismaGuiaIntentoRepositorio implements GuiaIntentoRepositorio {
   }
 
   async listarResultados(guia_id: number): Promise<FilaResultadoGuia[]> {
-    const [guia, filas] = await Promise.all([
+    const [guia, filas, totalPreguntas] = await Promise.all([
       this.prisma.guia.findUnique({ where: { id: guia_id } }),
       this.prisma.guiaIntento.findMany({
         where: { guia_id },
@@ -115,6 +115,7 @@ export class PrismaGuiaIntentoRepositorio implements GuiaIntentoRepositorio {
         },
         orderBy: { id: 'asc' },
       }),
+      this.prisma.guiaPregunta.count({ where: { guia_id } }),
     ]);
     const notaTotal = guia?.nota ?? 0;
 
@@ -138,6 +139,8 @@ export class PrismaGuiaIntentoRepositorio implements GuiaIntentoRepositorio {
         apellidos,
         intento_id: oficial?.id ?? null,
         estado_oficial: oficial?.estado ?? null,
+        aciertos: oficial?.aciertos ?? null,
+        total_preguntas: totalPreguntas,
         nota_obtenida: oficial?.nota_obtenida ?? null,
         nota_total: notaTotal,
         total_intentos: intentos.length,

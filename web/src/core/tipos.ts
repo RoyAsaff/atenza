@@ -453,6 +453,10 @@ export interface FilaResultadoGuia {
   apellidos: string;
   intento_id: number | null;
   estado_oficial: EstadoIntento | null;
+  /** Cuántas de las preguntas contestó bien el oficial — null si todavía
+   * no tiene intento oficial, o tiene abiertas sin revisar. */
+  aciertos: number | null;
+  total_preguntas: number;
   nota_obtenida: number | null;
   nota_total: number;
   total_intentos: number;
