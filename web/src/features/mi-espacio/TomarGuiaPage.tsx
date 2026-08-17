@@ -6,25 +6,23 @@
 // click de "Comenzar" — ver el plan de guías nativas.
 
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { useMutation } from '@tanstack/react-query';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
-import { GuiaIntentoParaRendir, Materia } from '../../core/tipos';
+import { GuiaIntentoParaRendir } from '../../core/tipos';
 import { Alert, Button, Card, CardBody, PageBreadcrumb, PageHeader, Spinner } from '../../core/ui/ui';
 
+// Ruteada dos veces (docente viendo su propia materia, y estudiante desde
+// "inscrito") — no pide el detalle de la materia (esa consulta exige ser
+// el docente dueño) para funcionar igual en los dos casos; el link de
+// vuelta se arma según por dónde entró, sin otra llamada de por medio.
 export function TomarGuiaPage() {
   const { id, guiaId } = useParams();
   const materiaId = Number(id);
+  const location = useLocation();
+  const esInscrito = location.pathname.startsWith('/inscrito/');
   const [error, setError] = useState('');
-
-  const { data: materia } = useQuery({
-    queryKey: ['materia', id],
-    queryFn: async () => {
-      const { data } = await api.get<{ materia: Materia }>(`/api/materias/${id}`);
-      return data.materia;
-    },
-  });
 
   const tomar = useMutation({
     mutationFn: async () => {
@@ -42,7 +40,7 @@ export function TomarGuiaPage() {
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <PageBreadcrumb>
-        <Link to={`/materias/${id}`}>‹ {materia ? materia.nombre_materia : 'Materia'}</Link>
+        <Link to={esInscrito ? `/inscrito/${id}` : `/materias/${id}`}>‹ Volver a la materia</Link>
       </PageBreadcrumb>
       <PageHeader eyebrow="Guía" title="Vas a salir a tu guía" />
 

@@ -51,6 +51,18 @@ function preguntaVacia(): PreguntaForm {
   return { referencia: '', tipo: 'automatica', respuesta_modelo: '' };
 }
 
+/** El formulario siempre carga `respuesta_modelo` como string (incluso
+ * vacío) aunque no aplique a preguntas automáticas — acá se limpia antes
+ * de mandar, para no depender de que el backend perdone el string vacío. */
+function preguntasParaEnviar(preguntas: PreguntaForm[]) {
+  return preguntas.map((p, i) => ({
+    referencia: p.referencia.trim(),
+    tipo: p.tipo,
+    respuesta_modelo: p.tipo === 'abierta' && p.respuesta_modelo.trim() ? p.respuesta_modelo.trim() : undefined,
+    orden: i,
+  }));
+}
+
 // ── Editor del manifest de preguntas (guías nativas) ──────────────
 
 function EditorPreguntas({
@@ -203,7 +215,7 @@ function ModalGuia({
         orden,
         nota: Number(nota),
         tiempo_limite_minutos: tiempoLimite ? Number(tiempoLimite) : undefined,
-        preguntas: preguntas.map((p, i) => ({ ...p, orden: i })),
+        preguntas: preguntasParaEnviar(preguntas),
       }),
     ...alTerminar,
   });
@@ -220,7 +232,7 @@ function ModalGuia({
         url,
         nota: Number(nota),
         tiempo_limite_minutos: tiempoLimite ? Number(tiempoLimite) : undefined,
-        preguntas: preguntas.map((p, i) => ({ ...p, orden: i })),
+        preguntas: preguntasParaEnviar(preguntas),
       }),
     ...alTerminar,
   });

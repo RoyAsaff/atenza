@@ -122,6 +122,7 @@ export function App() {
                 lista de "Materias inscritas" vive en el home (Inicio),
                 arriba de "Materias que dicto"; acá solo el detalle. */}
             <Route path="inscrito/:id" element={<MateriaInscritaDetallePage />} />
+            <Route path="inscrito/:id/guias/:guiaId/tomar" element={<TomarGuiaPage />} />
           </Route>
 
           {/* Admin (E2) */}

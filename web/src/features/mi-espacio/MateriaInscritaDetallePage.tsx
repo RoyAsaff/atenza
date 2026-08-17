@@ -63,7 +63,8 @@ export function MateriaInscritaDetallePage() {
         <CardBody>
           <h2 className="mb-1 font-semibold text-text">Guías</h2>
           <p className="mb-4 text-sm text-text-secondary">
-            Repasa la guía antes de la clase — no lleva nota, es solo práctica.
+            Repasa antes de la clase. Las que tu docente lanza en vivo cuentan con nota real —
+            las demás son solo práctica.
           </p>
 
           {isLoading && (
@@ -92,19 +93,45 @@ export function MateriaInscritaDetallePage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
-                    {g.completado && (
-                      <Badge tone="success" punto>
-                        <CheckCircle2 size={14} /> Completada
-                      </Badge>
+                    {g.estado === 'externa_legacy' ? (
+                      <>
+                        {g.completado && (
+                          <Badge tone="success" punto>
+                            <CheckCircle2 size={14} /> Completada
+                          </Badge>
+                        )}
+                        <a
+                          href={g.url_acceso}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-primary-700 transition hover:border-primary-200 hover:bg-primary-50"
+                        >
+                          Abrir guía →
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        {g.nota_obtenida !== null ? (
+                          <Badge tone="success" punto>
+                            <CheckCircle2 size={14} /> {g.nota_obtenida}/{g.nota} pts
+                          </Badge>
+                        ) : (
+                          g.completado && <Badge tone="info">Pendiente de revisión</Badge>
+                        )}
+                        {g.estado === 'publicada' ? (
+                          <span className="text-sm text-text-disabled">
+                            Todavía no se lanzó en clase
+                          </span>
+                        ) : (
+                          <Link
+                            to={`/inscrito/${materiaId}/guias/${g.id}/tomar`}
+                            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-primary-700 transition hover:border-primary-200 hover:bg-primary-50"
+                          >
+                            {g.completado ? 'Repasar de nuevo →' : 'Tomar la guía →'}
+                          </Link>
+                        )}
+                      </>
                     )}
-                    <a
-                      href={g.url_acceso}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-semibold text-primary-700 transition hover:border-primary-200 hover:bg-primary-50"
-                    >
-                      Abrir guía →
-                    </a>
                   </div>
                 </li>
               ))}

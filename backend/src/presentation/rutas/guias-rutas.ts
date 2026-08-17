@@ -47,7 +47,13 @@ const idNumerico = z.coerce.number().int().positive();
 const esquemaGuiaPregunta = z.object({
   referencia: z.string().min(1),
   tipo: z.enum(['automatica', 'abierta']),
-  respuesta_modelo: z.string().min(1).optional(),
+  // String vacío cuenta como "no vino" — el formulario del front siempre
+  // manda este campo (aunque sea '') incluso en preguntas automáticas,
+  // donde no aplica.
+  respuesta_modelo: z
+    .string()
+    .optional()
+    .transform((v) => (v?.trim() ? v.trim() : undefined)),
   orden: z.number().int().nonnegative(),
 });
 
