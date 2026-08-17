@@ -66,15 +66,15 @@ jobs:
           ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
       - name: Confiar en el host del server
         run: ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
-      - name: prisma migrate deploy
-        # --build es obligatorio acá: atenza-migrate es un servicio con su
-        # propia imagen (context: ./atenza-backend, mismo código, build
-        # aparte de atenza-backend) — el job "deploy" de arriba solo
-        # reconstruye la imagen de atenza-backend, nunca la de
-        # atenza-migrate. Sin --build corre con código/migraciones viejas
-        # cacheadas en su imagen, aunque el código ya se haya subido al
-        # server (bug real, 16/08: migró "0 pendientes" con 2 migraciones
-        # nuevas sin aplicar, porque la imagen de atenza-migrate era vieja).
+      # TEMPORAL (17/08): 20260817194040_saas_plan_unico_promociones falló
+      # en producción (pagos.monto_lista NOT NULL sin default, contra una
+      # tabla con filas) y quedó marcada "failed" en _prisma_migrations —
+      # Prisma se niega a aplicar nada más hasta resolverlo. La migración
+      # ya se corrigió (backfill agregado), pero primero hay que decirle a
+      # Prisma que ese intento fallido no aplicó nada (cierto: la
+      # transacción se revirtió sola) para poder reintentar. Revertir este
+      # paso al de siempre apenas se confirme que funcionó.
+      - name: prisma migrate resolve --rolled-back (una sola vez)
         run: |
           ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
-            "cd ~/stack && docker compose run --rm --build atenza-migrate"
+            "cd ~/stack && docker compose run --rm --build atenza-migrate npx prisma migrate resolve --rolled-back 20260817194040_saas_plan_unico_promociones"

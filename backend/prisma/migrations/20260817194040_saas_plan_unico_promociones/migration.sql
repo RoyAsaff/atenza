@@ -7,9 +7,20 @@ CREATE TYPE "TipoDescuentoPromocion" AS ENUM ('porcentaje', 'monto_fijo');
 -- CreateEnum
 CREATE TYPE "CicloAplicablePromocion" AS ENUM ('mensual', 'anual', 'ambos');
 
--- AlterTable
-ALTER TABLE "pagos" ADD COLUMN     "monto_lista" DECIMAL(10,2) NOT NULL,
+-- AlterTable (17/08, corregido tras fallar en producción: pagos ya tenía
+-- filas — NOT NULL sin default rompe contra una tabla no vacía. Se agrega
+-- nullable, se backfillea, y recién ahí se exige NOT NULL.)
+ALTER TABLE "pagos" ADD COLUMN     "monto_lista" DECIMAL(10,2),
 ADD COLUMN     "promocion_id" INTEGER;
+
+-- Backfill: antes de esta migración no existía el concepto de promoción,
+-- así que para cualquier pago ya registrado el precio de lista es
+-- necesariamente el mismo que lo que se mostró/pagó (`monto`) — no hay
+-- descuento que reconstruir retroactivamente porque no podía haber habido
+-- ninguno.
+UPDATE "pagos" SET "monto_lista" = "monto" WHERE "monto_lista" IS NULL;
+
+ALTER TABLE "pagos" ALTER COLUMN "monto_lista" SET NOT NULL;
 
 -- AlterTable
 ALTER TABLE "planes" ADD COLUMN     "limite_materias" INTEGER,
