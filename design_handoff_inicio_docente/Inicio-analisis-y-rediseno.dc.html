@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#e8eef3; font-family:'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#2d5a9a; text-decoration:none; }
+  a:hover { color:#254674; }
+</style>
+</helmet>
+
+<section style="display:flex; flex-direction:column; gap:32px; padding:48px; align-items:flex-start">
+
+  <div style="max-width:900px; display:flex; flex-direction:column; gap:16px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <h1 style="margin:0; font-size:30px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">1b en detalle — estados y móvil</h1>
+      <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#677b89">InicioPage.tsx</span>
+    </div>
+    <p style="margin:0; font-size:16px; line-height:1.6; color:#556672; text-wrap:pretty">Todo lo que falta para implementar <a href="#1b">1b</a>: qué pasa cuando no hay clase en curso, cuando el día está vacío, mientras carga, y cómo se apila en un teléfono. El panel "Requiere tu atención" es lo único que necesita backend nuevo; el resto sale de <span style="font-family:'JetBrains Mono',monospace; font-size:13px">/api/mi-espacio/clases-hoy</span> más un campo de duración por clase.</p>
+  </div>
+
+  <div id="3a" style="display:flex; flex-wrap:wrap; gap:24px; align-items:flex-start">
+
+    <div style="display:flex; flex-direction:column; gap:10px; width:560px">
+      <div style="display:flex; align-items:center; gap:10px">
+        <span style="display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; background:#254674; color:#fff; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.04em">3a</span>
+        <span style="font-size:14px; font-weight:700; color:#2e3a42">Sin clase en curso</span>
+        <span style="font-size:13px; color:#677b89">hay clases hoy, pero ninguna ahora</span>
+      </div>
+      <div style="background:#f3f7f9; border:1px solid #bbc9d3; border-radius:12px; padding:24px">
+        <div style="border-radius:14px; background:#fff; border:1px solid #d2dde5; padding:22px; display:flex; flex-direction:column; gap:14px">
+          <div style="display:flex; align-items:center; gap:10px">
+            <div style="width:8px; height:8px; border-radius:999px; background:#bbc9d3"></div>
+            <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:#677b89">Próxima clase · en 2 h 25 min</p>
+          </div>
+          <div>
+            <p style="margin:0; font-size:21px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Álgebra Lineal</p>
+            <p style="margin:5px 0 0; font-size:15px; color:#556672">15:00 · Espacios vectoriales · 24 estudiantes</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px">
+            <div style="padding:10px 18px; border-radius:8px; background:#254674; color:#fff; font-size:15px; font-weight:600">Preparar clase</div>
+            <div style="padding:10px 16px; border-radius:8px; border:1px solid #d2dde5; font-size:15px; font-weight:500; color:#2e3a42">Evaluaciones</div>
+            <div style="padding:10px 16px; border-radius:8px; border:1px solid #d2dde5; font-size:15px; font-weight:500; color:#2e3a42">Guías</div>
+          </div>
+        </div>
+      </div>
+      <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">Mismo bloque, en superficie blanca en vez de navy: el navy queda reservado para "esto está pasando ahora". La acción primaria cambia a <strong style="color:#2e3a42">Preparar clase</strong>, no a pasar lista.</p>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:10px; width:560px">
+      <div style="display:flex; align-items:center; gap:10px">
+        <span style="display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; background:#254674; color:#fff; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.04em">3b</span>
+        <span style="font-size:14px; font-weight:700; color:#2e3a42">Día terminado</span>
+        <span style="font-size:13px; color:#677b89">todas las clases ya pasaron</span>
+      </div>
+      <div style="background:#f3f7f9; border:1px solid #bbc9d3; border-radius:12px; padding:24px">
+        <div style="border-radius:14px; background:#fff; border:1px solid #d2dde5; padding:24px; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center">
+          <p style="margin:0; font-size:19px; font-weight:700; color:#2e3a42">Terminaste el día</p>
+          <p style="margin:0; max-width:360px; font-size:15px; line-height:1.55; color:#556672">3 clases dictadas, 3 listas tomadas. Mañana empiezas con <strong style="color:#2e3a42">Cálculo I</strong> a las 08:00.</p>
+          <div style="margin-top:6px; display:flex; gap:8px">
+            <div style="padding:9px 16px; border-radius:8px; background:#254674; color:#fff; font-size:14px; font-weight:600">Revisar entregas (12)</div>
+            <div style="padding:9px 16px; border-radius:8px; border:1px solid #d2dde5; font-size:14px; font-weight:500; color:#2e3a42">Preparar mañana</div>
+          </div>
+        </div>
+      </div>
+      <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">Mismo tratamiento para el día sin clases (fin de semana): en vez de "No tienes clases hoy." en gris, cierra el día y ofrece el siguiente paso.</p>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:10px; width:560px">
+      <div style="display:flex; align-items:center; gap:10px">
+        <span style="display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; background:#254674; color:#fff; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.04em">3c</span>
+        <span style="font-size:14px; font-weight:700; color:#2e3a42">Cargando</span>
+        <span style="font-size:13px; color:#677b89">esqueleto, no spinner</span>
+      </div>
+      <div style="background:#f3f7f9; border:1px solid #bbc9d3; border-radius:12px; padding:24px; display:flex; flex-direction:column; gap:14px">
+        <div style="border-radius:14px; background:#e8eef3; height:150px"></div>
+        <div style="border-radius:12px; border:1px solid #d2dde5; background:#fff; overflow:hidden">
+          <div style="display:flex; align-items:center; gap:16px; padding:14px 16px; border-bottom:1px solid #e8eef3">
+            <div style="width:40px; height:12px; border-radius:4px; background:#e8eef3"></div>
+            <div style="flex:1; display:flex; flex-direction:column; gap:6px"><div style="width:45%; height:12px; border-radius:4px; background:#e8eef3"></div><div style="width:30%; height:10px; border-radius:4px; background:#eef3f7"></div></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:16px; padding:14px 16px">
+            <div style="width:40px; height:12px; border-radius:4px; background:#e8eef3"></div>
+            <div style="flex:1; display:flex; flex-direction:column; gap:6px"><div style="width:55%; height:12px; border-radius:4px; background:#e8eef3"></div><div style="width:26%; height:10px; border-radius:4px; background:#eef3f7"></div></div>
+          </div>
+        </div>
+      </div>
+      <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">El <span style="font-family:'JetBrains Mono',monospace; font-size:12px">Spinner</span> + "Cargando clases de hoy…" actual desplaza todo el contenido cuando llega la respuesta. El esqueleto reserva la altura del bloque y de dos filas.</p>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:10px; width:560px">
+      <div style="display:flex; align-items:center; gap:10px">
+        <span style="display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; background:#254674; color:#fff; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.04em">3d</span>
+        <span style="font-size:14px; font-weight:700; color:#2e3a42">Cuenta nueva</span>
+        <span style="font-size:13px; color:#677b89">sin ninguna materia</span>
+      </div>
+      <div style="background:#f3f7f9; border:1px solid #bbc9d3; border-radius:12px; padding:24px">
+        <div style="border-radius:14px; background:#fff; border:1px solid #d2dde5; padding:28px 24px; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center">
+          <img src="https://unpkg.com/lucide-static@0.441.0/icons/graduation-cap.svg" alt="" style="width:30px; height:30px; opacity:0.4">
+          <p style="margin:4px 0 0; font-size:19px; font-weight:700; color:#2e3a42">Bienvenido a Atenza, Roy</p>
+          <p style="margin:0; max-width:400px; font-size:15px; line-height:1.55; color:#556672">Crea tu primera materia y comparte el código con tu curso para empezar a pasar lista.</p>
+          <div style="margin-top:8px; display:flex; gap:8px">
+            <div style="padding:10px 18px; border-radius:8px; background:#254674; color:#fff; font-size:15px; font-weight:600">Crear materia</div>
+            <div style="padding:10px 16px; border-radius:8px; border:1px solid #d2dde5; font-size:15px; font-weight:500; color:#2e3a42">Unirme con un código</div>
+          </div>
+        </div>
+      </div>
+      <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">Hoy el texto describe dónde queda el botón "+" del topbar. Las dos acciones deben estar acá mismo, aunque sigan existiendo arriba.</p>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:10px">
+      <div style="display:flex; align-items:center; gap:10px">
+        <span style="display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; background:#254674; color:#fff; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.04em">3e</span>
+        <span style="font-size:14px; font-weight:700; color:#2e3a42">Móvil</span>
+        <span style="font-size:13px; color:#677b89">390 px</span>
+      </div>
+      <div style="width:390px; height:760px; overflow:hidden; border:1px solid #bbc9d3; border-radius:14px; box-shadow:0 12px 32px rgba(28,51,84,0.14); background:#f3f7f9; display:flex; flex-direction:column">
+        <header style="height:54px; flex-shrink:0; background:#fff; border-bottom:1px solid #d2dde5; padding:0 14px; display:flex; align-items:center; justify-content:space-between">
+          <div style="display:flex; align-items:center; gap:10px">
+            <img src="https://unpkg.com/lucide-static@0.441.0/icons/menu.svg" alt="" style="width:20px; height:20px; opacity:0.7">
+            <img src="isologo.png" alt="Atenza" style="width:26px; height:26px; object-fit:contain">
+          </div>
+          <div style="display:flex; align-items:center; gap:8px">
+            <div style="width:30px; height:30px; border-radius:8px; border:1px solid #d2dde5; display:flex; align-items:center; justify-content:center; font-size:15px; color:#556672">+</div>
+            <div style="width:30px; height:30px; border-radius:999px; background:#e5ecf5; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#254674">RM</div>
+          </div>
+        </header>
+        <div style="flex:1; overflow:hidden; padding:18px 14px; display:flex; flex-direction:column; gap:16px">
+          <div style="display:flex; align-items:baseline; justify-content:space-between">
+            <h1 style="margin:0; font-size:19px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Hola, Roy</h1>
+            <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:#677b89">Lun 17 · 10:34</p>
+          </div>
+
+          <div style="border-radius:14px; background:#254674; padding:18px; display:flex; flex-direction:column; gap:14px">
+            <div style="display:flex; align-items:center; gap:9px">
+              <div style="width:7px; height:7px; border-radius:999px; background:#45d3e3"></div>
+              <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:#a4e3ea">En curso · termina 11:50</p>
+            </div>
+            <div>
+              <p style="margin:0; font-size:19px; font-weight:800; letter-spacing:-0.02em; color:#fff; text-wrap:pretty">Cálculo I — Paralelo B</p>
+              <p style="margin:5px 0 0; font-size:14px; color:#cbd9ec">Derivadas: regla de la cadena · 28 estudiantes</p>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px">
+              <div style="height:46px; border-radius:8px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:700; color:#254674">Pasar lista</div>
+              <div style="display:flex; gap:8px">
+                <div style="flex:1; height:44px; border-radius:8px; border:1px solid #5c8bcc; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:500; color:#e5ecf5">Evaluaciones</div>
+                <div style="flex:1; height:44px; border-radius:8px; border:1px solid #5c8bcc; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:500; color:#e5ecf5">Guías</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 style="margin:0 0 8px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#677b89">Requiere tu atención</h2>
+            <div style="display:flex; gap:10px; overflow:hidden">
+              <div style="flex-shrink:0; width:236px; background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:13px 14px; display:flex; flex-direction:column; gap:6px">
+                <span style="align-self:flex-start; padding:3px 8px; border-radius:999px; background:#fef4ee; font-size:10px; font-weight:700; letter-spacing:0.03em; text-transform:uppercase; color:#a15326">Evaluación abierta</span>
+                <p style="margin:0; font-size:14px; font-weight:600; color:#2e3a42">Práctico 3 — Álgebra Lineal</p>
+                <p style="margin:0; font-size:13px; color:#677b89">18 de 24 · cierra 23:59</p>
+              </div>
+              <div style="flex-shrink:0; width:236px; background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:13px 14px; display:flex; flex-direction:column; gap:6px">
+                <span style="align-self:flex-start; padding:3px 8px; border-radius:999px; background:#e5ecf5; font-size:10px; font-weight:700; letter-spacing:0.03em; text-transform:uppercase; color:#254674">Por revisar</span>
+                <p style="margin:0; font-size:14px; font-weight:600; color:#2e3a42">Guía de límites</p>
+                <p style="margin:0; font-size:13px; color:#677b89">12 sin corregir</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 style="margin:0 0 8px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#677b89">Resto del día</h2>
+            <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; overflow:hidden">
+              <div style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid #e8eef3">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:500; color:#556672; width:40px">15:00</span>
+                <div style="flex:1; min-width:0">
+                  <p style="margin:0; font-size:14px; font-weight:600; color:#2e3a42">Álgebra Lineal</p>
+                  <p style="margin:1px 0 0; font-size:12px; color:#677b89">Espacios vectoriales</p>
+                </div>
+                <img src="https://unpkg.com/lucide-static@0.441.0/icons/chevron-right.svg" alt="" style="width:16px; height:16px; opacity:0.4">
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; padding:12px 14px">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:500; color:#556672; width:40px">18:00</span>
+                <div style="flex:1; min-width:0">
+                  <p style="margin:0; font-size:14px; font-weight:600; color:#2e3a42">Didáctica de la Mat.</p>
+                  <p style="margin:1px 0 0; font-size:12px; color:#677b89">Inscrito</p>
+                </div>
+                <img src="https://unpkg.com/lucide-static@0.441.0/icons/chevron-right.svg" alt="" style="width:16px; height:16px; opacity:0.4">
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 style="margin:0 0 8px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#677b89">Ya pasó</h2>
+            <div style="display:flex; align-items:center; gap:12px; padding:0 2px">
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9fb0bc; width:40px">08:00</span>
+              <p style="margin:0; flex:1; font-size:13px; color:#677b89">Cálculo I</p>
+              <span style="font-size:12px; font-weight:500; color:#14a3b3">Lista · 30/32</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p style="margin:0; width:390px; font-size:14px; line-height:1.55; color:#556672">Una columna: el bloque en curso primero, pendientes en carrusel horizontal y las filas del día debajo. Botones de 44-46 px.</p>
+    </div>
+
+  </div>
+
+</section>
+
+<section style="display:flex; flex-direction:column; gap:40px; padding:48px; align-items:flex-start">
+
+  <div style="max-width:900px; display:flex; flex-direction:column; gap:20px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <h1 style="margin:0; font-size:30px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Inicio sin sesión — análisis y rediseño</h1>
+      <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#677b89">LandingPage.tsx</span>
+    </div>
+    <p style="margin:0; font-size:16px; line-height:1.6; color:#556672; text-wrap:pretty">La landing tiene el contenido correcto pero lo presenta todo con el mismo peso y sin mostrar nunca el producto. Un docente llega, lee seis tarjetas de texto y tiene que registrarse para saber cómo se ve.</p>
+
+    <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; margin-top:4px">
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">1 · No se ve el producto</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">Cero capturas. Modo examen seguro y monitoreo en vivo son cosas que se entienden viéndolas, y aquí solo se describen en prosa.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">2 · Seis tarjetas del mismo peso</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">"Modo examen seguro" y "Monitoreo en vivo" son los diferenciadores; ocupan el mismo espacio que "Inscripción por código". La grilla iguala todo.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">3 · El dato más específico, en el texto más chico</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">"Plataforma académica para docentes universitarios" dice a quién sirve, y va en 14px sobre el <span style="font-family:'JetBrains Mono',monospace; font-size:12px">h1</span>, que en cambio enumera tres funciones.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">4 · Falta el precio</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><span style="font-family:'JetBrains Mono',monospace; font-size:12px">PlanesPage</span> ya existe pero la landing no la enlaza. Solo se promete "30 días gratis", que abre la pregunta sin responderla.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">5 · Una sección entera para el APK</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">El bloque más destacado después del hero es descargar un archivo desde GitHub. Es la acción de los estudiantes, no del docente que decide.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">6 · Sin ritmo y sin confianza</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">Cuatro secciones centradas con el mismo <span style="font-family:'JetBrains Mono',monospace; font-size:12px">py-20</span> y dos CTA idénticos. El footer no tiene contacto, privacidad ni términos — para una herramienta que guarda datos de estudiantes eso pesa.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="actual-landing" style="display:flex; flex-direction:column; gap:12px">
+    <div style="display:flex; align-items:center; gap:10px">
+      <span style="display:inline-flex; align-items:center; height:24px; padding:0 10px; border-radius:999px; background:#404f59; color:#fff; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; letter-spacing:0.04em">ACTUAL</span>
+      <span style="font-size:14px; color:#677b89">reconstrucción del código, sin cambios</span>
+    </div>
+
+    <div style="width:1180px; overflow:hidden; border:1px solid #bbc9d3; border-radius:14px; box-shadow:0 12px 32px rgba(28,51,84,0.14); background:#f3f7f9">
+      <header style="background:#fff; border-bottom:1px solid #d2dde5">
+        <div style="max-width:1024px; margin:0 auto; padding:16px 24px; display:flex; align-items:center; justify-content:space-between">
+          <span style="display:inline-flex; align-items:center; gap:8px">
+            <img src="isologo.png" alt="Atenza" style="width:32px; height:32px; object-fit:contain">
+            <span style="font-size:18px; font-weight:800; letter-spacing:-0.01em; color:#2e3a42">Atenza</span>
+          </span>
+          <div style="padding:8px 16px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42">Ingresar</div>
+        </div>
+      </header>
+
+      <div style="max-width:1024px; margin:0 auto; padding:72px 24px; text-align:center">
+        <p style="margin:0 0 12px; font-size:14px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#366dba">Plataforma académica para docentes universitarios</p>
+        <h1 style="margin:0 auto; max-width:768px; font-size:44px; font-weight:800; letter-spacing:-0.025em; line-height:1.1; color:#2e3a42">Asistencia, exámenes seguros y notas — todo en un solo lugar</h1>
+        <p style="margin:20px auto 0; max-width:672px; font-size:18px; line-height:1.6; color:#556672">Atenza te ayuda a llevar tus materias, evaluar a tus estudiantes con un modo examen que cuida la integridad académica, y centralizar las notas — sin depender de hojas de cálculo sueltas.</p>
+        <div style="margin-top:32px; display:flex; align-items:center; justify-content:center; gap:12px">
+          <div style="padding:10px 20px; border-radius:6px; background:#254674; color:#fff; font-size:16px; font-weight:500">Regístrate gratis</div>
+          <div style="padding:10px 20px; border-radius:6px; border:1px solid #d2dde5; background:#fff; font-size:16px; font-weight:500; color:#2e3a42">Ya tengo cuenta</div>
+        </div>
+        <p style="margin:16px 0 0; font-size:14px; color:#9fb0bc">30 días de prueba gratis, sin tarjeta de crédito.</p>
+      </div>
+
+      <div style="border-top:1px solid #d2dde5; padding:72px 0">
+        <div style="max-width:1024px; margin:0 auto; padding:0 24px">
+          <h2 style="margin:0; text-align:center; font-size:24px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Qué puedes hacer con Atenza</h2>
+          <div style="margin-top:40px; display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:20px">
+            <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:20px">
+              <span style="display:flex; width:40px; height:40px; align-items:center; justify-content:center; border-radius:6px; background:#f2f5fa"><img src="https://unpkg.com/lucide-static@0.441.0/icons/clipboard-check.svg" alt="" style="width:20px; height:20px; opacity:0.7"></span>
+              <h3 style="margin:12px 0 0; font-size:16px; font-weight:700; color:#2e3a42">Asistencia por clase</h3>
+              <p style="margin:6px 0 0; font-size:14px; line-height:1.55; color:#556672">Pasa lista en segundos (puntual, atraso, licencia, falta) y mira el consolidado y el % de asistencia de todo el curso.</p>
+            </div>
+            <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:20px">
+              <span style="display:flex; width:40px; height:40px; align-items:center; justify-content:center; border-radius:6px; background:#f2f5fa"><img src="https://unpkg.com/lucide-static@0.441.0/icons/square-user.svg" alt="" style="width:20px; height:20px; opacity:0.7"></span>
+              <h3 style="margin:12px 0 0; font-size:16px; font-weight:700; color:#2e3a42">Inscripción por código</h3>
+              <p style="margin:6px 0 0; font-size:14px; line-height:1.55; color:#556672">Comparte un código con tus estudiantes; ellos se inscriben solos desde la app. Nómina, búsqueda y retiro sin planillas sueltas.</p>
+            </div>
+            <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:20px">
+              <span style="display:flex; width:40px; height:40px; align-items:center; justify-content:center; border-radius:6px; background:#f2f5fa"><img src="https://unpkg.com/lucide-static@0.441.0/icons/list-checks.svg" alt="" style="width:20px; height:20px; opacity:0.7"></span>
+              <h3 style="margin:12px 0 0; font-size:16px; font-weight:700; color:#2e3a42">Evaluaciones de selección múltiple</h3>
+              <p style="margin:6px 0 0; font-size:14px; line-height:1.55; color:#556672">Arma exámenes a mano, importando un Word ya hecho, o con un prompt sugerido para tu IA favorita — todo en el mismo formato.</p>
+            </div>
+            <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:20px">
+              <span style="display:flex; width:40px; height:40px; align-items:center; justify-content:center; border-radius:6px; background:#f2f5fa"><img src="https://unpkg.com/lucide-static@0.441.0/icons/shield-check.svg" alt="" style="width:20px; height:20px; opacity:0.7"></span>
+              <h3 style="margin:12px 0 0; font-size:16px; font-weight:700; color:#2e3a42">Modo examen seguro</h3>
+              <p style="margin:6px 0 0; font-size:14px; line-height:1.55; color:#556672">Pantalla completa, sin capturas y con reporte de incidentes si el estudiante sale de la app — disponible en Android y también desde el navegador, para quienes solo tienen iPhone.</p>
+            </div>
+            <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:20px">
+              <span style="display:flex; width:40px; height:40px; align-items:center; justify-content:center; border-radius:6px; background:#f2f5fa"><img src="https://unpkg.com/lucide-static@0.441.0/icons/activity.svg" alt="" style="width:20px; height:20px; opacity:0.7"></span>
+              <h3 style="margin:12px 0 0; font-size:16px; font-weight:700; color:#2e3a42">Monitoreo en vivo</h3>
+              <p style="margin:6px 0 0; font-size:14px; line-height:1.55; color:#556672">Mira en tiempo real quién va respondiendo, pausa o cancela el examen para todo el curso, y revisa cada incidente al instante.</p>
+            </div>
+            <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:20px">
+              <span style="display:flex; width:40px; height:40px; align-items:center; justify-content:center; border-radius:6px; background:#f2f5fa"><img src="https://unpkg.com/lucide-static@0.441.0/icons/file-spreadsheet.svg" alt="" style="width:20px; height:20px; opacity:0.7"></span>
+              <h3 style="margin:12px 0 0; font-size:16px; font-weight:700; color:#2e3a42">Centralizador de notas</h3>
+              <p style="margin:6px 0 0; font-size:14px; line-height:1.55; color:#556672">Notas de todas las evaluaciones de la materia en una sola matriz, exportable a Excel cuando la necesites.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #d2dde5; background:#fff; padding:72px 0">
+        <div style="max-width:1024px; margin:0 auto; padding:0 24px; display:flex; align-items:center; gap:32px">
+          <span style="display:flex; width:64px; height:64px; flex-shrink:0; align-items:center; justify-content:center; border-radius:16px; background:#f2f5fa"><img src="https://unpkg.com/lucide-static@0.441.0/icons/smartphone.svg" alt="" style="width:32px; height:32px; opacity:0.7"></span>
+          <div style="flex:1">
+            <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">App para estudiantes (Android)</h2>
+            <p style="margin:8px 0 0; max-width:672px; font-size:16px; line-height:1.6; color:#556672">Mis materias, asistencia, notas y el modo examen seguro en modo kiosco, desde el celular. ¿Tienes iPhone? Rinde el examen igual desde <span style="color:#2d5a9a">el navegador</span>, sin instalar nada.</p>
+          </div>
+          <div style="flex-shrink:0; display:flex; align-items:center; gap:8px; padding:10px 20px; border-radius:6px; background:#254674; color:#fff; font-size:16px; font-weight:500"><img src="https://unpkg.com/lucide-static@0.441.0/icons/download.svg" alt="" style="width:18px; height:18px; filter:invert(1); opacity:0.9">Descargar APK</div>
+        </div>
+      </div>
+
+      <div style="max-width:1024px; margin:0 auto; padding:72px 24px; text-align:center">
+        <h2 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Empieza a usar Atenza hoy</h2>
+        <p style="margin:12px auto 0; max-width:576px; font-size:16px; line-height:1.6; color:#556672">Crea tu cuenta, arma tu primera materia y prueba el modo examen seguro con tus propios estudiantes.</p>
+        <div style="margin-top:24px; display:flex; justify-content:center">
+          <div style="padding:10px 20px; border-radius:6px; background:#254674; color:#fff; font-size:16px; font-weight:500">Regístrate gratis</div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #d2dde5; padding:32px 24px; display:flex; align-items:center; justify-content:center; gap:8px; font-size:14px; color:#9fb0bc">
+        <img src="isologo.png" alt="" style="width:16px; height:16px; object-fit:contain">
+        Atenza © 2026
+      </div>
+    </div>
+  </div>
+
+  <div id="2a" style="display:flex; flex-direction:column; gap:12px">
+    <div style="display:flex; align-items:center; gap:10px">
+      <span style="display:inline-flex; align-items:center; height:24px; padding:0 10px; border-radius:999px; background:#254674; color:#fff; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; letter-spacing:0.04em">2a</span>
+      <span style="font-size:15px; font-weight:700; color:#2e3a42">Mostrar el producto y jerarquizar</span>
+      <span style="font-size:14px; color:#677b89">hero con captura, dos diferenciadores grandes, precio a la vista</span>
+    </div>
+
+    <div style="width:1180px; overflow:hidden; border:1px solid #bbc9d3; border-radius:14px; box-shadow:0 12px 32px rgba(28,51,84,0.14); background:#f3f7f9">
+      <header style="background:#fff; border-bottom:1px solid #d2dde5">
+        <div style="max-width:1024px; margin:0 auto; padding:14px 24px; display:flex; align-items:center; justify-content:space-between">
+          <span style="display:inline-flex; align-items:center; gap:8px">
+            <img src="isologo.png" alt="Atenza" style="width:32px; height:32px; object-fit:contain">
+            <span style="font-size:18px; font-weight:800; letter-spacing:-0.01em; color:#2e3a42">Atenza</span>
+          </span>
+          <div style="display:flex; align-items:center; gap:24px">
+            <span style="font-size:14px; font-weight:500; color:#556672">Producto</span>
+            <span style="font-size:14px; font-weight:500; color:#556672">Precios</span>
+            <span style="font-size:14px; font-weight:500; color:#556672">Para estudiantes</span>
+            <div style="display:flex; align-items:center; gap:8px">
+              <div style="padding:8px 14px; font-size:14px; font-weight:500; color:#2e3a42">Ingresar</div>
+              <div style="padding:8px 16px; border-radius:6px; background:#254674; color:#fff; font-size:14px; font-weight:600">Crear cuenta</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div style="background:#fff; border-bottom:1px solid #d2dde5">
+        <div style="max-width:1024px; margin:0 auto; padding:64px 24px 0; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:48px; align-items:center">
+          <div>
+            <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:#14a3b3">Para docentes universitarios</p>
+            <h1 style="margin:14px 0 0; font-size:46px; font-weight:800; letter-spacing:-0.03em; line-height:1.08; color:#2e3a42; text-wrap:pretty">Toma asistencia, aplica exámenes y cierra notas sin planillas sueltas</h1>
+            <p style="margin:20px 0 0; max-width:520px; font-size:18px; line-height:1.6; color:#556672; text-wrap:pretty">Una materia, un código de inscripción y todo lo demás en el mismo lugar: la lista del día, el examen en modo seguro y la matriz de notas lista para exportar.</p>
+            <div style="margin-top:28px; display:flex; align-items:center; gap:12px">
+              <div style="padding:13px 24px; border-radius:8px; background:#254674; color:#fff; font-size:16px; font-weight:600; box-shadow:0 1px 2px rgba(46,58,66,0.05)">Regístrate gratis</div>
+              <div style="padding:13px 22px; border-radius:8px; border:1px solid #d2dde5; background:#fff; font-size:16px; font-weight:500; color:#2e3a42">Ya tengo cuenta</div>
+            </div>
+            <p style="margin:14px 0 0; font-size:14px; color:#677b89">30 días de prueba · sin tarjeta · exportable a Excel cuando quieras</p>
+          </div>
+          <div style="align-self:end">
+            <div style="height:340px; border-radius:12px 12px 0 0; border:1px solid #bbc9d3; border-bottom:none; background-image:repeating-linear-gradient(135deg, #eef3f7 0 10px, #e3ebf1 10px 20px); display:flex; align-items:center; justify-content:center">
+              <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:0.04em; color:#677b89">captura: monitoreo en vivo de un examen</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:72px 0">
+        <div style="max-width:1024px; margin:0 auto; padding:0 24px">
+          <h2 style="margin:0; font-size:28px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Lo que no vas a encontrar en una hoja de cálculo</h2>
+          <div style="margin-top:28px; display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:20px">
+            <div style="background:#fff; border:1px solid #d2dde5; border-radius:14px; overflow:hidden; box-shadow:0 1px 2px rgba(46,58,66,0.05)">
+              <div style="height:200px; background-image:repeating-linear-gradient(135deg, #eef3f7 0 10px, #e3ebf1 10px 20px); border-bottom:1px solid #d2dde5; display:flex; align-items:center; justify-content:center">
+                <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:12px; color:#677b89">captura: examen en modo kiosco</p>
+              </div>
+              <div style="padding:22px 24px">
+                <h3 style="margin:0; font-size:19px; font-weight:700; color:#2e3a42">Modo examen seguro</h3>
+                <p style="margin:8px 0 0; font-size:15px; line-height:1.6; color:#556672">Pantalla completa, sin capturas y con reporte de incidentes si el estudiante sale de la app. En Android y también desde el navegador, para quienes solo tienen iPhone.</p>
+              </div>
+            </div>
+            <div style="background:#fff; border:1px solid #d2dde5; border-radius:14px; overflow:hidden; box-shadow:0 1px 2px rgba(46,58,66,0.05)">
+              <div style="height:200px; background-image:repeating-linear-gradient(135deg, #eef3f7 0 10px, #e3ebf1 10px 20px); border-bottom:1px solid #d2dde5; display:flex; align-items:center; justify-content:center">
+                <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:12px; color:#677b89">captura: tabla de monitoreo con incidentes</p>
+              </div>
+              <div style="padding:22px 24px">
+                <h3 style="margin:0; font-size:19px; font-weight:700; color:#2e3a42">Monitoreo en vivo</h3>
+                <p style="margin:8px 0 0; font-size:15px; line-height:1.6; color:#556672">Mira en tiempo real quién va respondiendo, pausa o cancela el examen para todo el curso, y revisa cada incidente al instante.</p>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:20px; background:#fff; border:1px solid #d2dde5; border-radius:14px; padding:8px 0">
+            <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr))">
+              <div style="display:flex; gap:14px; padding:18px 24px">
+                <img src="https://unpkg.com/lucide-static@0.441.0/icons/clipboard-check.svg" alt="" style="width:20px; height:20px; margin-top:2px; opacity:0.6">
+                <div>
+                  <h3 style="margin:0; font-size:15px; font-weight:700; color:#2e3a42">Asistencia por clase</h3>
+                  <p style="margin:3px 0 0; font-size:14px; line-height:1.5; color:#556672">Puntual, atraso, licencia o falta — con el consolidado y el % del curso.</p>
+                </div>
+              </div>
+              <div style="display:flex; gap:14px; padding:18px 24px">
+                <img src="https://unpkg.com/lucide-static@0.441.0/icons/square-user.svg" alt="" style="width:20px; height:20px; margin-top:2px; opacity:0.6">
+                <div>
+                  <h3 style="margin:0; font-size:15px; font-weight:700; color:#2e3a42">Inscripción por código</h3>
+                  <p style="margin:3px 0 0; font-size:14px; line-height:1.5; color:#556672">Compartes un código y tus estudiantes se inscriben solos.</p>
+                </div>
+              </div>
+              <div style="display:flex; gap:14px; padding:18px 24px">
+                <img src="https://unpkg.com/lucide-static@0.441.0/icons/list-checks.svg" alt="" style="width:20px; height:20px; margin-top:2px; opacity:0.6">
+                <div>
+                  <h3 style="margin:0; font-size:15px; font-weight:700; color:#2e3a42">Exámenes desde un Word</h3>
+                  <p style="margin:3px 0 0; font-size:14px; line-height:1.5; color:#556672">Importa el que ya tienes hecho, o ármalo con el prompt sugerido para tu IA.</p>
+                </div>
+              </div>
+              <div style="display:flex; gap:14px; padding:18px 24px">
+                <img src="https://unpkg.com/lucide-static@0.441.0/icons/file-spreadsheet.svg" alt="" style="width:20px; height:20px; margin-top:2px; opacity:0.6">
+                <div>
+                  <h3 style="margin:0; font-size:15px; font-weight:700; color:#2e3a42">Centralizador de notas</h3>
+                  <p style="margin:3px 0 0; font-size:14px; line-height:1.5; color:#556672">Toda la materia en una matriz, exportable a Excel.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #d2dde5; background:#fff; padding:64px 0">
+        <div style="max-width:1024px; margin:0 auto; padding:0 24px">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px">
+            <h2 style="margin:0; font-size:28px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Precio</h2>
+            <span style="font-size:15px; font-weight:500; color:#2d5a9a">Ver todos los planes →</span>
+          </div>
+          <div style="margin-top:24px; display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:16px">
+            <div style="border:1px solid #d2dde5; border-radius:12px; padding:22px 24px">
+              <p style="margin:0; font-size:15px; font-weight:700; color:#2e3a42">Prueba</p>
+              <p style="margin:8px 0 0; font-size:28px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">30 días</p>
+              <p style="margin:6px 0 0; font-size:14px; color:#556672">Todo incluido, sin tarjeta.</p>
+            </div>
+            <div style="border:1px solid #254674; border-radius:12px; padding:22px 24px; box-shadow:0 4px 12px rgba(46,58,66,0.08)">
+              <p style="margin:0; font-size:15px; font-weight:700; color:#254674">Docente</p>
+              <p style="margin:8px 0 0; font-size:28px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Bs —<span style="font-size:15px; font-weight:500; color:#677b89"> /semestre</span></p>
+              <p style="margin:6px 0 0; font-size:14px; color:#556672">Materias ilimitadas y monitoreo en vivo.</p>
+            </div>
+            <div style="border:1px solid #d2dde5; border-radius:12px; padding:22px 24px">
+              <p style="margin:0; font-size:15px; font-weight:700; color:#2e3a42">Institución</p>
+              <p style="margin:8px 0 0; font-size:28px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">A convenir</p>
+              <p style="margin:6px 0 0; font-size:14px; color:#556672">Varios docentes de la misma carrera.</p>
+            </div>
+          </div>
+          <p style="margin:14px 0 0; font-family:'JetBrains Mono',monospace; font-size:11px; color:#9fb0bc">precios reales pendientes — tomar de PlanesPage / la tabla de planes</p>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #d2dde5; padding:36px 0">
+        <div style="max-width:1024px; margin:0 auto; padding:0 24px; display:flex; align-items:center; gap:16px">
+          <img src="https://unpkg.com/lucide-static@0.441.0/icons/smartphone.svg" alt="" style="width:22px; height:22px; opacity:0.55">
+          <p style="margin:0; flex:1; font-size:15px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Tus estudiantes usan la app de Android</strong> — o rinden desde el navegador si tienen iPhone. Se descarga cuando lances tu primer examen; no hace falta antes.</p>
+          <span style="font-size:15px; font-weight:500; color:#2d5a9a">Descargar APK →</span>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid #d2dde5; background:#254674; padding:64px 24px; text-align:center">
+        <h2 style="margin:0; font-size:30px; font-weight:800; letter-spacing:-0.02em; color:#fff">Empieza con tu materia de este semestre</h2>
+        <p style="margin:12px auto 0; max-width:560px; font-size:16px; line-height:1.6; color:#cbd9ec">Crea la materia, comparte el código con tu curso y prueba el modo examen seguro con tus propios estudiantes.</p>
+        <div style="margin-top:26px; display:flex; justify-content:center">
+          <div style="padding:13px 26px; border-radius:8px; background:#fff; color:#254674; font-size:16px; font-weight:700">Regístrate gratis</div>
+        </div>
+      </div>
+
+      <div style="background:#fff; border-top:1px solid #d2dde5; padding:36px 24px">
+        <div style="max-width:1024px; margin:0 auto; display:flex; justify-content:space-between; gap:32px">
+          <span style="display:inline-flex; align-items:flex-start; gap:8px">
+            <img src="isologo.png" alt="" style="width:20px; height:20px; object-fit:contain">
+            <span style="font-size:14px; color:#677b89">Atenza © 2026</span>
+          </span>
+          <div style="display:flex; gap:56px">
+            <div style="display:flex; flex-direction:column; gap:8px">
+              <p style="margin:0; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#9fb0bc">Producto</p>
+              <span style="font-size:14px; color:#556672">Funciones</span>
+              <span style="font-size:14px; color:#556672">Precios</span>
+              <span style="font-size:14px; color:#556672">App para estudiantes</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px">
+              <p style="margin:0; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#9fb0bc">Soporte</p>
+              <span style="font-size:14px; color:#556672">Contacto</span>
+              <span style="font-size:14px; color:#556672">Ayuda</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px">
+              <p style="margin:0; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#9fb0bc">Legal</p>
+              <span style="font-size:14px; color:#556672">Privacidad</span>
+              <span style="font-size:14px; color:#556672">Términos</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:1180px; display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:2px">
+      <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Hero a dos columnas.</strong> El <span style="font-family:'JetBrains Mono',monospace; font-size:12px">h1</span> ahora nombra el trabajo del docente y la captura entra en el primer pantallazo.</p>
+      <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Dos diferenciadores grandes.</strong> Examen seguro y monitoreo con imagen; las otras cuatro funciones bajan a una lista compacta.</p>
+      <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Precio en la página.</strong> Tres columnas y un link a <span style="font-family:'JetBrains Mono',monospace; font-size:12px">/planes</span>. Necesito los montos reales para llenarlo.</p>
+      <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">El APK deja de ser sección.</strong> Pasa a una línea con contexto, y el footer gana contacto, privacidad y términos.</p>
+    </div>
+  </div>
+
+</section>
+
+<section style="display:flex; flex-direction:column; gap:40px; padding:48px; align-items:flex-start">
+
+  <div style="max-width:900px; display:flex; flex-direction:column; gap:20px">
+    <div style="display:flex; align-items:baseline; gap:12px">
+      <h1 style="margin:0; font-size:30px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Pantalla de Inicio — análisis y dos rediseños</h1>
+      <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#677b89">InicioPage.tsx</span>
+    </div>
+    <p style="margin:0; font-size:16px; line-height:1.6; color:#556672; text-wrap:pretty">Reconstruí la pantalla actual desde el código y la comparo con dos direcciones de mejora. Ambas usan los tokens de Atenza sin cambios: Plus Jakarta Sans, navy <span style="font-family:'JetBrains Mono',monospace; font-size:13px">primary</span>, teal <span style="font-family:'JetBrains Mono',monospace; font-size:13px">secondary</span> y la escala de grises azulados. Los datos son de ejemplo.</p>
+
+    <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; margin-top:4px">
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">1 · Sin jerarquía temporal</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">Las clases se listan como tarjetas idénticas y la hora vive en texto secundario junto al tema. Nada indica qué está pasando ahora, qué ya terminó y qué falta.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">2 · Tres acciones iguales por clase</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">Pasar lista, Evaluaciones y Guías son tres botones <span style="font-family:'JetBrains Mono',monospace; font-size:12px">secondary</span> del mismo peso. Con cuatro clases son doce botones compitiendo, sin acción primaria.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">3 · El encabezado explica la navegación</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">"Elige una materia en el menú de la izquierda" ocupa la zona más valiosa de la pantalla para describir el sidebar que ya está a la vista.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">4 · Cero estado</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">No se ve si ya pasaste lista, si una evaluación quedó abierta ni cuántos estudiantes hay. El docente entra a la clase para averiguarlo.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">5 · "Enseño / Inscrito" duplica el sidebar</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">Los mismos dos grupos aparecen en el menú y en el contenido. En una agenda del día el rol importa menos que la hora.</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:18px 20px; display:flex; flex-direction:column; gap:6px">
+        <p style="margin:0; font-size:13px; font-weight:700; color:#cc6124">6 · El día vacío es un callejón</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672">"No tienes clases hoy." en gris deshabilitado, sin nada que hacer después. Es el estado más frecuente de un fin de semana.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="actual" style="display:flex; flex-direction:column; gap:12px">
+    <div style="display:flex; align-items:center; gap:10px">
+      <span style="display:inline-flex; align-items:center; height:24px; padding:0 10px; border-radius:999px; background:#404f59; color:#fff; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; letter-spacing:0.04em">ACTUAL</span>
+      <span style="font-size:14px; color:#677b89">reconstrucción del código, sin cambios</span>
+    </div>
+
+    <div style="width:1180px; height:640px; overflow:hidden; border:1px solid #bbc9d3; border-radius:14px; box-shadow:0 12px 32px rgba(28,51,84,0.14); background:#f3f7f9; display:flex">
+      <aside style="width:256px; flex-shrink:0; background:#fff; border-right:1px solid #d2dde5; display:flex; flex-direction:column">
+        <div style="padding:20px 16px; display:flex; align-items:center; gap:9px">
+          <img src="isologo.png" alt="Atenza" style="width:32px; height:32px; object-fit:contain">
+          <span style="font-size:18px; font-weight:800; letter-spacing:-0.01em; color:#2e3a42">Atenza</span>
+        </div>
+        <nav style="padding:0 12px; display:flex; flex-direction:column; gap:4px">
+          <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-left:2px solid #2d5a9a; border-radius:6px; background:#f2f5fa; font-size:14px; font-weight:500; color:#254674"><img src="https://unpkg.com/lucide-static@0.441.0/icons/notebook-text.svg" alt="" style="width:17px; height:17px; opacity:0.75"> Inicio</div>
+          <div style="margin-top:8px; border-top:1px solid #d2dde5; padding-top:12px; display:flex; flex-direction:column; gap:12px">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#9fb0bc"><img src="https://unpkg.com/lucide-static@0.441.0/icons/graduation-cap.svg" alt="" style="width:14px; height:14px; opacity:0.45">Enseño</div>
+              <div style="display:flex; flex-direction:column; gap:2px">
+                <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Cálculo I</div>
+                <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Cálculo I — Paralelo B</div>
+                <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Álgebra Lineal</div>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#9fb0bc"><img src="https://unpkg.com/lucide-static@0.441.0/icons/book-open.svg" alt="" style="width:14px; height:14px; opacity:0.45">Inscrito</div>
+              <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Didáctica de la Matemática</div>
+            </div>
+          </div>
+        </nav>
+      </aside>
+
+      <div style="flex:1; min-width:0; display:flex; flex-direction:column">
+        <header style="height:56px; flex-shrink:0; background:#fff; border-bottom:1px solid #d2dde5; padding:0 24px; display:flex; align-items:center; justify-content:space-between">
+          <p style="margin:0; font-size:14px; font-weight:500; color:#556672">Mi espacio</p>
+          <div style="display:flex; align-items:center; gap:8px">
+            <div style="width:32px; height:32px; border-radius:8px; border:1px solid #d2dde5; display:flex; align-items:center; justify-content:center; font-size:16px; color:#556672">+</div>
+            <div style="width:32px; height:32px; border-radius:999px; background:#e5ecf5; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#254674">RM</div>
+          </div>
+        </header>
+
+        <div style="flex:1; overflow:hidden; padding:32px 24px">
+          <div style="max-width:1024px; margin:0 auto; display:flex; flex-direction:column; gap:32px">
+            <div>
+              <h1 style="margin:0; font-size:24px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Hola, Roy 👋</h1>
+              <p style="margin:4px 0 0; font-size:14px; color:#556672">Elige una materia en el menú de la izquierda para entrar, o revisa tus clases de hoy acá abajo.</p>
+            </div>
+
+            <section>
+              <h2 style="margin:0 0 12px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#556672">Enseño</h2>
+              <div style="display:flex; flex-direction:column; gap:12px">
+                <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:16px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px">
+                  <div style="min-width:0">
+                    <p style="margin:0; font-size:15px; font-weight:600; color:#2e3a42">Cálculo I</p>
+                    <p style="margin:2px 0 0; font-size:14px; color:#556672">08:00 · Límites y continuidad</p>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px">
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42"><img src="https://unpkg.com/lucide-static@0.441.0/icons/clipboard-check.svg" alt="" style="width:15px; height:15px; opacity:0.8">Pasar lista</div>
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42"><img src="https://unpkg.com/lucide-static@0.441.0/icons/clipboard-list.svg" alt="" style="width:15px; height:15px; opacity:0.8">Evaluaciones</div>
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42"><img src="https://unpkg.com/lucide-static@0.441.0/icons/book-open.svg" alt="" style="width:15px; height:15px; opacity:0.8">Guías</div>
+                  </div>
+                </div>
+                <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:16px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px">
+                  <div style="min-width:0">
+                    <p style="margin:0; font-size:15px; font-weight:600; color:#2e3a42">Cálculo I — Paralelo B</p>
+                    <p style="margin:2px 0 0; font-size:14px; color:#556672">10:30 · Derivadas: regla de la cadena</p>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px">
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42"><img src="https://unpkg.com/lucide-static@0.441.0/icons/clipboard-check.svg" alt="" style="width:15px; height:15px; opacity:0.8">Pasar lista</div>
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42"><img src="https://unpkg.com/lucide-static@0.441.0/icons/clipboard-list.svg" alt="" style="width:15px; height:15px; opacity:0.8">Evaluaciones</div>
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42"><img src="https://unpkg.com/lucide-static@0.441.0/icons/book-open.svg" alt="" style="width:15px; height:15px; opacity:0.8">Guías</div>
+                  </div>
+                </div>
+                <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:16px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px">
+                  <div style="min-width:0">
+                    <p style="margin:0; font-size:15px; font-weight:600; color:#2e3a42">Álgebra Lineal</p>
+                    <p style="margin:2px 0 0; font-size:14px; color:#556672">15:00 · Espacios vectoriales</p>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px">
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42"><img src="https://unpkg.com/lucide-static@0.441.0/icons/clipboard-check.svg" alt="" style="width:15px; height:15px; opacity:0.8">Pasar lista</div>
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42"><img src="https://unpkg.com/lucide-static@0.441.0/icons/clipboard-list.svg" alt="" style="width:15px; height:15px; opacity:0.8">Evaluaciones</div>
+                    <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42"><img src="https://unpkg.com/lucide-static@0.441.0/icons/book-open.svg" alt="" style="width:15px; height:15px; opacity:0.8">Guías</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h2 style="margin:0 0 12px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#556672">Inscrito</h2>
+              <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; box-shadow:0 1px 2px rgba(46,58,66,0.05); padding:16px; display:flex; align-items:center; justify-content:space-between; gap:12px">
+                <div>
+                  <p style="margin:0; font-size:15px; font-weight:600; color:#2e3a42">Didáctica de la Matemática</p>
+                  <p style="margin:2px 0 0; font-size:14px; color:#556672">18:00 · Evaluación formativa en aula</p>
+                </div>
+                <div style="padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; background:#fff; font-size:14px; font-weight:500; color:#2e3a42">Ver materia →</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:32px; align-items:flex-start; flex-wrap:wrap">
+
+    <div id="1a" style="display:flex; flex-direction:column; gap:12px">
+      <div style="display:flex; align-items:center; gap:10px">
+        <span style="display:inline-flex; align-items:center; height:24px; padding:0 10px; border-radius:999px; background:#254674; color:#fff; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; letter-spacing:0.04em">1a</span>
+        <span style="font-size:15px; font-weight:700; color:#2e3a42">Agenda del día</span>
+        <span style="font-size:14px; color:#677b89">una sola línea de tiempo, estado visible, una acción primaria por clase</span>
+      </div>
+
+      <div style="width:1180px; height:640px; overflow:hidden; border:1px solid #bbc9d3; border-radius:14px; box-shadow:0 12px 32px rgba(28,51,84,0.14); background:#f3f7f9; display:flex">
+        <aside style="width:256px; flex-shrink:0; background:#fff; border-right:1px solid #d2dde5; display:flex; flex-direction:column">
+          <div style="padding:20px 16px; display:flex; align-items:center; gap:9px">
+            <img src="isologo.png" alt="Atenza" style="width:32px; height:32px; object-fit:contain">
+            <span style="font-size:18px; font-weight:800; letter-spacing:-0.01em; color:#2e3a42">Atenza</span>
+          </div>
+          <nav style="padding:0 12px; display:flex; flex-direction:column; gap:4px">
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-left:2px solid #2d5a9a; border-radius:6px; background:#f2f5fa; font-size:14px; font-weight:500; color:#254674">Hoy</div>
+            <div style="margin-top:8px; border-top:1px solid #d2dde5; padding-top:12px; display:flex; flex-direction:column; gap:12px">
+              <div>
+                <div style="padding:6px 12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#9fb0bc">Enseño</div>
+                <div style="display:flex; flex-direction:column; gap:2px">
+                  <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Cálculo I</div>
+                  <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Cálculo I — Paralelo B</div>
+                  <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Álgebra Lineal</div>
+                </div>
+              </div>
+              <div>
+                <div style="padding:6px 12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#9fb0bc">Inscrito</div>
+                <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Didáctica de la Matemática</div>
+              </div>
+            </div>
+          </nav>
+        </aside>
+
+        <div style="flex:1; min-width:0; display:flex; flex-direction:column">
+          <header style="height:56px; flex-shrink:0; background:#fff; border-bottom:1px solid #d2dde5; padding:0 24px; display:flex; align-items:center; justify-content:space-between">
+            <p style="margin:0; font-size:14px; font-weight:500; color:#556672">Mi espacio</p>
+            <div style="display:flex; align-items:center; gap:8px">
+              <div style="width:32px; height:32px; border-radius:8px; border:1px solid #d2dde5; display:flex; align-items:center; justify-content:center; font-size:16px; color:#556672">+</div>
+              <div style="width:32px; height:32px; border-radius:999px; background:#e5ecf5; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#254674">RM</div>
+            </div>
+          </header>
+
+          <div style="flex:1; overflow:hidden; padding:28px 24px">
+            <div style="max-width:1024px; margin:0 auto; display:flex; flex-direction:column; gap:22px">
+
+              <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; padding-bottom:16px; border-bottom:1px solid #d2dde5">
+                <div>
+                  <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; color:#14a3b3">Lunes 17 de agosto</p>
+                  <h1 style="margin:6px 0 0; font-size:26px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">4 clases hoy</h1>
+                </div>
+                <p style="margin:0; font-size:14px; color:#556672">2 listas por pasar · 1 evaluación abierta</p>
+              </div>
+
+              <div style="display:flex; flex-direction:column">
+
+                <div style="display:grid; grid-template-columns:64px 20px 1fr; align-items:stretch; column-gap:0">
+                  <div style="padding-top:16px; text-align:right; padding-right:14px">
+                    <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:500; color:#9fb0bc">08:00</p>
+                  </div>
+                  <div style="display:flex; flex-direction:column; align-items:center">
+                    <div style="width:9px; height:9px; border-radius:999px; background:#bbc9d3; margin-top:21px"></div>
+                    <div style="flex:1; width:1px; background:#d2dde5"></div>
+                  </div>
+                  <div style="padding:0 0 12px 16px">
+                    <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; opacity:0.72">
+                      <div>
+                        <p style="margin:0; font-size:15px; font-weight:600; color:#556672">Cálculo I</p>
+                        <p style="margin:2px 0 0; font-size:14px; color:#677b89">Límites y continuidad</p>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:12px">
+                        <span style="font-size:13px; font-weight:500; color:#14a3b3">Asistencia tomada · 30/32</span>
+                        <div style="padding:6px 12px; border:1px solid #d2dde5; border-radius:6px; font-size:14px; font-weight:500; color:#2e3a42">Ver clase</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:64px 20px 1fr; align-items:stretch">
+                  <div style="padding-top:18px; text-align:right; padding-right:14px">
+                    <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:700; color:#254674">10:30</p>
+                    <p style="margin:2px 0 0; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; color:#cc6124">AHORA</p>
+                  </div>
+                  <div style="display:flex; flex-direction:column; align-items:center">
+                    <div style="width:11px; height:11px; border-radius:999px; background:#cc6124; box-shadow:0 0 0 4px #fef4ee; margin-top:22px"></div>
+                    <div style="flex:1; width:1px; background:#d2dde5"></div>
+                  </div>
+                  <div style="padding:0 0 12px 16px">
+                    <div style="background:#fff; border:1px solid #bbc9d3; border-radius:12px; box-shadow:0 4px 12px rgba(46,58,66,0.08); padding:18px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px">
+                      <div>
+                        <p style="margin:0; font-size:17px; font-weight:700; color:#2e3a42">Cálculo I — Paralelo B</p>
+                        <p style="margin:3px 0 0; font-size:14px; color:#556672">Derivadas: regla de la cadena · 28 estudiantes</p>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:8px">
+                        <div style="padding:9px 16px; border:1px solid #d2dde5; border-radius:6px; font-size:14px; font-weight:500; color:#2e3a42">Guías</div>
+                        <div style="padding:9px 16px; border:1px solid #d2dde5; border-radius:6px; font-size:14px; font-weight:500; color:#2e3a42">Evaluaciones</div>
+                        <div style="padding:9px 18px; border-radius:6px; background:#254674; color:#fff; font-size:14px; font-weight:600; box-shadow:0 1px 2px rgba(46,58,66,0.05)">Pasar lista</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:64px 20px 1fr; align-items:stretch">
+                  <div style="padding-top:16px; text-align:right; padding-right:14px">
+                    <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:500; color:#556672">15:00</p>
+                  </div>
+                  <div style="display:flex; flex-direction:column; align-items:center">
+                    <div style="width:9px; height:9px; border-radius:999px; background:#fff; border:2px solid #bbc9d3; margin-top:21px"></div>
+                    <div style="flex:1; width:1px; background:#d2dde5"></div>
+                  </div>
+                  <div style="padding:0 0 12px 16px">
+                    <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px">
+                      <div>
+                        <p style="margin:0; font-size:15px; font-weight:600; color:#2e3a42">Álgebra Lineal</p>
+                        <p style="margin:2px 0 0; font-size:14px; color:#556672">Espacios vectoriales · 24 estudiantes</p>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:12px">
+                        <span style="padding:3px 9px; border-radius:999px; background:#fef4ee; font-size:12px; font-weight:600; color:#a15326">Evaluación abierta</span>
+                        <div style="padding:6px 14px; border:1px solid #d2dde5; border-radius:6px; font-size:14px; font-weight:500; color:#2e3a42">Preparar clase</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:64px 20px 1fr; align-items:stretch">
+                  <div style="padding-top:16px; text-align:right; padding-right:14px">
+                    <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:14px; font-weight:500; color:#556672">18:00</p>
+                  </div>
+                  <div style="display:flex; flex-direction:column; align-items:center">
+                    <div style="width:9px; height:9px; border-radius:999px; background:#fff; border:2px solid #bbc9d3; margin-top:21px"></div>
+                  </div>
+                  <div style="padding:0 0 0 16px">
+                    <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px">
+                      <div style="display:flex; align-items:center; gap:10px">
+                        <span style="padding:3px 9px; border-radius:999px; background:#e3f5f7; font-size:12px; font-weight:600; color:#0f7e8a">Inscrito</span>
+                        <div>
+                          <p style="margin:0; font-size:15px; font-weight:600; color:#2e3a42">Didáctica de la Matemática</p>
+                          <p style="margin:2px 0 0; font-size:14px; color:#556672">Evaluación formativa en aula</p>
+                        </div>
+                      </div>
+                      <div style="padding:6px 14px; border:1px solid #d2dde5; border-radius:6px; font-size:14px; font-weight:500; color:#2e3a42">Ver materia</div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:1180px; display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:2px">
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Una lista, no dos.</strong> El orden es la hora; el rol pasa a ser una etiqueta. El sidebar sigue siendo el lugar de las materias.</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Una acción primaria.</strong> La clase en curso crece y su botón navy es el siguiente paso obvio; las pasadas se atenúan con el resultado ya resuelto.</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Estado en la tarjeta.</strong> Asistencia tomada, evaluación abierta y número de estudiantes se leen sin entrar a la clase.</p>
+      </div>
+    </div>
+
+    <div id="1b" style="display:flex; flex-direction:column; gap:12px">
+      <div style="display:flex; align-items:center; gap:10px">
+        <span style="display:inline-flex; align-items:center; height:24px; padding:0 10px; border-radius:999px; background:#254674; color:#fff; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; letter-spacing:0.04em">1b</span>
+        <span style="font-size:15px; font-weight:700; color:#2e3a42">Foco en la clase de ahora</span>
+        <span style="font-size:14px; color:#677b89">un bloque grande para lo inmediato y una columna de pendientes</span>
+      </div>
+
+      <div style="width:1180px; height:640px; overflow:hidden; border:1px solid #bbc9d3; border-radius:14px; box-shadow:0 12px 32px rgba(28,51,84,0.14); background:#f3f7f9; display:flex">
+        <aside style="width:256px; flex-shrink:0; background:#fff; border-right:1px solid #d2dde5; display:flex; flex-direction:column">
+          <div style="padding:20px 16px; display:flex; align-items:center; gap:9px">
+            <img src="isologo.png" alt="Atenza" style="width:32px; height:32px; object-fit:contain">
+            <span style="font-size:18px; font-weight:800; letter-spacing:-0.01em; color:#2e3a42">Atenza</span>
+          </div>
+          <nav style="padding:0 12px; display:flex; flex-direction:column; gap:4px">
+            <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-left:2px solid #2d5a9a; border-radius:6px; background:#f2f5fa; font-size:14px; font-weight:500; color:#254674">Hoy</div>
+            <div style="margin-top:8px; border-top:1px solid #d2dde5; padding-top:12px; display:flex; flex-direction:column; gap:12px">
+              <div>
+                <div style="padding:6px 12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#9fb0bc">Enseño</div>
+                <div style="display:flex; flex-direction:column; gap:2px">
+                  <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Cálculo I</div>
+                  <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Cálculo I — Paralelo B</div>
+                  <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Álgebra Lineal</div>
+                </div>
+              </div>
+              <div>
+                <div style="padding:6px 12px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#9fb0bc">Inscrito</div>
+                <div style="padding:6px 12px; border-left:2px solid transparent; font-size:14px; color:#556672">Didáctica de la Matemática</div>
+              </div>
+            </div>
+          </nav>
+        </aside>
+
+        <div style="flex:1; min-width:0; display:flex; flex-direction:column">
+          <header style="height:56px; flex-shrink:0; background:#fff; border-bottom:1px solid #d2dde5; padding:0 24px; display:flex; align-items:center; justify-content:space-between">
+            <p style="margin:0; font-size:14px; font-weight:500; color:#556672">Mi espacio</p>
+            <div style="display:flex; align-items:center; gap:8px">
+              <div style="width:32px; height:32px; border-radius:8px; border:1px solid #d2dde5; display:flex; align-items:center; justify-content:center; font-size:16px; color:#556672">+</div>
+              <div style="width:32px; height:32px; border-radius:999px; background:#e5ecf5; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#254674">RM</div>
+            </div>
+          </header>
+
+          <div style="flex:1; overflow:hidden; padding:28px 24px">
+            <div style="max-width:1024px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1fr) 296px; gap:24px; align-items:start">
+
+              <div style="display:flex; flex-direction:column; gap:18px; min-width:0">
+                <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px">
+                  <h1 style="margin:0; font-size:22px; font-weight:800; letter-spacing:-0.02em; color:#2e3a42">Hola, Roy</h1>
+                  <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; color:#677b89">Lun 17 ago · 10:34</p>
+                </div>
+
+                <div style="border-radius:14px; background:#254674; padding:24px; display:flex; flex-direction:column; gap:18px">
+                  <div style="display:flex; align-items:center; gap:10px">
+                    <div style="width:8px; height:8px; border-radius:999px; background:#45d3e3"></div>
+                    <p style="margin:0; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:#a4e3ea">En curso · termina 11:50</p>
+                  </div>
+                  <div>
+                    <p style="margin:0; font-size:24px; font-weight:800; letter-spacing:-0.02em; color:#fff">Cálculo I — Paralelo B</p>
+                    <p style="margin:6px 0 0; font-size:15px; color:#cbd9ec">Derivadas: regla de la cadena · 28 estudiantes</p>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:10px">
+                    <div style="padding:11px 20px; border-radius:8px; background:#fff; font-size:15px; font-weight:700; color:#254674">Pasar lista</div>
+                    <div style="padding:11px 18px; border-radius:8px; border:1px solid #5c8bcc; font-size:15px; font-weight:500; color:#e5ecf5">Evaluaciones</div>
+                    <div style="padding:11px 18px; border-radius:8px; border:1px solid #5c8bcc; font-size:15px; font-weight:500; color:#e5ecf5">Guías</div>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 style="margin:0 0 10px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#677b89">Resto del día</h2>
+                  <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; overflow:hidden">
+                    <div style="display:flex; align-items:center; gap:16px; padding:13px 16px; border-bottom:1px solid #e8eef3">
+                      <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:500; color:#556672; width:44px">15:00</span>
+                      <div style="flex:1; min-width:0">
+                        <p style="margin:0; font-size:15px; font-weight:600; color:#2e3a42">Álgebra Lineal</p>
+                        <p style="margin:1px 0 0; font-size:13px; color:#677b89">Espacios vectoriales</p>
+                      </div>
+                      <span style="font-size:14px; font-weight:500; color:#2d5a9a">Preparar →</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:16px; padding:13px 16px">
+                      <span style="font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:500; color:#556672; width:44px">18:00</span>
+                      <div style="flex:1; min-width:0">
+                        <p style="margin:0; font-size:15px; font-weight:600; color:#2e3a42">Didáctica de la Matemática</p>
+                        <p style="margin:1px 0 0; font-size:13px; color:#677b89">Inscrito · Evaluación formativa</p>
+                      </div>
+                      <span style="font-size:14px; font-weight:500; color:#2d5a9a">Ver →</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h2 style="margin:0 0 10px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; color:#677b89">Ya pasó</h2>
+                  <div style="display:flex; align-items:center; gap:16px; padding:0 16px">
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#9fb0bc; width:44px">08:00</span>
+                    <p style="margin:0; flex:1; font-size:14px; color:#677b89">Cálculo I · Límites y continuidad</p>
+                    <span style="font-size:13px; font-weight:500; color:#14a3b3">Lista tomada · 30/32</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="background:#fff; border:1px solid #d2dde5; border-radius:14px; overflow:hidden">
+                <div style="padding:14px 16px; border-bottom:1px solid #d2dde5">
+                  <h2 style="margin:0; font-size:14px; font-weight:700; color:#2e3a42">Requiere tu atención</h2>
+                </div>
+                <div style="display:flex; flex-direction:column">
+                  <div style="padding:14px 16px; border-bottom:1px solid #e8eef3; display:flex; flex-direction:column; gap:6px">
+                    <span style="align-self:flex-start; padding:3px 9px; border-radius:999px; background:#fef4ee; font-size:11px; font-weight:700; letter-spacing:0.03em; text-transform:uppercase; color:#a15326">Evaluación abierta</span>
+                    <p style="margin:0; font-size:14px; font-weight:600; color:#2e3a42">Práctico 3 — Álgebra Lineal</p>
+                    <p style="margin:0; font-size:13px; color:#677b89">18 de 24 entregaron · cierra hoy 23:59</p>
+                  </div>
+                  <div style="padding:14px 16px; border-bottom:1px solid #e8eef3; display:flex; flex-direction:column; gap:6px">
+                    <span style="align-self:flex-start; padding:3px 9px; border-radius:999px; background:#e5ecf5; font-size:11px; font-weight:700; letter-spacing:0.03em; text-transform:uppercase; color:#254674">Por revisar</span>
+                    <p style="margin:0; font-size:14px; font-weight:600; color:#2e3a42">Guía de límites — Cálculo I</p>
+                    <p style="margin:0; font-size:13px; color:#677b89">12 respuestas sin corregir</p>
+                  </div>
+                  <div style="padding:14px 16px; display:flex; flex-direction:column; gap:6px">
+                    <span style="align-self:flex-start; padding:3px 9px; border-radius:999px; background:#e8eef3; font-size:11px; font-weight:700; letter-spacing:0.03em; text-transform:uppercase; color:#556672">Asistencia</span>
+                    <p style="margin:0; font-size:14px; font-weight:600; color:#2e3a42">2 faltas seguidas: J. Alvarado</p>
+                    <p style="margin:0; font-size:13px; color:#677b89">Cálculo I — Paralelo B</p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:1180px; display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:2px">
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Lo inmediato manda.</strong> La clase en curso ocupa un bloque navy con su propia acción primaria; el resto del día baja a filas compactas.</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Usa el ancho.</strong> La columna derecha convierte el aire sobrante en trabajo pendiente concreto en vez de tarjetas estiradas.</p>
+        <p style="margin:0; font-size:14px; line-height:1.55; color:#556672"><strong style="color:#2e3a42">Más pesado de construir.</strong> Requiere endpoints nuevos para pendientes; <a href="#1a">1a</a> se resuelve con lo que ya devuelve <span style="font-family:'JetBrains Mono',monospace; font-size:12px">/clases-hoy</span>.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="width:1180px; background:#fff; border:1px solid #d2dde5; border-radius:14px; padding:24px 26px; display:flex; flex-direction:column; gap:14px">
+    <h2 style="margin:0; font-size:17px; font-weight:700; color:#2e3a42">El día sin clases</h2>
+    <p style="margin:0; max-width:640px; font-size:14px; line-height:1.6; color:#556672">Hoy ese caso muestra "No tienes clases hoy." en gris deshabilitado. Es el estado de todos los fines de semana y de cualquier día libre, así que conviene que ofrezca el siguiente paso.</p>
+    <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; margin-top:4px">
+      <div style="background:#f3f7f9; border:1px dashed #bbc9d3; border-radius:12px; padding:36px 24px; text-align:center">
+        <p style="margin:0; font-size:14px; color:#9fb0bc">No tienes clases hoy.</p>
+        <p style="margin:14px 0 0; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:#9fb0bc">Actual</p>
+      </div>
+      <div style="background:#fff; border:1px solid #d2dde5; border-radius:12px; padding:28px 24px; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center">
+        <p style="margin:0; font-size:17px; font-weight:700; color:#2e3a42">Sin clases hoy</p>
+        <p style="margin:0; max-width:320px; font-size:14px; line-height:1.55; color:#556672">Tu próxima clase es <strong style="color:#2e3a42">Cálculo I</strong>, mañana 08:00 — Derivadas implícitas.</p>
+        <div style="display:flex; gap:8px; margin-top:6px">
+          <div style="padding:9px 16px; border-radius:6px; background:#254674; color:#fff; font-size:14px; font-weight:600">Preparar esa clase</div>
+          <div style="padding:9px 16px; border-radius:6px; border:1px solid #d2dde5; font-size:14px; font-weight:500; color:#2e3a42">Revisar entregas (12)</div>
+        </div>
+        <p style="margin:12px 0 0; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:#9fb0bc">Propuesta</p>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+</x-dc>
+</body>
+</html>

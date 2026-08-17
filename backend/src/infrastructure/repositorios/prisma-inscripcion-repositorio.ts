@@ -102,4 +102,8 @@ export class PrismaInscripcionRepositorio implements InscripcionRepositorio {
       where: { retirado: false, materia: { docente_id } },
     });
   }
+
+  async contarActivosPorMateria(materia_id: number): Promise<number> {
+    return this.prisma.inscripcion.count({ where: { materia_id, retirado: false } });
+  }
 }

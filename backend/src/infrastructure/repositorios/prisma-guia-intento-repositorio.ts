@@ -3,6 +3,7 @@ import {
   FilaMonitoreoGuia,
   FilaResultadoGuia,
   FilaRevisionGuia,
+  FilaRevisionPendienteDocente,
   GuiaIncidente,
   GuiaIntento,
   GuiaRespuesta,
@@ -169,6 +170,48 @@ export class PrismaGuiaIntentoRepositorio implements GuiaIntentoRepositorio {
       respuesta_modelo: f.pregunta.respuesta_modelo,
       texto_libre: f.texto_libre,
     }));
+  }
+
+  async listarRevisionPendientePorDocente(docente_id: number): Promise<FilaRevisionPendienteDocente[]> {
+    const filas = await this.prisma.guiaRespuesta.findMany({
+      where: {
+        correcta: null,
+        intento: { es_oficial: true, guia: { clase: { materia: { docente_id } } } },
+      },
+      select: {
+        intento: {
+          select: {
+            guia: {
+              select: {
+                id: true,
+                tema: true,
+                clase: { select: { materia: { select: { id: true, nombre_materia: true } } } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Agrupado en JS por guía — el volumen (respuestas abiertas pendientes
+    // de un docente) es chico, no justifica un groupBy con joins anidados.
+    const porGuia = new Map<number, FilaRevisionPendienteDocente>();
+    for (const f of filas) {
+      const { guia } = f.intento;
+      const existente = porGuia.get(guia.id);
+      if (existente) {
+        existente.pendientes += 1;
+      } else {
+        porGuia.set(guia.id, {
+          guia_id: guia.id,
+          guia_tema: guia.tema,
+          materia_id: guia.clase.materia.id,
+          materia_nombre: guia.clase.materia.nombre_materia,
+          pendientes: 1,
+        });
+      }
+    }
+    return [...porGuia.values()];
   }
 
   async crear(datos: DatosNuevoGuiaIntento): Promise<GuiaIntento> {

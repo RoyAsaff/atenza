@@ -2,6 +2,7 @@ import {
   FilaMonitoreoGuia,
   FilaResultadoGuia,
   FilaRevisionGuia,
+  FilaRevisionPendienteDocente,
   GuiaIncidente,
   GuiaIntento,
   GuiaRespuesta,
@@ -45,6 +46,10 @@ export interface GuiaIntentoRepositorio {
   /** Respuestas abiertas (correcta = null) de intentos oficiales, listas
    * para que el docente las califique. */
   listarRevisionPendiente(guia_id: number): Promise<FilaRevisionGuia[]>;
+  /** Inicio (17/08) · panel "Requiere tu atención": cuántas respuestas
+   * abiertas pendientes hay por guía, cruzando TODAS las materias del
+   * docente (no una guía puntual como el método de arriba). */
+  listarRevisionPendientePorDocente(docente_id: number): Promise<FilaRevisionPendienteDocente[]>;
   crear(datos: DatosNuevoGuiaIntento): Promise<GuiaIntento>;
   cambiarEstado(
     id: number,

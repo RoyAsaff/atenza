@@ -381,19 +381,38 @@ export interface MateriaInscrita {
   };
 }
 
-// Resumen de "Inicio" (08/08): próxima clase, última evaluación y última
-// guía por cada materia — dictada e inscrita (GET /api/mi-espacio/resumen).
+// Clases de HOY (13/08, GET /api/mi-espacio/clases-hoy) — dictadas e
+// inscritas. Rediseño de Inicio (17/08, handoff 1b): se agregan los campos
+// para el bloque "en curso"/"Resto del día"/"Ya pasó". `duracion_minutos`
+// es un valor FIJO en el backend (Clase no tiene duración real todavía).
 export interface ClaseDeHoy {
   clase_id: number;
   materia_id: number;
   nombre_materia: string;
   hora: string;
   tema: string;
+  duracion_minutos: number;
+  rol: 'dictada' | 'inscrita';
+  total_estudiantes: number;
+  asistencia_tomada: boolean;
+  asistencia_resumen: { presentes: number; total: number } | null;
+  tiene_evaluacion_abierta: boolean;
 }
 
 export interface ClasesDeHoy {
   dictadas: ClaseDeHoy[];
   inscritas: ClaseDeHoy[];
+}
+
+// Inicio (17/08) · panel "Requiere tu atención" (GET /api/mi-espacio/pendientes).
+// Sin categoría "asistencia" en esta pasada (ver CONTEXTO.md).
+export type TipoPendiente = 'evaluacion_abierta' | 'por_revisar';
+
+export interface Pendiente {
+  tipo: TipoPendiente;
+  titulo: string;
+  detalle: string;
+  url: string;
 }
 
 // Guías de pre-clase (fusión con PaginaGuias, 05/08; guías nativas 16/08).

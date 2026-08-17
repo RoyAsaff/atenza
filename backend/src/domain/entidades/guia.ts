@@ -195,3 +195,14 @@ export interface FilaRevisionGuia {
   respuesta_modelo: string | null;
   texto_libre: string | null;
 }
+
+/** Inicio (17/08) · panel "Requiere tu atención": conteo de respuestas
+ * abiertas pendientes por guía, cruzando todas las materias del docente
+ * (a diferencia de FilaRevisionGuia, que es fila a fila de UNA guía). */
+export interface FilaRevisionPendienteDocente {
+  guia_id: number;
+  guia_tema: string;
+  materia_id: number;
+  materia_nombre: string;
+  pendientes: number;
+}

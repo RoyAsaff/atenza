@@ -34,4 +34,7 @@ export interface InscripcionRepositorio {
    * contra `Plan.limite_estudiantes` al inscribir a alguien nuevo.
    */
   contarActivasPorDocente(docente_id: number): Promise<number>;
+  /** Inicio (17/08): estudiantes activos de UNA materia puntual (para el
+   * subtítulo "N estudiantes" del bloque de clase en curso/próxima). */
+  contarActivosPorMateria(materia_id: number): Promise<number>;
 }

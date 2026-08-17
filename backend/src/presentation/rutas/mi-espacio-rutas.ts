@@ -9,6 +9,7 @@ import {
   tokenService,
   verClasesDeHoy,
   verEvaluacionesDocente,
+  verPendientesDocente,
 } from '../dependencias';
 import { crearAutenticar } from '../middlewares/autenticar';
 import { autorizarContexto } from '../middlewares/autorizar';
@@ -58,6 +59,16 @@ miEspacioRouter.get('/evaluaciones', autenticar, soloDocente, async (req, res, n
   try {
     const evaluaciones = await verEvaluacionesDocente.ejecutar({ docente_id: req.auth!.sub });
     res.json({ evaluaciones });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/mi-espacio/pendientes — Inicio (17/08): panel "Requiere tu atención".
+miEspacioRouter.get('/pendientes', autenticar, soloDocente, async (req, res, next) => {
+  try {
+    const pendientes = await verPendientesDocente.ejecutar({ docente_id: req.auth!.sub });
+    res.json({ pendientes });
   } catch (error) {
     next(error);
   }

@@ -107,6 +107,7 @@ import {
 } from '../application/evaluaciones/importar-preguntas';
 import { extraerHtmlDocx } from '../infrastructure/parsers/extraer-html-docx';
 import { VerClasesDeHoy } from '../application/mi-espacio/ver-clases-hoy';
+import { VerPendientesDocente } from '../application/mi-espacio/ver-pendientes';
 import { PrismaGuiaRepositorio } from '../infrastructure/repositorios/prisma-guia-repositorio';
 import { PrismaGuiaCompletadaRepositorio } from '../infrastructure/repositorios/prisma-guia-completada-repositorio';
 import { PrismaGuiaIntentoRepositorio } from '../infrastructure/repositorios/prisma-guia-intento-repositorio';
@@ -715,10 +716,17 @@ export const barrerVencimientos = new BarrerVencimientos(
   socketIoEmisor,
 );
 
-// "Inicio" (13/08): clases de HOY — dictadas e inscritas, en una sola
-// llamada (ver-clases-hoy.ts).
+// "Inicio" (13/08, extendido 17/08): clases de HOY — dictadas e inscritas,
+// en una sola llamada (ver-clases-hoy.ts).
 export const verClasesDeHoy = new VerClasesDeHoy(
   materiaRepositorio,
   inscripcionRepositorio,
   claseRepositorio,
+  asistenciaRepositorio,
+  evaluacionRepositorio,
+);
+// Inicio (17/08): panel "Requiere tu atención" (ver-pendientes.ts).
+export const verPendientesDocente = new VerPendientesDocente(
+  evaluacionRepositorio,
+  guiaIntentoRepositorio,
 );
