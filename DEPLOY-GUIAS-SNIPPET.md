@@ -12,6 +12,28 @@ guía) con la MISMA referencia. Las preguntas `quiz-open` (textarea + "ver
 respuesta modelo") no se autocalifican — se reportan como pendientes y las
 revisás vos en Atenza.
 
+**⚠️ Requisito crítico si tu progreso vive en `localStorage` por página**
+(como el motor de quizzes de estas guías): ese progreso está pensado para
+"completaste esto alguna vez en tu vida en este navegador", no sabe nada
+de "intentos" de Atenza. Si no lo limpiás al entrar a un lanzamiento
+nuevo, cualquier resto de una práctica libre anterior o de un intento
+previo (oficial o repaso) ya deja casi todo marcado como resuelto — con
+eso, contestar la PRIMERA pregunta nueva alcanza para que tu propio
+código crea que ya se terminó todo, dispara `/finalizar` de una, y el
+backend cierra el intento antes de que el estudiante siga contestando
+(bug real, 17/08: la nota le quedó calculada con una sola respuesta,
+todo lo demás rechazado en silencio porque el intento ya estaba
+cerrado). Antes de leer/escribir tu progreso, comparar contra qué
+`guia_intento` pertenece lo que ya está guardado, y si cambió, limpiarlo:
+
+```js
+var claveIntentoActual = TU_PREFIJO_DE_PROGRESO + '_atenza_intento_actual';
+if (localStorage.getItem(claveIntentoActual) !== guiaIntentoId) {
+  // limpiá acá las claves de progreso de esta página (las tuyas, no las de Atenza)
+  localStorage.setItem(claveIntentoActual, guiaIntentoId);
+}
+```
+
 ```html
 <script>
 (function () {
