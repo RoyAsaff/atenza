@@ -22,12 +22,37 @@ revisás vos en Atenza.
   var guiaIntentoId = params.get('guia_intento');
   if (!token || !guiaIntentoId) return; // acceso público normal, sin Atenza
 
+  // NO swallowees el error acá — el aviso de abajo necesita saber si
+  // /finalizar realmente llegó, si no la nota queda mal calculada sin que
+  // nadie se entere (bug real, visto en producción el 17/08: una guía sin
+  // este script nunca reportó nada, el docente tuvo que cancelar el
+  // lanzamiento a mano y a todos les quedó nota 0). Los call-sites de
+  // respuesta/incidente sí lo swallowean (fire-and-forget), solo
+  // /finalizar necesita reaccionar al resultado.
   function post(path, body) {
     return fetch(ATENZA_API + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify(body || {}),
-    }).catch(function () {});
+    });
+  }
+
+  // ── Aviso flotante — la única señal visible de "ya terminaste, podés
+  // cerrar la pestaña" o "no se pudo enviar, tocá para reintentar". Sin
+  // esto el estudiante llega al 100% local (su barra de progreso de
+  // siempre) y no tiene ninguna pista de que además hay que esperar a que
+  // se confirme del lado de ATENZA.
+  function avisar(texto, ok, onClick) {
+    var aviso = document.createElement('div');
+    aviso.textContent = texto;
+    aviso.style.cssText =
+      'position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:960;' +
+      'padding:12px 22px; border-radius:10px; font-size:14px; font-weight:600; color:#fff;' +
+      'box-shadow:0 5px 15px rgba(0,0,0,.25); max-width:90vw; text-align:center; cursor:' +
+      (onClick ? 'pointer' : 'default') + ';' +
+      'background:' + (ok ? '#78b159' : '#c0392b') + ';'; // ajustá los colores a tu paleta
+    if (onClick) aviso.addEventListener('click', function () { aviso.remove(); onClick(); });
+    document.body.appendChild(aviso);
   }
 
   // ── Pantalla completa: se pide en un click real del usuario, no solo.
@@ -47,17 +72,21 @@ revisás vos en Atenza.
 
   // ── Reportar cada pregunta contestada — engancha al motor que ya tenés.
   // Llamá a estas dos funciones desde donde ya marcás una pregunta como
-  // resuelta (junto a marcarResuelto(id, "ok"/"error") en tu código).
+  // resuelta (junto a marcarResuelto(id, "ok"/"error") en tu código). Si
+  // ya tenés un único choke-point tipo marcarResuelto(id, estado), es más
+  // seguro engancharte ahí una sola vez (ver ejemplo en "Qué tenés que
+  // enganchar vos" más abajo) que acordarte de llamar esto en cada
+  // call-site del motor.
   window.atenzaReportarAutomatica = function (referencia, correcta) {
-    post('/api/guias/intentos/' + guiaIntentoId + '/respuesta', { referencia: referencia, correcta: correcta });
+    post('/api/guias/intentos/' + guiaIntentoId + '/respuesta', { referencia: referencia, correcta: correcta }).catch(function () {});
   };
   window.atenzaReportarAbierta = function (referencia, textoLibre) {
-    post('/api/guias/intentos/' + guiaIntentoId + '/respuesta', { referencia: referencia, texto_libre: textoLibre });
+    post('/api/guias/intentos/' + guiaIntentoId + '/respuesta', { referencia: referencia, texto_libre: textoLibre }).catch(function () {});
   };
 
   // ── Incidencias: salir de pantalla completa, cambiar de pestaña, perder foco.
   function reportarIncidente(detalle) {
-    post('/api/guias/intentos/' + guiaIntentoId + '/incidente', { detalle: detalle });
+    post('/api/guias/intentos/' + guiaIntentoId + '/incidente', { detalle: detalle }).catch(function () {});
   }
   document.addEventListener('visibilitychange', function () {
     if (comenzado && document.hidden) reportarIncidente('visibilitychange');
@@ -74,8 +103,26 @@ revisás vos en Atenza.
 
   // ── Finalizar: llamalo cuando el estudiante termina el 100% del
   // cuestionario (mismo lugar donde antes llamabas al /completar viejo).
+  // A diferencia de las otras dos, esta SÍ le muestra algo al estudiante
+  // y reintenta si falla — es la única señal de que la guía quedó
+  // registrada de verdad, no la des por sentada.
+  var finalizando = false;
   window.atenzaFinalizarGuia = function () {
-    post('/api/guias/intentos/' + guiaIntentoId + '/finalizar', {});
+    if (finalizando) return;
+    finalizando = true;
+    post('/api/guias/intentos/' + guiaIntentoId + '/finalizar', {})
+      .then(function (res) {
+        if (res.ok) {
+          avisar('✅ ¡Guía enviada! Ya podés cerrar esta pestaña.', true);
+        } else {
+          finalizando = false;
+          avisar('⚠️ No se pudo enviar tu guía — tocá para reintentar.', false, window.atenzaFinalizarGuia);
+        }
+      })
+      .catch(function () {
+        finalizando = false;
+        avisar('⚠️ No se pudo enviar tu guía — tocá para reintentar.', false, window.atenzaFinalizarGuia);
+      });
   };
 })();
 </script>
@@ -109,3 +156,13 @@ window.atenzaFinalizarGuia && window.atenzaFinalizarGuia();
 - No hace falta tocar nada del `/completar` viejo para guías
   `externa_legacy` — este snippet es solo para guías nuevas, creadas con
   nota y manifest de preguntas en Atenza.
+- **Este snippet es obligatorio en la página, no algo que Atenza aplica
+  sola.** Vincular una guía nueva en Atenza (con nota + manifest) no hace
+  nada del lado de la página externa — si no pegaste este bloque ahí, el
+  lanzamiento igual se crea y el estudiante igual puede "Tomar la guía",
+  pero nada de lo que conteste se reporta y termina con nota 0. Antes de
+  lanzar una guía nueva en clase, confirmar que su página ya tiene el
+  bloque (bug real, 17/08: se lanzó `joins-subconsultas.html` sin haberlo
+  pegado nunca ahí — el docente tuvo que cancelar el lanzamiento a mano
+  porque nunca llegó el `/finalizar`, y a todos les quedó nota 0/20
+  aunque habían contestado todo bien).
