@@ -1,0 +1,77 @@
+// Guías nativas (16/08) · Pantalla de confirmación antes de salir a la
+// página externa. A diferencia de un examen, acá NO tiene sentido pedir
+// pantalla completa en ESTA página: al navegar a otro dominio el navegador
+// la cierra sola. La pantalla completa de verdad la pide la propia página
+// externa (con el script que se le entrega al docente), en su propio
+// click de "Comenzar" — ver el plan de guías nativas.
+
+import { useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Link, useParams } from 'react-router-dom';
+import { AlertTriangle, ExternalLink } from 'lucide-react';
+import { api, mensajeDeError } from '../../core/api/cliente';
+import { GuiaIntentoParaRendir, Materia } from '../../core/tipos';
+import { Alert, Button, Card, CardBody, PageBreadcrumb, PageHeader, Spinner } from '../../core/ui/ui';
+
+export function TomarGuiaPage() {
+  const { id, guiaId } = useParams();
+  const materiaId = Number(id);
+  const [error, setError] = useState('');
+
+  const { data: materia } = useQuery({
+    queryKey: ['materia', id],
+    queryFn: async () => {
+      const { data } = await api.get<{ materia: Materia }>(`/api/materias/${id}`);
+      return data.materia;
+    },
+  });
+
+  const tomar = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<{ intento: GuiaIntentoParaRendir }>(
+        `/api/materias/${materiaId}/guias/${guiaId}/tomar`,
+      );
+      return data.intento;
+    },
+    onSuccess: (intento) => {
+      window.location.href = intento.url_acceso;
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
+  });
+
+  return (
+    <div className="mx-auto max-w-xl space-y-6">
+      <PageBreadcrumb>
+        <Link to={`/materias/${id}`}>‹ {materia ? materia.nombre_materia : 'Materia'}</Link>
+      </PageBreadcrumb>
+      <PageHeader eyebrow="Guía" title="Vas a salir a tu guía" />
+
+      <Card>
+        <CardBody className="space-y-4">
+          <Alert tone="info" icon={<AlertTriangle size={16} />}>
+            Se va a abrir en pantalla completa. No cierres ni cambies de pestaña hasta terminar
+            — el docente ve si saliste de la pantalla.
+          </Alert>
+          <p className="text-sm text-text-secondary">
+            Al continuar salís de Atenza hacia la página de la guía. Ahí vas a ver un botón para
+            comenzar en pantalla completa.
+          </p>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <Button onClick={() => tomar.mutate()} disabled={tomar.isPending}>
+            {tomar.isPending ? (
+              <>
+                <Spinner /> Abriendo…
+              </>
+            ) : (
+              <>
+                <ExternalLink size={16} /> Continuar
+              </>
+            )}
+          </Button>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}

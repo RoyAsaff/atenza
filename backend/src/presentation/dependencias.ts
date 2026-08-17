@@ -106,15 +106,34 @@ import { extraerHtmlDocx } from '../infrastructure/parsers/extraer-html-docx';
 import { VerClasesDeHoy } from '../application/mi-espacio/ver-clases-hoy';
 import { PrismaGuiaRepositorio } from '../infrastructure/repositorios/prisma-guia-repositorio';
 import { PrismaGuiaCompletadaRepositorio } from '../infrastructure/repositorios/prisma-guia-completada-repositorio';
+import { PrismaGuiaIntentoRepositorio } from '../infrastructure/repositorios/prisma-guia-intento-repositorio';
 import {
   ActualizarGuia,
   CrearGuia,
   EliminarGuia,
   RegistrarCompletado,
+  VerGuiaDetalle,
   VerGuias,
   VerMisGuias,
 } from '../application/guias/gestionar-guias';
-import { crearVerificarTokenGuia } from './middlewares/verificar-token-guia';
+import { LanzarGuia } from '../application/guias/lanzar-guia';
+import {
+  CancelarGuiaLanzamiento,
+  PausarGuiaIntento,
+  ReactivarGuiaIntento,
+} from '../application/guias/gestionar-lanzamiento-guia';
+import {
+  FinalizarGuiaIntento,
+  GuardarRespuestaGuia,
+  IniciarOReanudarGuiaIntento,
+  ReportarIncidenteGuia,
+} from '../application/guias/rendir-guia';
+import { RevisarRespuestaGuia, VerRevisionGuia } from '../application/guias/revisar-respuestas-guia';
+import { VerMonitoreoGuia, VerResultadosGuia } from '../application/guias/ver-resultados-guia';
+import {
+  crearVerificarTokenGuia,
+  crearVerificarTokenGuiaIntento,
+} from './middlewares/verificar-token-guia';
 
 /** Convierte duraciones tipo "8h", "30d", "45m" a segundos. */
 export function duracionASegundos(duracion: string): number {
@@ -424,14 +443,6 @@ export const verMonitoreo = new VerMonitoreo(
   bitacoraRepositorio,
   socketIoEmisor,
 );
-// Barrido en segundo plano (13/08, ver barrer-vencimientos.ts) — index.ts
-// lo corre en un setInterval, no depende de ninguna petición HTTP.
-export const barrerVencimientos = new BarrerVencimientos(
-  evaluacionRepositorio,
-  intentoRepositorio,
-  bitacoraRepositorio,
-  socketIoEmisor,
-);
 export const pausarEvaluacion = new PausarEvaluacion(
   evaluacionRepositorio,
   claseRepositorio,
@@ -536,10 +547,11 @@ export const verCentralizador = new VerCentralizador(
 );
 export const exportarCentralizador = new ExportarCentralizador(verCentralizador);
 
-// Guías de pre-clase (fusión con PaginaGuias, 05/08) — no está en el
-// diagrama. Sin ciclo borrador/lanzada como Evaluación (ver gestionar-guias.ts).
+// Guías de pre-clase (fusión con PaginaGuias, 05/08; guías nativas 16/08)
+// — no está en el diagrama. Ver gestionar-guias.ts.
 export const guiaRepositorio = new PrismaGuiaRepositorio(prisma);
 export const guiaCompletadaRepositorio = new PrismaGuiaCompletadaRepositorio(prisma);
+export const guiaIntentoRepositorio = new PrismaGuiaIntentoRepositorio(prisma);
 
 export const crearGuia = new CrearGuia(
   guiaRepositorio,
@@ -559,12 +571,14 @@ export const eliminarGuia = new EliminarGuia(
   materiaRepositorio,
   bitacoraRepositorio,
 );
+export const verGuiaDetalle = new VerGuiaDetalle(guiaRepositorio, claseRepositorio, materiaRepositorio);
 export const verGuias = new VerGuias(
   guiaRepositorio,
   claseRepositorio,
   materiaRepositorio,
   inscripcionRepositorio,
   guiaCompletadaRepositorio,
+  guiaIntentoRepositorio,
   tokenService,
 );
 export const verMisGuias = new VerMisGuias(
@@ -573,6 +587,7 @@ export const verMisGuias = new VerMisGuias(
   materiaRepositorio,
   inscripcionRepositorio,
   guiaCompletadaRepositorio,
+  guiaIntentoRepositorio,
   tokenService,
 );
 export const registrarCompletado = new RegistrarCompletado(
@@ -582,8 +597,101 @@ export const registrarCompletado = new RegistrarCompletado(
   socketIoEmisor,
 );
 // Middleware de acceso acotado (sin sesión real) para que la propia guía
-// en PaginaGuias pueda reportar "completada" — ver verificar-token-guia.ts.
+// externa pueda reportar "completada" (legacy) — ver verificar-token-guia.ts.
 export const verificarTokenGuia = crearVerificarTokenGuia(tokenService);
+// Guías nativas: mismo criterio, acotado a UN intento puntual.
+export const verificarTokenGuiaIntento = crearVerificarTokenGuiaIntento(tokenService);
+
+export const lanzarGuia = new LanzarGuia(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  asistenciaRepositorio,
+  guiaIntentoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const pausarGuiaIntento = new PausarGuiaIntento(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  guiaIntentoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const reactivarGuiaIntento = new ReactivarGuiaIntento(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  guiaIntentoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const cancelarGuiaLanzamiento = new CancelarGuiaLanzamiento(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  guiaIntentoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const iniciarOReanudarGuiaIntento = new IniciarOReanudarGuiaIntento(
+  guiaRepositorio,
+  guiaIntentoRepositorio,
+  tokenService,
+);
+export const guardarRespuestaGuia = new GuardarRespuestaGuia(
+  guiaRepositorio,
+  guiaIntentoRepositorio,
+  socketIoEmisor,
+);
+export const reportarIncidenteGuia = new ReportarIncidenteGuia(
+  guiaIntentoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const finalizarGuiaIntento = new FinalizarGuiaIntento(
+  guiaRepositorio,
+  guiaIntentoRepositorio,
+  socketIoEmisor,
+);
+export const verRevisionGuia = new VerRevisionGuia(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  guiaIntentoRepositorio,
+);
+export const revisarRespuestaGuia = new RevisarRespuestaGuia(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  guiaIntentoRepositorio,
+  socketIoEmisor,
+);
+export const verResultadosGuia = new VerResultadosGuia(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  guiaIntentoRepositorio,
+);
+export const verMonitoreoGuia = new VerMonitoreoGuia(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  guiaIntentoRepositorio,
+);
+
+// Barrido en segundo plano (13/08, extendido a guías 16/08 — ver
+// barrer-vencimientos.ts) — index.ts lo corre en un setInterval, no
+// depende de ninguna petición HTTP.
+export const barrerVencimientos = new BarrerVencimientos(
+  evaluacionRepositorio,
+  intentoRepositorio,
+  guiaRepositorio,
+  guiaIntentoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
 
 // "Inicio" (13/08): clases de HOY — dictadas e inscritas, en una sola
 // llamada (ver-clases-hoy.ts).

@@ -50,6 +50,8 @@ model Usuario {
   asistencias       Asistencia[] // marcajes como estudiante (E5)
   intentos          Intento[] // exámenes rendidos como estudiante (E7)
   guias_completadas GuiaCompletada[] // guías de pre-clase completadas (estudiante)
+  guia_intentos     GuiaIntento[] // guías nativas rendidas como estudiante (16/08)
+  guias_revisadas   GuiaRespuesta[] @relation("GuiaRespuestasRevisadas") // preguntas abiertas que calificó como docente
 
   // SaaS por cuenta (reemplaza el pago por materia, decisión con Roy 17/07):
   // la prueba gratis de 30 días arranca al registrarse; plan_id es el plan
@@ -173,6 +175,16 @@ model Clase {
 // docente la crea. `url` apunta a una página autocontenida publicada en
 // PaginaGuias (GitHub Pages); ATENZA solo referencia el link, no aloja
 // el contenido.
+// Guías nativas (16/08): antes solo lanzada/publicada/externa_legacy convivían
+// como estado implícito por el campo `nota` (null = legacy, sin tocar). Ver
+// bloque GuiaPregunta/GuiaIntento/GuiaRespuesta/GuiaIncidente más abajo.
+enum EstadoGuia {
+  publicada
+  lanzada
+  cerrada
+  externa_legacy
+}
+
 model Guia {
   id          Int              @id @default(autoincrement())
   clase       Clase            @relation(fields: [clase_id], references: [id])
@@ -181,6 +193,14 @@ model Guia {
   url         String
   orden       Int
   completadas GuiaCompletada[]
+
+  // Guías nativas (16/08) — null en las creadas antes de este cambio
+  // (`estado` queda en "externa_legacy" para esas, ver migración de datos).
+  nota                   Float?
+  estado                 EstadoGuia @default(publicada)
+  tiempo_limite_minutos  Int?
+  preguntas              GuiaPregunta[]
+  intentos               GuiaIntento[]
 
   @@index([clase_id])
   @@map("guias")
@@ -199,6 +219,98 @@ model GuiaCompletada {
 
   @@unique([guia_id, estudiante_id])
   @@map("guias_completadas")
+}
+
+// ── Guías nativas (16/08) ────────────────────────────────────────
+// El contenido (teoría + cuestionario) sigue viviendo en la página externa
+// de cada docente — igual que hoy. Lo que se vuelve nativo es el
+// lanzamiento/intento/nota/incidencia alrededor, calcado de
+// Evaluación/Intento/Respuesta/Incidente. GuiaPregunta es solo un manifest
+// liviano (referencia + tipo), NO aloja enunciado ni opciones.
+
+enum TipoGuiaPregunta {
+  automatica // quiz-mc / quiz-match / quiz-classify: se autocorrige sola
+  abierta // quiz-open (textarea + "ver respuesta modelo"): la revisa el docente
+}
+
+model GuiaPregunta {
+  id               Int              @id @default(autoincrement())
+  guia             Guia             @relation(fields: [guia_id], references: [id])
+  guia_id          Int
+  referencia       String // el data-quiz-id que ya usa el HTML del docente
+  tipo             TipoGuiaPregunta
+  // Solo si tipo = abierta — la carga el docente al publicar, para que la
+  // revisión (RevisarGuiaPage) sea lado a lado, sin ir a buscar la guía.
+  respuesta_modelo String?
+  orden            Int
+  respuestas       GuiaRespuesta[]
+
+  @@unique([guia_id, referencia])
+  @@index([guia_id])
+  @@map("guias_preguntas")
+}
+
+model GuiaIntento {
+  id             Int             @id @default(autoincrement())
+  guia           Guia            @relation(fields: [guia_id], references: [id])
+  guia_id        Int
+  estudiante     Usuario         @relation(fields: [estudiante_id], references: [id])
+  estudiante_id  Int
+  estado         EstadoIntento   @default(en_curso)
+  // true solo en el intento creado al lanzar la guía a la clase — el único
+  // que califica para el curso. Los siguientes (repaso) quedan en false.
+  es_oficial     Boolean
+  numero_intento Int // 1, 2, 3… por estudiante — señal de "volvió a estudiar"
+  fecha_inicio   DateTime        @default(now())
+  fecha_limite   DateTime? // si la guía tiene tiempo_limite_minutos y es_oficial
+  fecha_fin      DateTime?
+  // Cacheada acá en vez de una entidad Nota aparte y versionada (D-12, como
+  // en exámenes): cada GuiaIntento ya es su propia fila inmutable por
+  // intento, no hace falta versionar. null = sin calcular todavía (pendiente
+  // de revisión, o simplemente no es el oficial).
+  aciertos       Int?
+  nota_obtenida  Float?
+  respuestas     GuiaRespuesta[]
+  incidentes     GuiaIncidente[]
+
+  // Sin @@unique a propósito: a diferencia de Intento (uno por evaluación),
+  // acá puede haber varios GuiaIntento del mismo estudiante (oficial + repasos).
+  @@index([guia_id])
+  @@index([estudiante_id])
+  @@map("guias_intentos")
+}
+
+model GuiaRespuesta {
+  id               Int          @id @default(autoincrement())
+  intento          GuiaIntento  @relation(fields: [guia_intento_id], references: [id])
+  guia_intento_id  Int
+  pregunta         GuiaPregunta @relation(fields: [guia_pregunta_id], references: [id])
+  guia_pregunta_id Int
+  // null = pendiente de revisión — solo posible en preguntas abiertas; las
+  // automáticas llegan siempre resueltas, nunca quedan en null.
+  correcta         Boolean?
+  texto_libre      String? // lo que escribió el estudiante, solo en abiertas
+  respondida_en    DateTime     @default(now())
+  revisada_en      DateTime?
+  revisor          Usuario?     @relation("GuiaRespuestasRevisadas", fields: [revisada_por_id], references: [id])
+  revisada_por_id  Int?
+
+  // Reportar la misma pregunta dos veces actualiza, no duplica (mismo
+  // criterio que Respuesta.guardarRespuesta en exámenes).
+  @@unique([guia_intento_id, guia_pregunta_id])
+  @@map("guias_respuestas")
+}
+
+model GuiaIncidente {
+  id              Int           @id @default(autoincrement())
+  intento         GuiaIntento   @relation(fields: [guia_intento_id], references: [id])
+  guia_intento_id Int
+  tipo            TipoIncidente
+  detalle         String?
+  fecha_hora      DateTime      @default(now())
+
+  @@index([guia_intento_id])
+  @@map("guias_incidentes")
 }
 
 // ── Diagrama: estudiante_materia (E3) ────────────────────────────

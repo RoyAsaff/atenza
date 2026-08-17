@@ -11,6 +11,9 @@ export class JwtTokenService implements TokenService {
         sub: String(payload.sub),
         contexto: payload.contexto,
         ...(payload.guia_id !== undefined ? { guia_id: payload.guia_id } : {}),
+        ...(payload.guia_intento_id !== undefined
+          ? { guia_intento_id: payload.guia_intento_id }
+          : {}),
       },
       this.secreto,
       { expiresIn: duracionSegundos, jwtid: payload.jti },
@@ -25,6 +28,9 @@ export class JwtTokenService implements TokenService {
         contexto: decodificado.contexto,
         jti: decodificado.jti as string,
         ...(decodificado.guia_id !== undefined ? { guia_id: Number(decodificado.guia_id) } : {}),
+        ...(decodificado.guia_intento_id !== undefined
+          ? { guia_intento_id: Number(decodificado.guia_intento_id) }
+          : {}),
       };
     } catch {
       throw new NoAutorizadoError('Token inválido o expirado');

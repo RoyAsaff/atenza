@@ -12,6 +12,9 @@ import { PasarListaPage } from '../features/mi-espacio/PasarListaPage';
 import { ConsolidadoAsistenciaPage } from '../features/mi-espacio/ConsolidadoAsistenciaPage';
 import { EvaluacionesClasePage } from '../features/mi-espacio/EvaluacionesClasePage';
 import { GuiasClasePage } from '../features/mi-espacio/GuiasClasePage';
+import { TomarGuiaPage } from '../features/mi-espacio/TomarGuiaPage';
+import { GuiaResultadosPage } from '../features/mi-espacio/GuiaResultadosPage';
+import { RevisarGuiaPage } from '../features/mi-espacio/RevisarGuiaPage';
 import { EvaluacionEditorPage } from '../features/mi-espacio/EvaluacionEditorPage';
 import { MonitoreoPage } from '../features/mi-espacio/MonitoreoPage';
 import { ResultadosPage } from '../features/mi-espacio/ResultadosPage';
@@ -90,8 +93,15 @@ export function App() {
             />
             <Route path="materias/:id/evaluaciones/:evalId" element={<EvaluacionEditorPage />} />
 
-            {/* Docente: guías de pre-clase (fusión con PaginaGuias, 05/08) */}
+            {/* Docente: guías de pre-clase (fusión con PaginaGuias, 05/08;
+                guías nativas 16/08 — lanzamiento/resultados/revisión). */}
             <Route path="materias/:id/clases/:claseId/guias" element={<GuiasClasePage />} />
+            <Route path="materias/:id/guias/:guiaId/tomar" element={<TomarGuiaPage />} />
+            <Route
+              path="materias/:id/guias/:guiaId/resultados"
+              element={<GuiaResultadosPage />}
+            />
+            <Route path="materias/:id/guias/:guiaId/revision" element={<RevisarGuiaPage />} />
 
             {/* Docente (E7) */}
             <Route

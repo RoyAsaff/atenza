@@ -355,27 +355,50 @@ export interface ClasesDeHoy {
   inscritas: ClaseDeHoy[];
 }
 
-// Guías de pre-clase (fusión con PaginaGuias, 05/08) — vista del estudiante:
-// la guía sigue siendo el HTML de PaginaGuias, acá solo vive el link de
-// acceso (con el token de alcance acotado ya incluido) y si ya la completó.
+// Guías de pre-clase (fusión con PaginaGuias, 05/08; guías nativas 16/08).
+// "externa_legacy" = el modelo de siempre (link + booleano, sin nota ni
+// intentos). Las demás son nativas: nacen "publicada", pasan a "lanzada"
+// al lanzarse en clase, y a "cerrada" solo cuando todos los intentos
+// oficiales terminan (no bloquea repasos, solo apaga el monitoreo en vivo).
+export type EstadoGuia = 'publicada' | 'lanzada' | 'cerrada' | 'externa_legacy';
+
+// Vista del estudiante. En "externa_legacy": `url_acceso` trae el link de
+// siempre y `completado` es el booleano de siempre. En guías nativas,
+// `url_acceso` viene vacío — el link real se pide con "Tomar la guía"
+// (POST .../tomar), acotado a un intento puntual.
 export interface Guia {
   id: number;
   tema: string;
   orden: number;
   url_acceso: string;
   completado: boolean;
+  estado: EstadoGuia;
+  nota: number | null;
+  nota_obtenida: number | null;
   clase_id: number;
   clase_tema: string;
   clase_fecha: string;
 }
 
 // Vista del docente (GET /:id/clases/:claseId/guias, contexto docente): la
-// guía + quién de la nómina ya la completó — el dato nuevo pedido por Roy.
+// guía + quién de la nómina abrió/completó (siempre) + su manifest de
+// preguntas (nativas).
 export interface FilaCompletadoGuia {
   estudiante_id: number;
   nombres: string;
   apellidos: string;
   completado_en: string;
+}
+
+export type TipoGuiaPregunta = 'automatica' | 'abierta';
+
+export interface GuiaPregunta {
+  id: number;
+  guia_id: number;
+  referencia: string;
+  tipo: TipoGuiaPregunta;
+  respuesta_modelo: string | null;
+  orden: number;
 }
 
 export interface GuiaDocente {
@@ -384,5 +407,61 @@ export interface GuiaDocente {
   tema: string;
   url: string;
   orden: number;
+  nota: number | null;
+  estado: EstadoGuia;
+  tiempo_limite_minutos: number | null;
   completados: FilaCompletadoGuia[];
+  preguntas: GuiaPregunta[];
+}
+
+// ── Guías nativas: ejecución en vivo ──────────────────────────────
+
+export interface GuiaIntentoParaRendir {
+  intento_id: number;
+  guia_id: number;
+  tema: string;
+  url_acceso: string;
+  estado: EstadoIntento;
+  fecha_limite: string | null;
+}
+
+/** Fila del panel de monitoreo en vivo de una guía lanzada — mismo
+ * espíritu que FilaMonitoreo de exámenes. */
+export interface FilaMonitoreoGuia {
+  intento_id: number;
+  estudiante_id: number;
+  nombres: string;
+  apellidos: string;
+  estado: EstadoIntento;
+  respondidas: number;
+  total_preguntas: number;
+  incidentes: number;
+  fecha_inicio: string;
+  fecha_limite: string | null;
+}
+
+/** Fila de resultados: nota oficial por estudiante (o pendiente de
+ * revisión) + cuántos intentos totales hizo (oficial + repasos). */
+export interface FilaResultadoGuia {
+  estudiante_id: number;
+  nombres: string;
+  apellidos: string;
+  intento_id: number | null;
+  estado_oficial: EstadoIntento | null;
+  nota_obtenida: number | null;
+  nota_total: number;
+  total_intentos: number;
+  incidentes: number;
+}
+
+/** Fila de la pantalla de revisión: una respuesta abierta pendiente. */
+export interface FilaRevisionGuia {
+  guia_respuesta_id: number;
+  guia_intento_id: number;
+  estudiante_id: number;
+  nombres: string;
+  apellidos: string;
+  pregunta_referencia: string;
+  respuesta_modelo: string | null;
+  texto_libre: string | null;
 }

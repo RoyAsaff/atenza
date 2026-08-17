@@ -6,6 +6,7 @@ import {
   barrerVencimientos,
   claseRepositorio,
   evaluacionRepositorio,
+  guiaRepositorio,
   intentoRepositorio,
   materiaRepositorio,
   sesionRepositorio,
@@ -30,6 +31,7 @@ const io = crearServidorTiempoReal(httpServer, {
   evaluacionRepositorio,
   claseRepositorio,
   materiaRepositorio,
+  guiaRepositorio,
 });
 socketIoEmisor.conectar(io);
 
