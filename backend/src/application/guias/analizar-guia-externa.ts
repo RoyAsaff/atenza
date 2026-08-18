@@ -117,13 +117,28 @@ async function exigirUrlPublica(url: URL): Promise<void> {
 
 /** Saca el texto de la respuesta modelo, sin el título "Respuesta modelo"
  * que ya trae el propio HTML como encabezado visual. */
-function textoModelo($: cheerio.CheerioAPI, modelo: ReturnType<typeof $>): string | null {
+function textoModelo(modelo: ReturnType<cheerio.CheerioAPI>): string | null {
   if (modelo.length === 0) return null;
   const texto = modelo
     .text()
     .trim()
     .replace(/\s+/g, ' ')
     .replace(/^Respuesta modelo:?\s*/i, '');
+  return texto || null;
+}
+
+/** Saca el texto de un bloque ".code.salida" (la consola/"salida esperada"
+ * que Roy pega debajo de un ejercicio de código) para usarlo como
+ * respuesta modelo de un .editor-panel — a diferencia de textoModelo(), acá
+ * no se colapsan los saltos de línea: es la salida de una consola, el
+ * formato multilínea es justo lo que la hace útil como referencia al
+ * revisar. Se lee del <pre> puntual (ignora el rótulo "Consola"/"Salida
+ * esperada" del .code-header, que es un elemento hermano, no un prefijo de
+ * texto a recortar). */
+function textoSalida(salida: ReturnType<cheerio.CheerioAPI>): string | null {
+  if (salida.length === 0) return null;
+  const pre = salida.find('pre').first();
+  const texto = (pre.length > 0 ? pre.text() : salida.text()).trim();
   return texto || null;
 }
 
@@ -150,11 +165,36 @@ export class AnalizarGuiaExterna {
       if (!referencia || vistas.has(referencia)) return;
       vistas.add(referencia);
 
-      const esAbierta = elemento.hasClass('quiz-open');
+      // Dos convenciones distintas de Roy para "pregunta abierta", las dos
+      // sin autocorrección posible — las revisa el docente a mano:
+      //   - .quiz-open: textarea + "ver respuesta modelo" (la respuesta
+      //     modelo vive pegada ahí mismo, en .quiz-open-model).
+      //   - .editor-panel: ejercicio de código (con o sin "independiente"
+      //     para el bloque de varios ejercicios juntos). No trae una
+      //     respuesta modelo escrita, pero casi siempre el propio HTML le
+      //     pone al lado un ".code.salida" con la consola/salida esperada
+      //     del ejemplo — eso sirve como referencia al revisar el código
+      //     del estudiante, así que se usa como respuesta modelo.
+      const esQuizOpen = elemento.hasClass('quiz-open');
+      const esEditorPanel = elemento.hasClass('editor-panel');
+      const esAbierta = esQuizOpen || esEditorPanel;
+
+      let respuesta_modelo: string | null = null;
+      if (esQuizOpen) {
+        respuesta_modelo = textoModelo(elemento.find('.quiz-open-model'));
+      } else if (esEditorPanel) {
+        // Acotado a los hermanos hasta el próximo [data-quiz-id]: así no se
+        // le pega por error la salida de un ejercicio siguiente a uno que
+        // no tiene la suya propia (ej. un editor-panel seguido de un quiz
+        // sin ".code.salida" en el medio).
+        const salida = elemento.nextUntil('[data-quiz-id]', '.code.salida').first();
+        respuesta_modelo = textoSalida(salida);
+      }
+
       preguntas.push({
         referencia,
         tipo: esAbierta ? 'abierta' : 'automatica',
-        respuesta_modelo: esAbierta ? textoModelo($, elemento.find('.quiz-open-model')) : null,
+        respuesta_modelo,
         orden: preguntas.length,
       });
     });
