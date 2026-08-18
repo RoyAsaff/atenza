@@ -78,3 +78,29 @@ jobs:
         run: |
           ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
             "cd ~/stack && docker compose run --rm --build atenza-migrate"
+
+  # Manual, igual que "migrar" — separado a propósito: no toda migración
+  # trae datos de referencia nuevos, y no todo cambio de seed necesita una
+  # migración (ej. agregar una promoción). `prisma/seed.ts` es idempotente
+  # (upsert por nombre/email) — solo toca roles, la cuenta admin y
+  # `planes`, nunca materias/usuarios reales, así que correrlo de más no
+  # rompe nada. Bug real (17/08): la migración de "plan único" trajo el
+  # esquema nuevo pero nadie corrió el seed en producción — los planes
+  # nuevos (Gratis/Pro/Institucional) no existían, un pago aprobado seguía
+  # sin habilitar nada porque la cuenta quedaba en un plan viejo (Básico)
+  # sin las features de Pro.
+  sembrar:
+    needs: deploy
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cargar clave de deploy
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - name: Confiar en el host del server
+        run: ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+      - name: prisma db seed
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            "cd ~/stack && docker compose run --rm --build atenza-migrate npx prisma db seed"
