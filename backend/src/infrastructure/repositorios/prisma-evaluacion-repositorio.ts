@@ -114,6 +114,12 @@ export class PrismaEvaluacionRepositorio implements EvaluacionRepositorio {
     return this.prisma.evaluacion.findMany({ where: { estado: 'lanzada' } });
   }
 
+  async eliminar(id: number): Promise<void> {
+    // El cascade vive en el schema (onDelete: Cascade en preguntas/opciones/
+    // intentos/respuestas/incidentes/notas): un solo DELETE basta.
+    await this.prisma.evaluacion.delete({ where: { id } });
+  }
+
   async contarPreguntas(evaluacion_id: number): Promise<number> {
     return this.prisma.pregunta.count({ where: { evaluacion_id } });
   }

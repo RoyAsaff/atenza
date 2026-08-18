@@ -478,7 +478,9 @@ model Pregunta {
   id            Int         @id @default(autoincrement())
   pregunta      String
   url_imagen    String?
-  evaluacion    Evaluacion  @relation(fields: [evaluacion_id], references: [id])
+  // onDelete Cascade: eliminar una evaluación (opción del docente para
+  // deshacer una lanzada por error) borra sus preguntas.
+  evaluacion    Evaluacion  @relation(fields: [evaluacion_id], references: [id], onDelete: Cascade)
   evaluacion_id Int
   orden         Int
   opciones      Opcion[]
@@ -517,7 +519,8 @@ enum EstadoIntento {
 
 model Intento {
   id              Int           @id @default(autoincrement())
-  evaluacion      Evaluacion    @relation(fields: [evaluacion_id], references: [id])
+  // onDelete Cascade: eliminar la evaluación borra los intentos rendidos.
+  evaluacion      Evaluacion    @relation(fields: [evaluacion_id], references: [id], onDelete: Cascade)
   evaluacion_id   Int
   estudiante      Usuario       @relation(fields: [estudiante_id], references: [id])
   estudiante_id   Int
@@ -545,11 +548,13 @@ model Intento {
 // pregunta (D-06) y saber qué falta responder.
 model Respuesta {
   id            Int      @id @default(autoincrement())
-  intento       Intento  @relation(fields: [intento_id], references: [id])
+  // onDelete Cascade (las tres): eliminar la evaluación borra intentos,
+  // preguntas y opciones, y estos a su vez arrastran las respuestas.
+  intento       Intento  @relation(fields: [intento_id], references: [id], onDelete: Cascade)
   intento_id    Int
-  pregunta      Pregunta @relation(fields: [pregunta_id], references: [id])
+  pregunta      Pregunta @relation(fields: [pregunta_id], references: [id], onDelete: Cascade)
   pregunta_id   Int
-  opcion        Opcion   @relation(fields: [opcion_id], references: [id])
+  opcion        Opcion   @relation(fields: [opcion_id], references: [id], onDelete: Cascade)
   opcion_id     Int
   respondida_en DateTime @default(now())
 
@@ -566,7 +571,8 @@ enum TipoIncidente {
 
 model Incidente {
   id         Int           @id @default(autoincrement())
-  intento    Intento       @relation(fields: [intento_id], references: [id])
+  // onDelete Cascade: eliminar el intento (vía cascada desde la evaluación) borra sus incidentes.
+  intento    Intento       @relation(fields: [intento_id], references: [id], onDelete: Cascade)
   intento_id Int
   tipo       TipoIncidente
   detalle    String?
@@ -582,7 +588,8 @@ model Incidente {
 // @@unique a propósito). "Vigente" = mayor `version` por intento_id.
 model Nota {
   id              Int      @id @default(autoincrement())
-  intento         Intento  @relation(fields: [intento_id], references: [id])
+  // onDelete Cascade: eliminar el intento (vía cascada desde la evaluación) borra sus notas.
+  intento         Intento  @relation(fields: [intento_id], references: [id], onDelete: Cascade)
   intento_id      Int
   // Denormalizados desde Intento para no tener que hacer join al listar
   // por evaluación (Resultados/Centralizador) o por estudiante (Mis notas).

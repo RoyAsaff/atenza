@@ -463,6 +463,70 @@ export class CancelarEvaluacion {
   }
 }
 
+// ── Eliminar evaluación (deshacer, p.ej. lanzada por error) ──────
+// No está en el backlog original: lo pidió Roy el 17/08 después de lanzar
+// una evaluación equivocada y no querer que quedara en el centralizador
+// (que lista toda evaluación "finalizada", sin importar el motivo). A
+// diferencia de Cancelar (HU-23, que solo cierra el intento en curso),
+// esto borra la evaluación entera — preguntas, intentos, respuestas,
+// incidentes y notas van en cascada (ver schema.prisma).
+
+export class EliminarEvaluacion {
+  constructor(
+    private readonly evaluaciones: EvaluacionRepositorio,
+    private readonly clases: ClaseRepositorio,
+    private readonly materias: MateriaRepositorio,
+    private readonly intentos: IntentoRepositorio,
+    private readonly bitacora: BitacoraRepositorio,
+  ) {}
+
+  async ejecutar(
+    entrada: Auditoria & { materia_id: number; evaluacion_id: number; docente_id: number },
+  ): Promise<void> {
+    const evaluacion = await exigirEvaluacionPropia(
+      this.evaluaciones,
+      this.clases,
+      this.materias,
+      entrada.materia_id,
+      entrada.evaluacion_id,
+      entrada.docente_id,
+    );
+
+    // Si hay estudiantes rindiendo en este momento, hay que cerrarles el
+    // examen primero (Cancelar, HU-23) para que su app se entere por la vía
+    // ya soportada — borrar de golpe los dejaría con un intento a medias
+    // que de pronto deja de existir.
+    const intentos = await this.intentos.listarPorEvaluacion(evaluacion.id);
+    const enVivo = intentos.some(
+      (i) => i.estado === 'en_curso' || i.estado === 'pausado' || i.estado === 'desconectado',
+    );
+    if (enVivo) {
+      throw new EstadoInvalidoError(
+        'Hay estudiantes rindiendo esta evaluación; cancélala antes de eliminarla',
+      );
+    }
+
+    await this.evaluaciones.eliminar(evaluacion.id);
+
+    await this.bitacora.registrar({
+      usuario_id: entrada.docente_id,
+      rol_contexto: 'docente',
+      accion: 'evaluacion_eliminada',
+      entidad: 'evaluacion',
+      entidad_id: String(evaluacion.id),
+      valor_anterior: {
+        clase_id: evaluacion.clase_id,
+        tema: evaluacion.tema,
+        nota: evaluacion.nota,
+        estado: evaluacion.estado,
+        intentos: intentos.length,
+      },
+      ip: entrada.ip,
+      dispositivo: entrada.dispositivo,
+    });
+  }
+}
+
 // ── HU-23 Esc. 1 · Pausar / reactivar individual ─────────────────
 
 async function exigirIntentoDeEvaluacion(

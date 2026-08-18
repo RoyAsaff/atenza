@@ -13,6 +13,7 @@ import {
   cuentaActiva,
   demostracionEvaluacion,
   duplicarEvaluacion,
+  eliminarEvaluacion,
   eliminarPregunta,
   exigirImportarWord,
   exportarCentralizador,
@@ -199,6 +200,31 @@ evaluacionesRouter.patch(
         dispositivo: req.headers['user-agent'],
       });
       res.json({ evaluacion });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// DELETE /api/materias/:id/evaluaciones/:evalId — deshacer una evaluación
+// (p.ej. lanzada por error): borra en cascada preguntas, intentos,
+// respuestas, incidentes y notas. Bloqueada si hay estudiantes rindiendo
+// ahora mismo (cancélala primero, HU-23).
+evaluacionesRouter.delete(
+  '/:id/evaluaciones/:evalId',
+  autenticar,
+  soloDocente,
+  cuentaActiva,
+  async (req, res, next) => {
+    try {
+      await eliminarEvaluacion.ejecutar({
+        materia_id: idNumerico.parse(req.params.id),
+        evaluacion_id: idNumerico.parse(req.params.evalId),
+        docente_id: req.auth!.sub,
+        ip: req.ip,
+        dispositivo: req.headers['user-agent'],
+      });
+      res.status(204).send();
     } catch (error) {
       next(error);
     }

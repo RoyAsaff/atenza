@@ -825,6 +825,7 @@ export function EvaluacionEditorPage() {
   const [errorGuardar, setErrorGuardar] = useState('');
   const [errorDemo, setErrorDemo] = useState('');
   const [errorLanzar, setErrorLanzar] = useState('');
+  const [errorEliminar, setErrorEliminar] = useState('');
   const [demo, setDemo] = useState<Demostracion | null>(null);
   const [modalPreguntaAbierto, setModalPreguntaAbierto] = useState(false);
   const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
@@ -906,6 +907,34 @@ export function EvaluacionEditorPage() {
       )
     ) {
       lanzar.mutate();
+    }
+  }
+
+  // Deshacer una evaluación (p.ej. lanzada por error): borra en cascada
+  // preguntas, intentos, respuestas, incidentes y notas, y deja de contar
+  // en el centralizador.
+  const eliminar = useMutation({
+    mutationFn: () => api.delete(`/api/materias/${materiaId}/evaluaciones/${evaluacionId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['evaluaciones-materia', String(materiaId)] });
+      queryClient.invalidateQueries({ queryKey: ['centralizador', String(materiaId)] });
+      if (evaluacion) {
+        queryClient.invalidateQueries({ queryKey: ['evaluaciones', String(evaluacion.clase_id)] });
+        navigate(`/materias/${id}/clases/${evaluacion.clase_id}/evaluaciones`);
+      } else {
+        navigate(`/materias/${id}/evaluaciones`);
+      }
+    },
+    onError: (err: unknown) => setErrorEliminar(mensajeDeError(err)),
+  });
+
+  function manejarEliminar() {
+    if (
+      window.confirm(
+        'Se eliminará la evaluación por completo: preguntas, intentos, respuestas y notas. No se puede deshacer. ¿Continuar?',
+      )
+    ) {
+      eliminar.mutate();
     }
   }
 
@@ -1044,11 +1073,15 @@ export function EvaluacionEditorPage() {
                   Ver resultados →
                 </Link>
               )}
+              <Button variante="danger" onClick={manejarEliminar} disabled={eliminar.isPending}>
+                {eliminar.isPending ? 'Eliminando…' : 'Eliminar evaluación'}
+              </Button>
             </>
           }
         />
         {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
         {errorDemo && <p className="mt-2 text-sm text-red-600">{errorDemo}</p>}
+        {errorEliminar && <p className="mt-2 text-sm text-red-600">{errorEliminar}</p>}
         {errorLanzar && (
           <p className="mt-2 text-sm text-red-600">
             {errorLanzar}{' '}

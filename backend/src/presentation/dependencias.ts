@@ -76,6 +76,7 @@ import { PrismaIntentoRepositorio } from '../infrastructure/repositorios/prisma-
 import { SocketIoEmisor } from '../infrastructure/realtime/socketio-emisor';
 import {
   CancelarEvaluacion,
+  EliminarEvaluacion,
   LanzarEvaluacion,
   PausarEvaluacion,
   PausarIntento,
@@ -483,6 +484,13 @@ export const cancelarEvaluacion = new CancelarEvaluacion(
   intentoRepositorio,
   bitacoraRepositorio,
   socketIoEmisor,
+);
+export const eliminarEvaluacion = new EliminarEvaluacion(
+  evaluacionRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoRepositorio,
+  bitacoraRepositorio,
 );
 export const pausarIntento = new PausarIntento(
   evaluacionRepositorio,

@@ -51,6 +51,9 @@ export interface EvaluacionRepositorio {
   /** Barrido en segundo plano (ver barrer-vencimientos.ts): todas las
    * evaluaciones lanzadas ahora mismo, de cualquier docente/materia. */
   listarLanzadas(): Promise<Evaluacion[]>;
+  /** Deshacer una evaluación (p.ej. lanzada por error): borra en cascada
+   * preguntas/opciones, intentos, respuestas, incidentes y notas. */
+  eliminar(id: number): Promise<void>;
 
   contarPreguntas(evaluacion_id: number): Promise<number>;
   buscarPregunta(pregunta_id: number): Promise<Pregunta | null>;
