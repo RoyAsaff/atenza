@@ -11,6 +11,7 @@ import { GuiaIntentoRepositorio } from '../../domain/repositorios/guia-intento-r
 import { GuiaRepositorio } from '../../domain/repositorios/guia-repositorio';
 import { TiempoRealEmisor } from '../../domain/repositorios/tiempo-real';
 import { TokenService } from '../../domain/servicios/token-service';
+import { agregarParametrosDeAcceso } from './armar-url-acceso';
 
 // Vigencia del token de acceso a un intento — generosa: cubre una clase
 // entera o un repaso tranquilo sin que expire a mitad de camino.
@@ -34,8 +35,11 @@ function armarParaRendir(
     },
     ACCESO_INTENTO_SEGUNDOS,
   );
-  const separador = guia.url.includes('?') ? '&' : '?';
-  const url_acceso = `${guia.url}${separador}atenza_token=${token}&guia=${guia.id}&guia_intento=${intento.id}`;
+  const url_acceso = agregarParametrosDeAcceso(guia.url, {
+    atenza_token: token,
+    guia: guia.id,
+    guia_intento: intento.id,
+  });
 
   return {
     intento_id: intento.id,

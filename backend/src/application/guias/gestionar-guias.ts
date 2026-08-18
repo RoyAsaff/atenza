@@ -19,6 +19,7 @@ import { BitacoraRepositorio } from '../../domain/repositorios/bitacora-reposito
 import { UsuarioRepositorio } from '../../domain/repositorios/usuario-repositorio';
 import { TiempoRealEmisor } from '../../domain/repositorios/tiempo-real';
 import { TokenService } from '../../domain/servicios/token-service';
+import { agregarParametrosDeAcceso } from './armar-url-acceso';
 
 interface Auditoria {
   ip?: string;
@@ -81,9 +82,8 @@ async function armarAccesoLegacy(
     { sub: estudiante_id, contexto: 'estudiante', guia_id: guia.id, jti: `guia-${guia.id}` },
     ACCESO_GUIA_SEGUNDOS,
   );
-  const separador = guia.url.includes('?') ? '&' : '?';
   return {
-    url_acceso: `${guia.url}${separador}atenza_token=${token}&guia=${guia.id}`,
+    url_acceso: agregarParametrosDeAcceso(guia.url, { atenza_token: token, guia: guia.id }),
     completado: propio !== null,
   };
 }
