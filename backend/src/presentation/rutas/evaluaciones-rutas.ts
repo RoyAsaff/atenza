@@ -460,6 +460,12 @@ evaluacionesRouter.get(
 
 // ── E7 · HU-20 (lanzar), HU-22 (monitoreo), HU-23 (pausar/reactivar/cancelar) ──
 
+// Selección manual opcional de a quién lanzar (subconjunto de presentes).
+// Sin body o con estudiante_ids ausente/vacío → todos los presentes (de siempre).
+const esquemaLanzar = z.object({
+  estudiante_ids: z.array(idNumerico).min(1).optional(),
+});
+
 // POST /api/materias/:id/evaluaciones/:evalId/lanzar — HU-20
 evaluacionesRouter.post(
   '/:id/evaluaciones/:evalId/lanzar',
@@ -468,10 +474,12 @@ evaluacionesRouter.post(
   cuentaActiva,
   async (req, res, next) => {
     try {
+      const { estudiante_ids } = esquemaLanzar.parse(req.body ?? {});
       const evaluacion = await lanzarEvaluacion.ejecutar({
         materia_id: idNumerico.parse(req.params.id),
         evaluacion_id: idNumerico.parse(req.params.evalId),
         docente_id: req.auth!.sub,
+        estudiante_ids,
         ip: req.ip,
         dispositivo: req.headers['user-agent'],
       });

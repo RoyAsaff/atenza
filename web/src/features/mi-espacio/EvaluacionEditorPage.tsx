@@ -12,6 +12,7 @@ import {
   EstadoCuenta,
   EstadoEvaluacion,
   EvaluacionConPreguntas,
+  FilaListaAsistencia,
   Materia,
   Pregunta,
   PreguntaParseada,
@@ -25,6 +26,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  Checkbox,
   EmptyState,
   Input,
   Modal,
@@ -810,6 +812,133 @@ function ModalDemostracion({ demo, onCerrar }: { demo: Demostracion; onCerrar: (
   );
 }
 
+// ── HU-20: elegir a quién lanzar (todos los presentes o solo algunos) ──
+// Reusa el GET de asistencia (misma nómina que PasarListaPage) para no
+// duplicar el criterio de "presente" (puntual/atrasado) que ya vive en
+// el backend; acá solo se ofrece reducir ese conjunto.
+function ModalSeleccionarPresentes({
+  materiaId,
+  claseId,
+  enviando,
+  error,
+  onCerrar,
+  onConfirmar,
+}: {
+  materiaId: number;
+  claseId: number;
+  enviando: boolean;
+  error: string;
+  onCerrar: () => void;
+  onConfirmar: (estudianteIds: number[]) => void;
+}) {
+  const [seleccionados, setSeleccionados] = useState<Set<number> | null>(null);
+
+  const { data: lista, isLoading } = useQuery({
+    queryKey: ['asistencia', String(materiaId), String(claseId)],
+    queryFn: async () => {
+      const { data } = await api.get<{ lista: FilaListaAsistencia[] }>(
+        `/api/materias/${materiaId}/clases/${claseId}/asistencia`,
+      );
+      return data.lista;
+    },
+  });
+
+  const presentes = (lista ?? []).filter(
+    (f) => f.marcaje === 'puntual' || f.marcaje === 'atrasado',
+  );
+
+  useEffect(() => {
+    if (lista && seleccionados === null) {
+      setSeleccionados(new Set(presentes.map((f) => f.estudiante_id)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lista]);
+
+  const marcados = seleccionados ?? new Set<number>();
+  const todosMarcados = presentes.length > 0 && marcados.size === presentes.length;
+
+  function alternarTodos() {
+    setSeleccionados(todosMarcados ? new Set() : new Set(presentes.map((f) => f.estudiante_id)));
+  }
+
+  function alternarUno(estudianteId: number) {
+    setSeleccionados((prev) => {
+      const siguiente = new Set(prev ?? []);
+      if (siguiente.has(estudianteId)) siguiente.delete(estudianteId);
+      else siguiente.add(estudianteId);
+      return siguiente;
+    });
+  }
+
+  return (
+    <Modal
+      onCerrar={onCerrar}
+      titulo="Lanzar evaluación"
+      eyebrow="A quién convocar"
+      footer={
+        <>
+          <Button variante="secondary" onClick={onCerrar} disabled={enviando}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => onConfirmar(Array.from(marcados))}
+            disabled={enviando || isLoading || marcados.size === 0}
+          >
+            {enviando
+              ? 'Lanzando…'
+              : `Lanzar a ${marcados.size} estudiante${marcados.size === 1 ? '' : 's'}`}
+          </Button>
+        </>
+      }
+    >
+      {isLoading ? (
+        <div className="flex items-center gap-2 py-4 text-sm text-text-secondary">
+          <Spinner /> Cargando asistencia…
+        </div>
+      ) : presentes.length === 0 ? (
+        <div className="space-y-2 py-2 text-sm text-text-secondary">
+          <p>No hay estudiantes Puntuales o con Atraso registrados en esta clase.</p>
+          <Link to={`/materias/${materiaId}/clases/${claseId}/asistencia`} className="font-medium underline">
+            Pasar lista →
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between border-b border-border pb-2">
+            <p className="text-sm text-text-secondary">
+              {presentes.length} estudiante{presentes.length === 1 ? '' : 's'} presente
+              {presentes.length === 1 ? '' : 's'} en esta clase.
+            </p>
+            <Checkbox
+              etiqueta="Seleccionar todos"
+              checked={todosMarcados}
+              onChange={alternarTodos}
+            />
+          </div>
+          <ul className="max-h-72 space-y-1 overflow-y-auto">
+            {presentes.map((f) => (
+              <li
+                key={f.estudiante_id}
+                className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-surface-hover"
+              >
+                <Checkbox
+                  etiqueta={`${f.apellidos}, ${f.nombres}`}
+                  checked={marcados.has(f.estudiante_id)}
+                  onChange={() => alternarUno(f.estudiante_id)}
+                />
+                <Badge tone={f.marcaje === 'atrasado' ? 'warning' : 'success'}>
+                  {f.marcaje === 'atrasado' ? 'Atraso' : 'Puntual'}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {error && <p className="pt-1 text-sm text-red-600">{error}</p>}
+    </Modal>
+  );
+}
+
 export function EvaluacionEditorPage() {
   const { id, evalId } = useParams();
   const materiaId = Number(id);
@@ -830,6 +959,7 @@ export function EvaluacionEditorPage() {
   const [modalPreguntaAbierto, setModalPreguntaAbierto] = useState(false);
   const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
   const [modalPromptAbierto, setModalPromptAbierto] = useState(false);
+  const [modalLanzarAbierto, setModalLanzarAbierto] = useState(false);
 
   const { data: evaluacion, isLoading, isError } = useQuery({
     queryKey: ['evaluacion', String(evaluacionId)],
@@ -887,27 +1017,26 @@ export function EvaluacionEditorPage() {
     onError: (err: unknown) => setErrorDatos(mensajeDeError(err)),
   });
 
-  // HU-20: lanzar solo a Puntual/Atraso (Esc. 2: si falta asistencia, el
-  // backend lo rechaza y acá mostramos el enlace para ir a pasar lista).
+  // HU-20: lanzar a Puntual/Atraso, con opción de elegir solo algunos
+  // (ModalSeleccionarPresentes). Esc. 2: si falta asistencia, el modal ya
+  // lo detecta antes de intentar el POST y muestra el enlace a pasar lista.
   const lanzar = useMutation({
-    mutationFn: () =>
-      api.post(`/api/materias/${materiaId}/evaluaciones/${evaluacionId}/lanzar`),
+    mutationFn: (estudianteIds: number[]) =>
+      api.post(`/api/materias/${materiaId}/evaluaciones/${evaluacionId}/lanzar`, {
+        estudiante_ids: estudianteIds,
+      }),
     onSuccess: () => {
       setErrorLanzar('');
+      setModalLanzarAbierto(false);
       queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
       navigate(`/materias/${id}/evaluaciones/${evalId}/monitoreo`);
     },
     onError: (err: unknown) => setErrorLanzar(mensajeDeError(err)),
   });
 
-  function manejarLanzar() {
-    if (
-      window.confirm(
-        'Se lanzará el examen a los estudiantes Puntuales y con Atraso registrados en esta clase. No podrás editarla después. ¿Continuar?',
-      )
-    ) {
-      lanzar.mutate();
-    }
+  function abrirModalLanzar() {
+    setErrorLanzar('');
+    setModalLanzarAbierto(true);
   }
 
   // Deshacer una evaluación (p.ej. lanzada por error): borra en cascada
@@ -1053,7 +1182,7 @@ export function EvaluacionEditorPage() {
                 </Button>
               )}
               {evaluacion.estado === 'lista' && (
-                <Button onClick={manejarLanzar} disabled={lanzar.isPending}>
+                <Button onClick={abrirModalLanzar} disabled={lanzar.isPending}>
                   {lanzar.isPending ? 'Lanzando…' : 'Lanzar evaluación'}
                 </Button>
               )}
@@ -1082,17 +1211,6 @@ export function EvaluacionEditorPage() {
         {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
         {errorDemo && <p className="mt-2 text-sm text-red-600">{errorDemo}</p>}
         {errorEliminar && <p className="mt-2 text-sm text-red-600">{errorEliminar}</p>}
-        {errorLanzar && (
-          <p className="mt-2 text-sm text-red-600">
-            {errorLanzar}{' '}
-            <Link
-              to={`/materias/${id}/clases/${evaluacion.clase_id}/asistencia`}
-              className="font-medium underline"
-            >
-              Pasar lista →
-            </Link>
-          </p>
-        )}
       </div>
 
       {!editable && (
@@ -1247,6 +1365,17 @@ export function EvaluacionEditorPage() {
             })
           }
           onCerrar={() => setModalPreguntaAbierto(false)}
+        />
+      )}
+
+      {modalLanzarAbierto && (
+        <ModalSeleccionarPresentes
+          materiaId={materiaId}
+          claseId={evaluacion.clase_id}
+          enviando={lanzar.isPending}
+          error={errorLanzar}
+          onCerrar={() => setModalLanzarAbierto(false)}
+          onConfirmar={(estudianteIds) => lanzar.mutate(estudianteIds)}
         />
       )}
     </div>

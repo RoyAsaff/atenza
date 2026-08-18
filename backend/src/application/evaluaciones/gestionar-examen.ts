@@ -195,7 +195,14 @@ export class LanzarEvaluacion {
   ) {}
 
   async ejecutar(
-    entrada: Auditoria & { materia_id: number; evaluacion_id: number; docente_id: number },
+    entrada: Auditoria & {
+      materia_id: number;
+      evaluacion_id: number;
+      docente_id: number;
+      // Selección manual opcional (subconjunto de los presentes). Si se
+      // omite, se lanza a todos los Puntuales/Atrasados de siempre.
+      estudiante_ids?: number[];
+    },
   ): Promise<Evaluacion> {
     const evaluacion = await exigirEvaluacionPropia(
       this.evaluaciones,
@@ -217,11 +224,22 @@ export class LanzarEvaluacion {
       );
     }
 
-    const presentes = asistenciasClase.filter(
+    let presentes = asistenciasClase.filter(
       (a) => a.marcaje === 'puntual' || a.marcaje === 'atrasado',
     );
     if (presentes.length === 0) {
       throw new EstadoInvalidoError('No hay estudiantes Puntuales o con Atraso en esta clase');
+    }
+
+    // Lanzamiento selectivo: el docente eligió solo algunos presentes en
+    // vez del curso completo. Se intersecta con `presentes` para que nunca
+    // se pueda convocar a alguien con Licencia/Falta desde el cliente.
+    if (entrada.estudiante_ids) {
+      const seleccionados = new Set(entrada.estudiante_ids);
+      presentes = presentes.filter((a) => seleccionados.has(a.estudiante_id));
+      if (presentes.length === 0) {
+        throw new EstadoInvalidoError('Selecciona al menos un estudiante presente');
+      }
     }
 
     const conPreguntas = await this.evaluaciones.buscarConPreguntas(evaluacion.id);
