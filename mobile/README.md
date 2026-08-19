@@ -26,15 +26,23 @@ flutter pub get
 
 ## Ejecutar
 
-El backend debe estar corriendo (`cd backend && npm run dev`, puerto 3000).
+**El default de `apiUrl` (`lib/core/api/api_cliente.dart`) apunta al backend
+de producción** (`https://api-atenza.atenzabo.com`). Para desarrollar contra
+tu backend local (`cd backend && npm run dev`, puerto 3000) hay que pisarlo
+explícitamente con `--dart-define`:
 
 ```bash
 # Emulador Android (10.0.2.2 = localhost de tu PC):
-flutter run
+flutter run --dart-define=API_URL=http://10.0.2.2:3000
 
 # Teléfono físico en la misma red (usa la IP de tu PC):
 flutter run --dart-define=API_URL=http://192.168.x.x:3000
 ```
+
+Un `flutter run`/`flutter build` **sin** `--dart-define=API_URL=...` queda
+apuntando a producción — es lo que se quiere para generar el release
+(`flutter build apk --release`), pero ojo si la idea era probar contra el
+backend local.
 
 ## Decisiones aplicadas
 

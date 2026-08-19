@@ -8,11 +8,16 @@ import 'package:http/http.dart' as http;
 
 import '../errores.dart';
 
-/// Emulador Android: 10.0.2.2 apunta al localhost de la PC.
-/// Teléfono físico: flutter run --dart-define=API_URL=http://IP_DE_TU_PC:3000
+/// El default apunta al backend de producción — así un `flutter build`
+/// sin --dart-define (como sale un release) NO termina roto apuntando
+/// a localhost (incidente 19/08: v1.1.0+2 se subió así y no conectaba).
+///
+/// Para desarrollo local hay que pisar esto explícitamente:
+///   Emulador Android: --dart-define=API_URL=http://10.0.2.2:3000
+///   Teléfono físico:  --dart-define=API_URL=http://IP_DE_TU_PC:3000
 const String apiUrl = String.fromEnvironment(
   'API_URL',
-  defaultValue: 'http://10.0.2.2:3000',
+  defaultValue: 'https://api-atenza.atenzabo.com',
 );
 
 class ApiCliente {
