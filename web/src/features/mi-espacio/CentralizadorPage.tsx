@@ -1,6 +1,7 @@
 // E8 · HU-27: matriz estudiantes × evaluaciones finalizadas de la
-// materia, con el acumulado (Σ nota_obtenida / Σ nota_total) y export a
-// Excel (primer precedente de export en el código).
+// materia y export a Excel (primer precedente de export en el código).
+// El acumulado (Σ nota_obtenida / Σ nota_total) se quitó — la nota
+// agregada ahora se calcula acá mismo con "Nota final" (ver más abajo).
 
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -34,9 +35,10 @@ import {
 // para recién ahí multiplicar una sola vez por la base (base * promedio
 // de %, en vez de promediar "base * %_i" evaluación por evaluación —
 // álgebra idéntica, pero con un solo redondeo al final). Quien no rindió
-// una evaluación seleccionada aporta 0% (mismo criterio que el Acumulado
-// de siempre). Es puramente un cálculo en pantalla: no se guarda ni pega
-// en el Excel exportado.
+// una evaluación seleccionada aporta 0%. La selección y la base no se
+// guardan (se resetean al recargar), pero si hay un cálculo activo al
+// exportar, viaja como query param y el backend agrega la misma columna
+// al Excel (ver ExportarCentralizador).
 function calcularNotaFinal(
   fila: FilaCentralizador,
   columnas: { evaluacion_id: number; nota_total: number }[],
@@ -113,10 +115,19 @@ export function CentralizadorPage() {
     setExportando(true);
     setErrorExportar('');
     try {
+      // Si hay una "Nota final" calculada en pantalla, se manda tal cual
+      // para que el Excel traiga esa misma columna extra.
+      const params = mostrarNotaFinal
+        ? {
+            evaluacion_ids: columnasSeleccionadas.map((c) => c.evaluacion_id).join(','),
+            nota_base: notaBaseNum,
+          }
+        : undefined;
       // responseType 'blob' (en vez de un <a href> plano) para que el
       // interceptor de axios adjunte el Bearer token de la sesión.
       const respuesta = await api.get(`/api/materias/${materiaId}/centralizador/exportar`, {
         responseType: 'blob',
+        params,
       });
       const url = URL.createObjectURL(respuesta.data as Blob);
       const enlace = document.createElement('a');
@@ -140,7 +151,7 @@ export function CentralizadorPage() {
         <PageHeader
           eyebrow="Centralizador"
           title="Notas de la materia"
-          description="Matriz de estudiantes × evaluaciones finalizadas, con el acumulado."
+          description="Matriz de estudiantes × evaluaciones finalizadas."
           actions={
             centralizador && centralizador.columnas.length > 0 ? (
               <Button onClick={exportar} disabled={exportando}>
@@ -225,7 +236,6 @@ export function CentralizadorPage() {
                       <span className="ml-1 font-normal text-text-disabled">/{columna.nota_total}</span>
                     </Th>
                   ))}
-                  <Th>Acumulado</Th>
                   {mostrarNotaFinal && <Th>Nota final /{notaBaseNum}</Th>}
                 </Tr>
               </Thead>
@@ -243,11 +253,6 @@ export function CentralizadorPage() {
                         </Td>
                       );
                     })}
-                    <Td className="font-medium">
-                      {fila.acumulado_total > 0
-                        ? `${fila.acumulado_obtenido}/${fila.acumulado_total}`
-                        : <span className="font-normal text-text-disabled">—</span>}
-                    </Td>
                     {mostrarNotaFinal && (
                       <Td className="font-medium">
                         {calcularNotaFinal(fila, columnasSeleccionadas, notaBaseNum)}

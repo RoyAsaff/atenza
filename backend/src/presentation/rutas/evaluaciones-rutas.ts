@@ -719,6 +719,16 @@ evaluacionesRouter.get('/:id/centralizador', autenticar, soloDocente, async (req
   }
 });
 
+// Nota final calculada en CentralizadorPage: query opcional para que el
+// Excel exportado incluya la misma columna que se ve en pantalla.
+const esquemaExportarCentralizador = z.object({
+  evaluacion_ids: z
+    .string()
+    .optional()
+    .transform((valor) => valor?.split(',').map((s) => idNumerico.parse(s))),
+  nota_base: z.coerce.number().positive().optional(),
+});
+
 // GET /api/materias/:id/centralizador/exportar — HU-27 (descarga .xlsx)
 evaluacionesRouter.get(
   '/:id/centralizador/exportar',
@@ -727,11 +737,14 @@ evaluacionesRouter.get(
   async (req, res, next) => {
     try {
       const materia_id = idNumerico.parse(req.params.id);
+      const { evaluacion_ids, nota_base } = esquemaExportarCentralizador.parse(req.query);
       const materia = await materiaRepositorio.buscarPorId(materia_id);
       const buffer = await exportarCentralizador.ejecutar({
         materia_id,
         docente_id: req.auth!.sub,
         nombre_materia: materia?.nombre_materia ?? 'materia',
+        evaluacion_ids,
+        nota_base,
       });
       res.setHeader(
         'Content-Type',

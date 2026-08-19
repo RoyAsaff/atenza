@@ -49,14 +49,12 @@ export interface ColumnaCentralizador {
 }
 
 /** HU-27: fila del centralizador (un estudiante), con su celda por
- * evaluación (null = no rindió esa evaluación) y su acumulado. */
+ * evaluación (null = no rindió esa evaluación). */
 export interface FilaCentralizador {
   estudiante_id: number;
   nombres: string;
   apellidos: string;
   celdas: Record<number, number | null>; // evaluacion_id -> nota_obtenida
-  acumulado_obtenido: number;
-  acumulado_total: number;
 }
 
 export interface Centralizador {

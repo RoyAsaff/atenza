@@ -348,8 +348,6 @@ export interface FilaCentralizador {
   nombres: string;
   apellidos: string;
   celdas: Record<number, number | null>;
-  acumulado_obtenido: number;
-  acumulado_total: number;
 }
 
 export interface Centralizador {

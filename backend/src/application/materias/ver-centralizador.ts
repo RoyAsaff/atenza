@@ -1,8 +1,8 @@
 // E8 · HU-27 · Centralizador de notas por materia: matriz estudiantes ×
 // evaluaciones finalizadas (publicadas o no — es una vista del docente,
-// no del estudiante) con el acumulado (Σ nota_obtenida / Σ nota_total).
-// Un estudiante no convocado a una evaluación (HU-20: solo Puntual/
-// Atraso, o faltó) cuenta como 0 en esa evaluación (decisión de Roy).
+// no del estudiante). El acumulado (Σ nota_obtenida / Σ nota_total) se
+// quitó (ya no se usa) — la nota agregada ahora se calcula en pantalla
+// vía "Nota final" (ver CentralizadorPage / calcularNotaFinal más abajo).
 
 import ExcelJS from 'exceljs';
 import { ColumnaCentralizador, Centralizador, FilaCentralizador } from '../../domain/entidades/nota';
@@ -49,28 +49,35 @@ export class VerCentralizador {
     const filas: FilaCentralizador[] = inscripcionesActivas.map((inscripcion) => {
       const notasEstudiante = mapa.get(inscripcion.estudiante.id);
       const celdas: Record<number, number | null> = {};
-      let acumuladoObtenido = 0;
-      let acumuladoTotal = 0;
       for (const columna of columnas) {
-        const nota = notasEstudiante?.get(columna.evaluacion_id);
-        celdas[columna.evaluacion_id] = nota ?? null;
-        // Estudiante no convocado a esa evaluación (HU-20: solo Puntual/
-        // Atraso, o faltó): cuenta como 0 en el acumulado (decisión de Roy).
-        acumuladoObtenido += nota ?? 0;
-        acumuladoTotal += columna.nota_total;
+        celdas[columna.evaluacion_id] = notasEstudiante?.get(columna.evaluacion_id) ?? null;
       }
       return {
         estudiante_id: inscripcion.estudiante.id,
         nombres: inscripcion.estudiante.nombres,
         apellidos: inscripcion.estudiante.apellidos,
         celdas,
-        acumulado_obtenido: Math.round(acumuladoObtenido * 100) / 100,
-        acumulado_total: acumuladoTotal,
       };
     });
 
     return { columnas, filas };
   }
+}
+
+/** Misma fórmula que el frontend (CentralizadorPage): promedia el % de
+ * cada evaluación seleccionada (nota_obtenida/nota_total, 0 si no rindió)
+ * y recién ahí multiplica una sola vez por la nota base. */
+function calcularNotaFinal(
+  fila: FilaCentralizador,
+  columnas: ColumnaCentralizador[],
+  notaBase: number,
+): number {
+  const sumaPorcentajes = columnas.reduce((acc, c) => {
+    if (c.nota_total <= 0) return acc;
+    const obtenida = fila.celdas[c.evaluacion_id] ?? 0;
+    return acc + obtenida / c.nota_total;
+  }, 0);
+  return Math.round((sumaPorcentajes / columnas.length) * notaBase * 100) / 100;
 }
 
 export class ExportarCentralizador {
@@ -80,8 +87,19 @@ export class ExportarCentralizador {
     materia_id: number;
     docente_id: number;
     nombre_materia: string;
+    // Último cálculo de "Nota final" hecho en pantalla (CentralizadorPage):
+    // si vienen ambos y hay intersección con las columnas reales, se agrega
+    // esa columna extra al Excel. Opcional — sin esto exporta como siempre.
+    evaluacion_ids?: number[];
+    nota_base?: number;
   }): Promise<ExcelJS.Buffer> {
     const centralizador = await this.verCentralizador.ejecutar(entrada);
+
+    const columnasNotaFinal = entrada.evaluacion_ids
+      ? centralizador.columnas.filter((c) => entrada.evaluacion_ids!.includes(c.evaluacion_id))
+      : [];
+    const incluirNotaFinal =
+      !!entrada.nota_base && entrada.nota_base > 0 && columnasNotaFinal.length > 0;
 
     const libro = new ExcelJS.Workbook();
     const hoja = libro.addWorksheet('Centralizador');
@@ -93,7 +111,9 @@ export class ExportarCentralizador {
         key: `evaluacion_${c.evaluacion_id}`,
         width: 20,
       })),
-      { header: 'Acumulado', key: 'acumulado', width: 18 },
+      ...(incluirNotaFinal
+        ? [{ header: `Nota final (/${entrada.nota_base})`, key: 'nota_final', width: 18 }]
+        : []),
     ];
     hoja.getRow(1).font = { bold: true };
 
@@ -105,10 +125,9 @@ export class ExportarCentralizador {
         const nota = fila.celdas[columna.evaluacion_id];
         registro[`evaluacion_${columna.evaluacion_id}`] = nota ?? '—';
       }
-      registro.acumulado =
-        fila.acumulado_total > 0
-          ? `${fila.acumulado_obtenido}/${fila.acumulado_total}`
-          : '—';
+      if (incluirNotaFinal) {
+        registro.nota_final = calcularNotaFinal(fila, columnasNotaFinal, entrada.nota_base!);
+      }
       hoja.addRow(registro);
     }
 
