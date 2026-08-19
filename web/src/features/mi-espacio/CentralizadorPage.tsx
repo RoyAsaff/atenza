@@ -148,13 +148,21 @@ function Matriz({
           return (
             <div
               key={columna.evaluacion_id}
-              className={cn('flex flex-col items-center gap-[2px] px-2 py-[9px]', !cuenta && 'bg-neutral-50')}
+              className={cn(
+                'flex h-[150px] flex-col items-center justify-end gap-[6px] px-1 pt-2 pb-[9px]',
+                !cuenta && 'bg-neutral-50',
+              )}
             >
+              {/* Rotado: en columnas angostas el tema horizontal se corta o se
+                  superpone con el vecino. Vertical-rl + rotate-180 lo deja de
+                  abajo hacia arriba (como en Excel), sin achicar la columna. */}
               <p
                 className={cn(
-                  'truncate text-[12px] font-semibold text-text',
+                  'max-h-[120px] origin-center truncate whitespace-nowrap text-[12px] font-semibold text-text [writing-mode:vertical-rl]',
+                  'rotate-180',
                   !cuenta && 'font-medium text-text-disabled line-through',
                 )}
+                title={columna.tema}
               >
                 {columna.tema}
               </p>
