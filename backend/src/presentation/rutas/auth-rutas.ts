@@ -16,6 +16,7 @@ import {
   limitarLoginPorCuenta,
   limitarLoginPorIp,
   limitarResetPassword,
+  limitarResetPasswordPorCuenta,
 } from '../middlewares/limitar-tasa';
 import { aPublico } from '../../domain/entidades/usuario';
 
@@ -66,16 +67,21 @@ authRouter.post('/verificar-email', async (req, res, next) => {
 });
 
 // POST /api/auth/password/olvide — HU-04 Esc. 2 (paso 1)
-authRouter.post('/password/olvide', limitarResetPassword, async (req, res, next) => {
-  try {
-    const { email } = z.object({ email: z.string().email() }).parse(req.body);
-    await solicitarResetPassword.ejecutar(email);
-    // Siempre 200: no revelamos si el correo existe
-    res.json({ mensaje: 'Si el correo existe, recibirás un enlace de recuperación' });
-  } catch (error) {
-    next(error);
-  }
-});
+authRouter.post(
+  '/password/olvide',
+  limitarResetPassword,
+  limitarResetPasswordPorCuenta,
+  async (req, res, next) => {
+    try {
+      const { email } = z.object({ email: z.string().email() }).parse(req.body);
+      await solicitarResetPassword.ejecutar(email);
+      // Siempre 200: no revelamos si el correo existe
+      res.json({ mensaje: 'Si el correo existe, recibirás un enlace de recuperación' });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 // POST /api/auth/password/restablecer — HU-04 Esc. 2 (paso 2)
 authRouter.post('/password/restablecer', async (req, res, next) => {

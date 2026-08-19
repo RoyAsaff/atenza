@@ -35,7 +35,7 @@ export const limitarLoginPorIp = rateLimit({
   message: MENSAJE_DEMASIADOS_INTENTOS,
 });
 
-function emailDelCuerpo(req: Request): string {
+export function emailDelCuerpo(req: Request): string {
   const email = req.body?.email;
   // Sin email en el body (request mal formado, antes de que zod lo valide
   // en el handler) cae a un balde compartido por IP — no hay cuenta
@@ -55,10 +55,28 @@ export const limitarLoginPorCuenta = rateLimit({
   message: MENSAJE_DEMASIADOS_INTENTOS,
 });
 
+// Mismo bug que tenía login antes del 13/08 (ver limitarLoginPorIp arriba),
+// reportado el 19/08 en "olvidé mi contraseña": contar solo por IP hace que
+// varios estudiantes en la misma red de colegio (NAT) agoten el cupo del
+// grupo entero con un par de intentos — y con el límite tan bajo (5), se
+// vuelve a agotar en minutos aunque se reinicie el backend (el contador
+// vive en memoria, un restart solo lo pone en 0 un instante). Mismo
+// arreglo: la defensa real pasa a ser por CUENTA (el email que puso en el
+// forms, no revela si existe igual), este queda de respaldo genérico
+// contra un flood real desde una sola IP.
 export const limitarResetPassword = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: MENSAJE_DEMASIADOS_INTENTOS,
+});
+
+export const limitarResetPasswordPorCuenta = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: emailDelCuerpo,
   message: MENSAJE_DEMASIADOS_INTENTOS,
 });
