@@ -76,6 +76,12 @@ export interface GuiaIntentoRepositorio {
     correcta: boolean,
     revisada_por_id: number,
   ): Promise<GuiaRespuesta>;
+  /** Revisión en lote — mismo efecto que revisarRespuesta repetido N
+   * veces, en una sola transacción. */
+  revisarRespuestasLote(
+    revisiones: { guia_respuesta_id: number; correcta: boolean }[],
+    revisada_por_id: number,
+  ): Promise<GuiaRespuesta[]>;
 
   registrarIncidente(
     guia_intento_id: number,

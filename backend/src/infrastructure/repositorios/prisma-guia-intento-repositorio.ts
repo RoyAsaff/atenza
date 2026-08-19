@@ -299,6 +299,24 @@ export class PrismaGuiaIntentoRepositorio implements GuiaIntentoRepositorio {
     });
   }
 
+  /** Revisión en lote (18/08, HU corrección rápida): mismo update que
+   * revisarRespuesta pero las N filas van en una sola transacción — evita
+   * N round-trips a la base cuando el docente marca varias de una. */
+  async revisarRespuestasLote(
+    revisiones: { guia_respuesta_id: number; correcta: boolean }[],
+    revisada_por_id: number,
+  ): Promise<GuiaRespuesta[]> {
+    const revisada_en = new Date();
+    return this.prisma.$transaction(
+      revisiones.map((r) =>
+        this.prisma.guiaRespuesta.update({
+          where: { id: r.guia_respuesta_id },
+          data: { correcta: r.correcta, revisada_en, revisada_por_id },
+        }),
+      ),
+    );
+  }
+
   async registrarIncidente(
     guia_intento_id: number,
     tipo: TipoIncidente,

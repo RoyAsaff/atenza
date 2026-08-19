@@ -24,6 +24,7 @@ import {
   registrarCompletado,
   reportarIncidenteGuia,
   revisarRespuestaGuia,
+  revisarRespuestasGuiaLote,
   sesionRepositorio,
   tokenService,
   verGuiaDetalle,
@@ -378,6 +379,36 @@ guiasRouter.get(
         docente_id: req.auth!.sub,
       });
       res.json({ pendientes });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST /api/materias/:id/guias/:guiaId/revision/lote — corrección rápida:
+// varias respuestas de una, un solo request. Va ANTES que la ruta con
+// :guiaRespuestaId de abajo — si no, Express intentaría parsear "lote"
+// como el id numérico de esa otra ruta.
+guiasRouter.post(
+  '/:id/guias/:guiaId/revision/lote',
+  autenticar,
+  soloDocente,
+  async (req, res, next) => {
+    try {
+      const { revisiones } = z
+        .object({
+          revisiones: z
+            .array(z.object({ guia_respuesta_id: idNumerico, correcta: z.boolean() }))
+            .min(1),
+        })
+        .parse(req.body);
+      await revisarRespuestasGuiaLote.ejecutar({
+        materia_id: idNumerico.parse(req.params.id),
+        guia_id: idNumerico.parse(req.params.guiaId),
+        revisiones,
+        docente_id: req.auth!.sub,
+      });
+      res.status(204).send();
     } catch (error) {
       next(error);
     }

@@ -82,3 +82,58 @@ export class RevisarRespuestaGuia {
     }
   }
 }
+
+/** Revisión en lote (18/08) · corrección rápida: filtra por alumno/pregunta
+ * y marca varias de una, un solo request. Misma validación de pertenencia
+ * que RevisarRespuestaGuia (contra la lista de pendientes de la guía) pero
+ * hecha una vez para todo el lote, no por ítem — y la nota de cada alumno
+ * afectado se recalcula una sola vez al final, no una vez por respuesta
+ * suya que haya venido en el mismo lote. */
+export class RevisarRespuestasGuiaLote {
+  constructor(
+    private readonly guias: GuiaRepositorio,
+    private readonly clases: ClaseRepositorio,
+    private readonly materias: MateriaRepositorio,
+    private readonly guiaIntentos: GuiaIntentoRepositorio,
+    private readonly tiempoReal: TiempoRealEmisor,
+  ) {}
+
+  async ejecutar(entrada: {
+    materia_id: number;
+    guia_id: number;
+    revisiones: { guia_respuesta_id: number; correcta: boolean }[];
+    docente_id: number;
+  }): Promise<void> {
+    await exigirMateriaPropia(this.materias, entrada.materia_id, entrada.docente_id);
+    const guia = await exigirGuiaDeMateria(
+      this.guias,
+      this.clases,
+      entrada.materia_id,
+      entrada.guia_id,
+    );
+
+    const pendientes = await this.guiaIntentos.listarRevisionPendiente(guia.id);
+    const pendientesPorId = new Map(pendientes.map((p) => [p.guia_respuesta_id, p]));
+    const validas = entrada.revisiones.filter((r) => pendientesPorId.has(r.guia_respuesta_id));
+    if (validas.length === 0) return;
+
+    await this.guiaIntentos.revisarRespuestasLote(validas, entrada.docente_id);
+
+    const intentoIds = new Set(
+      validas.map((r) => pendientesPorId.get(r.guia_respuesta_id)!.guia_intento_id),
+    );
+    for (const intento_id of intentoIds) {
+      const intento = await this.guiaIntentos.buscarPorId(intento_id);
+      if (!intento) continue;
+      await calcularNotaSiCorresponde(this.guias, this.guiaIntentos, intento);
+
+      const actualizado = await this.guiaIntentos.buscarPorId(intento_id);
+      if (actualizado?.nota_obtenida !== null) {
+        this.tiempoReal.emitirAGuia(guia.id, 'intento-actualizado', {
+          intento_id,
+          estado: actualizado!.estado,
+        });
+      }
+    }
+  }
+}

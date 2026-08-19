@@ -135,7 +135,11 @@ import {
   ReportarIncidenteGuia,
   VerGuiaOficialActivo,
 } from '../application/guias/rendir-guia';
-import { RevisarRespuestaGuia, VerRevisionGuia } from '../application/guias/revisar-respuestas-guia';
+import {
+  RevisarRespuestaGuia,
+  RevisarRespuestasGuiaLote,
+  VerRevisionGuia,
+} from '../application/guias/revisar-respuestas-guia';
 import { VerMonitoreoGuia, VerResultadosGuia } from '../application/guias/ver-resultados-guia';
 import {
   crearVerificarTokenGuia,
@@ -693,6 +697,13 @@ export const verRevisionGuia = new VerRevisionGuia(
   guiaIntentoRepositorio,
 );
 export const revisarRespuestaGuia = new RevisarRespuestaGuia(
+  guiaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  guiaIntentoRepositorio,
+  socketIoEmisor,
+);
+export const revisarRespuestasGuiaLote = new RevisarRespuestasGuiaLote(
   guiaRepositorio,
   claseRepositorio,
   materiaRepositorio,
