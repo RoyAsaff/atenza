@@ -219,7 +219,10 @@ class _RaizState extends State<_Raiz> {
     if (auth.estado == EstadoAuth.sinSesion) {
       return const LoginPage();
     }
-    if (examen.intento != null) {
+    // `mostrarPantallaFinal` mantiene ExamenPage montada aunque `intento`
+    // ya haya vuelto a null (ver ExamenController.marcarPantallaFinal):
+    // si no, la pantalla de cierre nunca llegaría a mostrarse.
+    if (examen.intento != null || examen.mostrarPantallaFinal) {
       return const ExamenPage();
     }
     return const MisMateriasPage();

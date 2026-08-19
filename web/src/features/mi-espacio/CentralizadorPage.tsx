@@ -158,10 +158,10 @@ function Matriz({
                   abajo hacia arriba (como en Excel), sin achicar la columna. */}
               <p
                 className={cn(
-                  'max-h-[120px] origin-center truncate whitespace-nowrap text-[12px] font-semibold text-text [writing-mode:vertical-rl]',
-                  'rotate-180',
-                  !cuenta && 'font-medium text-text-disabled line-through',
-                )}
+  'max-h-[120px] origin-center text-[12px] font-semibold text-text [writing-mode:vertical-rl]',
+  'rotate-180 break-words',
+  !cuenta && 'font-medium text-text-disabled line-through',
+)}
                 title={columna.tema}
               >
                 {columna.tema}
