@@ -41,20 +41,35 @@ export interface Resultados {
   estadisticas: EstadisticasResultados;
 }
 
-/** HU-27: una columna del centralizador (una evaluación finalizada). */
+/** HU-27 + fusión con guías (24/08): una columna del centralizador — una
+ * evaluación finalizada o una guía cerrada. `id` es el evaluacion_id o
+ * guia_id según `tipo` (dos secuencias autoincrement separadas, por eso no
+ * alcanza un solo número para identificar la columna sin ambigüedad). */
+export type TipoColumnaCentralizador = 'evaluacion' | 'guia';
+
 export interface ColumnaCentralizador {
-  evaluacion_id: number;
+  tipo: TipoColumnaCentralizador;
+  id: number;
   tema: string;
   nota_total: number;
 }
 
-/** HU-27: fila del centralizador (un estudiante), con su celda por
- * evaluación (null = no rindió esa evaluación). */
+/** Clave estable de columna para `celdas` y para (de)serializar selecciones
+ * — evita colisiones entre un evaluacion_id y un guia_id iguales. */
+export function claveColumnaCentralizador(columna: {
+  tipo: TipoColumnaCentralizador;
+  id: number;
+}): string {
+  return `${columna.tipo}:${columna.id}`;
+}
+
+/** HU-27: fila del centralizador (un estudiante), con su celda por columna
+ * (null = no rindió esa evaluación / no tiene nota en esa guía). */
 export interface FilaCentralizador {
   estudiante_id: number;
   nombres: string;
   apellidos: string;
-  celdas: Record<number, number | null>; // evaluacion_id -> nota_obtenida
+  celdas: Record<string, number | null>; // claveColumnaCentralizador(columna) -> nota_obtenida
 }
 
 export interface Centralizador {

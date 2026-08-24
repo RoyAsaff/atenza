@@ -568,19 +568,23 @@ export const verMiDetalleIntento = new VerMiDetalleIntento(
   evaluacionRepositorio,
   intentoRepositorio,
 );
-export const verCentralizador = new VerCentralizador(
-  materiaRepositorio,
-  evaluacionRepositorio,
-  inscripcionRepositorio,
-  intentoRepositorio,
-);
-export const exportarCentralizador = new ExportarCentralizador(verCentralizador);
-
 // Guías de pre-clase (fusión con PaginaGuias, 05/08; guías nativas 16/08)
 // — no está en el diagrama. Ver gestionar-guias.ts.
 export const guiaRepositorio = new PrismaGuiaRepositorio(prisma);
 export const guiaCompletadaRepositorio = new PrismaGuiaCompletadaRepositorio(prisma);
 export const guiaIntentoRepositorio = new PrismaGuiaIntentoRepositorio(prisma);
+
+// El Centralizador (HU-27) fusiona evaluaciones + guías (24/08) — necesita
+// los repos de guía de arriba, por eso queda después de declararlos.
+export const verCentralizador = new VerCentralizador(
+  materiaRepositorio,
+  evaluacionRepositorio,
+  guiaRepositorio,
+  inscripcionRepositorio,
+  intentoRepositorio,
+  guiaIntentoRepositorio,
+);
+export const exportarCentralizador = new ExportarCentralizador(verCentralizador);
 
 export const crearGuia = new CrearGuia(
   guiaRepositorio,

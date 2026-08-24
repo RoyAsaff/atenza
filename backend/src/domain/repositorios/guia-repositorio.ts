@@ -38,6 +38,11 @@ export interface GuiaRepositorio {
   /** Barrido en segundo plano (ver barrer-vencimientos.ts): todas las
    * guías lanzadas ahora mismo, de cualquier docente/materia. */
   listarLanzadas(): Promise<Guia[]>;
+  /** HU-27: guías nativas ya cerradas de toda la materia (cualquier clase)
+   * — equivalente de listarFinalizadasPorMateria de Evaluación, para el
+   * Centralizador. Las "externa_legacy" nunca llegan a "cerrada", así que
+   * quedan afuera solas (no tienen nota cuantitativa que mostrar). */
+  listarCerradasPorMateria(materia_id: number): Promise<Guia[]>;
   /** Nace `estado: publicada`, lista para lanzar (16/08: guías nativas). */
   crear(datos: DatosNuevaGuia): Promise<Guia>;
   actualizar(id: number, datos: DatosActualizarGuia): Promise<Guia>;

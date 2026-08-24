@@ -78,6 +78,16 @@ export class PrismaGuiaIntentoRepositorio implements GuiaIntentoRepositorio {
     return filas.map(aGuiaIntento);
   }
 
+  async notasOficialesPorGuia(
+    guia_id: number,
+  ): Promise<{ estudiante_id: number; nota_obtenida: number }[]> {
+    const filas = await this.prisma.guiaIntento.findMany({
+      where: { guia_id, es_oficial: true, nota_obtenida: { not: null } },
+      select: { estudiante_id: true, nota_obtenida: true },
+    });
+    return filas.map((f) => ({ estudiante_id: f.estudiante_id, nota_obtenida: f.nota_obtenida! }));
+  }
+
   async listarMonitoreo(guia_id: number): Promise<FilaMonitoreoGuia[]> {
     const [filas, totalPreguntas] = await Promise.all([
       this.prisma.guiaIntento.findMany({

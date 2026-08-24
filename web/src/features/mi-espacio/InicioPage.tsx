@@ -149,10 +149,16 @@ function CarruselPendientesMobile({ pendientes }: { pendientes: Pendiente[] }) {
 }
 
 function BloqueClaseActual({ clase }: { clase: ClaseDeHoy }) {
+  const esDictada = clase.rol === 'dictada';
   const hora = horaAFecha(clase.hora, new Date());
   const fin = new Date(hora.getTime() + minutosDesde(clase.duracion_minutos));
   const horaFin = `${String(fin.getHours()).padStart(2, '0')}:${String(fin.getMinutes()).padStart(2, '0')}`;
-  const base = `/materias/${clase.materia_id}/clases/${clase.clase_id}`;
+  // Docente: acciones de gestión de la clase (/materias/...). Estudiante
+  // inscrito: no dicta esta clase, así que nada de "Pasar lista" — solo un
+  // acceso a la materia inscrita (/inscrito/...).
+  const base = esDictada
+    ? `/materias/${clase.materia_id}/clases/${clase.clase_id}`
+    : `/inscrito/${clase.materia_id}`;
 
   return (
     <div
@@ -170,42 +176,57 @@ function BloqueClaseActual({ clase }: { clase: ClaseDeHoy }) {
           {clase.nombre_materia}
         </p>
         <p className="mt-1 text-[15px] text-primary-200">
-          {clase.tema} · {clase.total_estudiantes} estudiantes
+          {clase.tema}
+          {esDictada ? ` · ${clase.total_estudiantes} estudiantes` : ''}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
-        <Link
-          to={`${base}/asistencia`}
-          className="rounded-lg bg-white px-5 py-[11px] text-[15px] font-bold text-primary-800 transition hover:bg-primary-50 max-lg:w-full max-lg:text-center max-lg:py-3"
-        >
-          Pasar lista
-        </Link>
-        <div className="flex flex-1 gap-2.5 lg:flex-none">
+        {esDictada ? (
+          <>
+            <Link
+              to={`${base}/asistencia`}
+              className="rounded-lg bg-white px-5 py-[11px] text-[15px] font-bold text-primary-800 transition hover:bg-primary-50 max-lg:w-full max-lg:text-center max-lg:py-3"
+            >
+              Pasar lista
+            </Link>
+            <div className="flex flex-1 gap-2.5 lg:flex-none">
+              <Link
+                to={`${base}/evaluaciones`}
+                className="flex-1 rounded-lg border border-primary-500 px-[18px] py-[11px] text-center text-[15px] font-medium text-primary-100 transition hover:bg-primary-700 lg:flex-none"
+              >
+                Evaluaciones
+              </Link>
+              <Link
+                to={`${base}/guias`}
+                className="flex-1 rounded-lg border border-primary-500 px-[18px] py-[11px] text-center text-[15px] font-medium text-primary-100 transition hover:bg-primary-700 lg:flex-none"
+              >
+                Guías
+              </Link>
+            </div>
+          </>
+        ) : (
           <Link
-            to={`${base}/evaluaciones`}
-            className="flex-1 rounded-lg border border-primary-500 px-[18px] py-[11px] text-center text-[15px] font-medium text-primary-100 transition hover:bg-primary-700 lg:flex-none"
+            to={base}
+            className="rounded-lg bg-white px-5 py-[11px] text-[15px] font-bold text-primary-800 transition hover:bg-primary-50 max-lg:w-full max-lg:text-center max-lg:py-3"
           >
-            Evaluaciones
+            Ver materia
           </Link>
-          <Link
-            to={`${base}/guias`}
-            className="flex-1 rounded-lg border border-primary-500 px-[18px] py-[11px] text-center text-[15px] font-medium text-primary-100 transition hover:bg-primary-700 lg:flex-none"
-          >
-            Guías
-          </Link>
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
 function BloqueProximaClase({ clase, ahora }: { clase: ClaseDeHoy; ahora: Date }) {
+  const esDictada = clase.rol === 'dictada';
   const inicio = horaAFecha(clase.hora, ahora);
   const minutosFaltan = Math.max(0, Math.round((inicio.getTime() - ahora.getTime()) / 60000));
   const horas = Math.floor(minutosFaltan / 60);
   const minutos = minutosFaltan % 60;
   const etiquetaFaltan = horas > 0 ? `en ${horas} h ${minutos} min` : `en ${minutos} min`;
-  const base = `/materias/${clase.materia_id}/clases/${clase.clase_id}`;
+  const base = esDictada
+    ? `/materias/${clase.materia_id}/clases/${clase.clase_id}`
+    : `/inscrito/${clase.materia_id}`;
 
   return (
     <div
@@ -221,19 +242,28 @@ function BloqueProximaClase({ clase, ahora }: { clase: ClaseDeHoy; ahora: Date }
       <div>
         <p className="text-[21px] font-extrabold tracking-tight text-text">{clase.nombre_materia}</p>
         <p className="mt-1 text-[15px] text-text-secondary">
-          {clase.hora} · {clase.tema} · {clase.total_estudiantes} estudiantes
+          {clase.hora} · {clase.tema}
+          {esDictada ? ` · ${clase.total_estudiantes} estudiantes` : ''}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2.5">
-        <Link to={`${base}/evaluaciones`} className={botonClases('primary')}>
-          Preparar clase
-        </Link>
-        <Link to={`${base}/evaluaciones`} className={botonClases('secondary')}>
-          Evaluaciones
-        </Link>
-        <Link to={`${base}/guias`} className={botonClases('secondary')}>
-          Guías
-        </Link>
+        {esDictada ? (
+          <>
+            <Link to={`${base}/evaluaciones`} className={botonClases('primary')}>
+              Preparar clase
+            </Link>
+            <Link to={`${base}/evaluaciones`} className={botonClases('secondary')}>
+              Evaluaciones
+            </Link>
+            <Link to={`${base}/guias`} className={botonClases('secondary')}>
+              Guías
+            </Link>
+          </>
+        ) : (
+          <Link to={base} className={botonClases('primary')}>
+            Ver materia
+          </Link>
+        )}
       </div>
     </div>
   );

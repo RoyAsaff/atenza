@@ -21,6 +21,13 @@ export class PrismaGuiaRepositorio implements GuiaRepositorio {
     return this.prisma.guia.findMany({ where: { estado: 'lanzada' } });
   }
 
+  async listarCerradasPorMateria(materia_id: number): Promise<Guia[]> {
+    return this.prisma.guia.findMany({
+      where: { estado: 'cerrada', clase: { materia_id } },
+      orderBy: { orden: 'asc' },
+    });
+  }
+
   async crear(datos: DatosNuevaGuia): Promise<Guia> {
     return this.prisma.guia.create({
       data: {

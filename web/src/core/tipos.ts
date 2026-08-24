@@ -337,17 +337,31 @@ export interface DetalleIntento {
   preguntas: PreguntaDetalleIntento[];
 }
 
+// Fusión con guías (24/08): una columna es una evaluación finalizada o una
+// guía cerrada — `id` es el evaluacion_id o guia_id según `tipo` (dos
+// secuencias separadas, por eso la celda se indexa por clave compuesta,
+// no por `id` solo). Ver claveColumnaCentralizador.
+export type TipoColumnaCentralizador = 'evaluacion' | 'guia';
+
 export interface ColumnaCentralizador {
-  evaluacion_id: number;
+  tipo: TipoColumnaCentralizador;
+  id: number;
   tema: string;
   nota_total: number;
+}
+
+export function claveColumnaCentralizador(columna: {
+  tipo: TipoColumnaCentralizador;
+  id: number;
+}): string {
+  return `${columna.tipo}:${columna.id}`;
 }
 
 export interface FilaCentralizador {
   estudiante_id: number;
   nombres: string;
   apellidos: string;
-  celdas: Record<number, number | null>;
+  celdas: Record<string, number | null>; // claveColumnaCentralizador(columna) -> nota_obtenida
 }
 
 export interface Centralizador {

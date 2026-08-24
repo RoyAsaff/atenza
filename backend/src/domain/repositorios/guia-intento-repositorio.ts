@@ -40,6 +40,13 @@ export interface GuiaIntentoRepositorio {
   /** Para calcular el próximo numero_intento (repaso). */
   contarPorEstudianteYGuia(guia_id: number, estudiante_id: number): Promise<number>;
   listarPorGuia(guia_id: number): Promise<GuiaIntento[]>;
+  /** HU-27: nota oficial vigente por estudiante en esta guía — equivalente
+   * de IntentoRepositorio.notasVigentesPorEvaluacion, para el Centralizador.
+   * Solo intentos oficiales con nota ya calculada (excluye pendientes de
+   * revisión y repasos). */
+  notasOficialesPorGuia(
+    guia_id: number,
+  ): Promise<{ estudiante_id: number; nota_obtenida: number }[]>;
   /** Solo intentos oficiales — el monitoreo en vivo es del lanzamiento. */
   listarMonitoreo(guia_id: number): Promise<FilaMonitoreoGuia[]>;
   listarResultados(guia_id: number): Promise<FilaResultadoGuia[]>;

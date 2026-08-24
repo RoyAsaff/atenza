@@ -730,7 +730,7 @@ export function MateriaDetallePage() {
           <TarjetaAccion
             icono={<FileSpreadsheet size={18} />}
             titulo="Centralizador"
-            descripcion="Notas de todas las evaluaciones"
+            descripcion="Notas de evaluaciones y guías"
             to={`/materias/${materia.id}/centralizador`}
           />
         </div>

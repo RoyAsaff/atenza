@@ -1,12 +1,22 @@
 // E8 · HU-27 · Centralizador de notas por materia: matriz estudiantes ×
-// evaluaciones finalizadas (publicadas o no — es una vista del docente,
-// no del estudiante). El acumulado (Σ nota_obtenida / Σ nota_total) se
-// quitó (ya no se usa) — la nota agregada ahora se calcula en pantalla
-// vía "Nota final" (ver CentralizadorPage / calcularNotaFinal más abajo).
+// evaluaciones finalizadas + guías cerradas (fusión 24/08 — antes solo
+// evaluaciones; el docente pidió verlas juntas en vez de un centralizador
+// aparte para guías, ver CONTEXTO.md). Ambas son publicadas o no: es una
+// vista del docente, no del estudiante. El acumulado (Σ nota_obtenida / Σ
+// nota_total) se quitó (ya no se usa) — la nota agregada ahora se calcula
+// en pantalla vía "Nota final" (ver CentralizadorPage / calcularNotaFinal
+// más abajo).
 
 import ExcelJS from 'exceljs';
-import { ColumnaCentralizador, Centralizador, FilaCentralizador } from '../../domain/entidades/nota';
+import {
+  ColumnaCentralizador,
+  Centralizador,
+  FilaCentralizador,
+  claveColumnaCentralizador,
+} from '../../domain/entidades/nota';
 import { EvaluacionRepositorio } from '../../domain/repositorios/evaluacion-repositorio';
+import { GuiaRepositorio } from '../../domain/repositorios/guia-repositorio';
+import { GuiaIntentoRepositorio } from '../../domain/repositorios/guia-intento-repositorio';
 import { InscripcionRepositorio } from '../../domain/repositorios/inscripcion-repositorio';
 import { IntentoRepositorio } from '../../domain/repositorios/intento-repositorio';
 import { MateriaRepositorio } from '../../domain/repositorios/materia-repositorio';
@@ -16,41 +26,62 @@ export class VerCentralizador {
   constructor(
     private readonly materias: MateriaRepositorio,
     private readonly evaluaciones: EvaluacionRepositorio,
+    private readonly guias: GuiaRepositorio,
     private readonly inscripciones: InscripcionRepositorio,
     private readonly intentos: IntentoRepositorio,
+    private readonly guiaIntentos: GuiaIntentoRepositorio,
   ) {}
 
   async ejecutar(entrada: { materia_id: number; docente_id: number }): Promise<Centralizador> {
     await exigirMateriaPropia(this.materias, entrada.materia_id, entrada.docente_id);
 
-    const [evaluacionesFinalizadas, inscripcionesActivas] = await Promise.all([
+    const [evaluacionesFinalizadas, guiasCerradas, inscripcionesActivas] = await Promise.all([
       this.evaluaciones.listarFinalizadasPorMateria(entrada.materia_id),
+      this.guias.listarCerradasPorMateria(entrada.materia_id),
       this.inscripciones.listarPorMateria(entrada.materia_id),
     ]);
 
-    const columnas: ColumnaCentralizador[] = evaluacionesFinalizadas.map((e) => ({
-      evaluacion_id: e.id,
+    const columnasEvaluacion: ColumnaCentralizador[] = evaluacionesFinalizadas.map((e) => ({
+      tipo: 'evaluacion',
+      id: e.id,
       tema: e.tema,
       nota_total: e.nota,
     }));
+    const columnasGuia: ColumnaCentralizador[] = guiasCerradas.map((g) => ({
+      tipo: 'guia',
+      id: g.id,
+      tema: g.tema,
+      nota_total: g.nota ?? 0,
+    }));
+    const columnas = [...columnasEvaluacion, ...columnasGuia];
 
-    const notasPorEvaluacion = await Promise.all(
-      evaluacionesFinalizadas.map((e) => this.intentos.notasVigentesPorEvaluacion(e.id)),
-    );
-    // estudiante_id -> evaluacion_id -> nota_obtenida
-    const mapa = new Map<number, Map<number, number>>();
+    const [notasPorEvaluacion, notasPorGuia] = await Promise.all([
+      Promise.all(evaluacionesFinalizadas.map((e) => this.intentos.notasVigentesPorEvaluacion(e.id))),
+      Promise.all(guiasCerradas.map((g) => this.guiaIntentos.notasOficialesPorGuia(g.id))),
+    ]);
+
+    // estudiante_id -> clave de columna -> nota_obtenida
+    const mapa = new Map<number, Map<string, number>>();
     evaluacionesFinalizadas.forEach((evaluacion, indice) => {
+      const clave = claveColumnaCentralizador({ tipo: 'evaluacion', id: evaluacion.id });
       for (const nota of notasPorEvaluacion[indice]) {
         if (!mapa.has(nota.estudiante_id)) mapa.set(nota.estudiante_id, new Map());
-        mapa.get(nota.estudiante_id)!.set(evaluacion.id, nota.nota_obtenida);
+        mapa.get(nota.estudiante_id)!.set(clave, nota.nota_obtenida);
+      }
+    });
+    guiasCerradas.forEach((guia, indice) => {
+      const clave = claveColumnaCentralizador({ tipo: 'guia', id: guia.id });
+      for (const nota of notasPorGuia[indice]) {
+        if (!mapa.has(nota.estudiante_id)) mapa.set(nota.estudiante_id, new Map());
+        mapa.get(nota.estudiante_id)!.set(clave, nota.nota_obtenida);
       }
     });
 
     const filas: FilaCentralizador[] = inscripcionesActivas.map((inscripcion) => {
       const notasEstudiante = mapa.get(inscripcion.estudiante.id);
-      const celdas: Record<number, number | null> = {};
+      const celdas: Record<string, number | null> = {};
       for (const columna of columnas) {
-        celdas[columna.evaluacion_id] = notasEstudiante?.get(columna.evaluacion_id) ?? null;
+        celdas[claveColumnaCentralizador(columna)] = notasEstudiante?.get(claveColumnaCentralizador(columna)) ?? null;
       }
       return {
         estudiante_id: inscripcion.estudiante.id,
@@ -65,19 +96,42 @@ export class VerCentralizador {
 }
 
 /** Misma fórmula que el frontend (CentralizadorPage): promedia el % de
- * cada evaluación seleccionada (nota_obtenida/nota_total, 0 si no rindió)
- * y recién ahí multiplica una sola vez por la nota base. */
+ * cada columna seleccionada dentro de su grupo (evaluación/guía; 0 si no
+ * tiene nota) y combina ambos grupos según su peso antes de multiplicar
+ * por la nota base. Si solo hay un grupo marcado, ese pesa 100 % (el otro
+ * peso, si viene, se ignora). */
 function calcularNotaFinal(
   fila: FilaCentralizador,
   columnas: ColumnaCentralizador[],
   notaBase: number,
+  pesoEvaluaciones?: number,
+  pesoGuias?: number,
 ): number {
-  const sumaPorcentajes = columnas.reduce((acc, c) => {
-    if (c.nota_total <= 0) return acc;
-    const obtenida = fila.celdas[c.evaluacion_id] ?? 0;
-    return acc + obtenida / c.nota_total;
-  }, 0);
-  return Math.round((sumaPorcentajes / columnas.length) * notaBase * 100) / 100;
+  const grupos = {
+    evaluacion: columnas.filter((c) => c.tipo === 'evaluacion'),
+    guia: columnas.filter((c) => c.tipo === 'guia'),
+  };
+
+  function promedioGrupo(grupo: ColumnaCentralizador[]): number {
+    if (grupo.length === 0) return 0;
+    const suma = grupo.reduce((acc, c) => {
+      if (c.nota_total <= 0) return acc;
+      const obtenida = fila.celdas[claveColumnaCentralizador(c)] ?? 0;
+      return acc + obtenida / c.nota_total;
+    }, 0);
+    return suma / grupo.length;
+  }
+
+  const hayEval = grupos.evaluacion.length > 0;
+  const hayGuia = grupos.guia.length > 0;
+  let wEval = hayEval ? (pesoEvaluaciones ?? 100) : 0;
+  let wGuia = hayGuia ? (pesoGuias ?? 0) : 0;
+  if (hayEval && !hayGuia) wEval = 100;
+  if (hayGuia && !hayEval) wGuia = 100;
+  const wTotal = wEval + wGuia || 100;
+
+  const porcentaje = (promedioGrupo(grupos.evaluacion) * wEval + promedioGrupo(grupos.guia) * wGuia) / wTotal;
+  return Math.round(porcentaje * notaBase * 100) / 100;
 }
 
 export class ExportarCentralizador {
@@ -88,15 +142,23 @@ export class ExportarCentralizador {
     docente_id: number;
     nombre_materia: string;
     // Último cálculo de "Nota final" hecho en pantalla (CentralizadorPage):
-    // si vienen ambos y hay intersección con las columnas reales, se agrega
-    // esa columna extra al Excel. Opcional — sin esto exporta como siempre.
-    evaluacion_ids?: number[];
+    // si vienen y hay intersección con las columnas reales, se agrega esa
+    // columna extra al Excel. Opcional — sin esto exporta como siempre.
+    // Claves con formato claveColumnaCentralizador ("evaluacion:3", "guia:5").
+    columna_claves?: string[];
     nota_base?: number;
+    // Pesos de cada grupo (%) tal como quedaron en pantalla — solo importan
+    // cuando hay columnas marcadas de AMBOS tipos; con uno solo, ese pesa
+    // 100 % sin importar lo que venga acá (ver calcularNotaFinal).
+    peso_evaluaciones?: number;
+    peso_guias?: number;
   }): Promise<ExcelJS.Buffer> {
     const centralizador = await this.verCentralizador.ejecutar(entrada);
 
-    const columnasNotaFinal = entrada.evaluacion_ids
-      ? centralizador.columnas.filter((c) => entrada.evaluacion_ids!.includes(c.evaluacion_id))
+    const columnasNotaFinal = entrada.columna_claves
+      ? centralizador.columnas.filter((c) =>
+          entrada.columna_claves!.includes(claveColumnaCentralizador(c)),
+        )
       : [];
     const incluirNotaFinal =
       !!entrada.nota_base && entrada.nota_base > 0 && columnasNotaFinal.length > 0;
@@ -107,8 +169,8 @@ export class ExportarCentralizador {
     hoja.columns = [
       { header: 'Estudiante', key: 'estudiante', width: 32 },
       ...centralizador.columnas.map((c) => ({
-        header: `${c.tema} (/${c.nota_total})`,
-        key: `evaluacion_${c.evaluacion_id}`,
+        header: `${c.tipo === 'guia' ? 'Guía · ' : ''}${c.tema} (/${c.nota_total})`,
+        key: claveColumnaCentralizador(c),
         width: 20,
       })),
       ...(incluirNotaFinal
@@ -122,11 +184,17 @@ export class ExportarCentralizador {
         estudiante: `${fila.apellidos} ${fila.nombres}`,
       };
       for (const columna of centralizador.columnas) {
-        const nota = fila.celdas[columna.evaluacion_id];
-        registro[`evaluacion_${columna.evaluacion_id}`] = nota ?? '—';
+        const nota = fila.celdas[claveColumnaCentralizador(columna)];
+        registro[claveColumnaCentralizador(columna)] = nota ?? '—';
       }
       if (incluirNotaFinal) {
-        registro.nota_final = calcularNotaFinal(fila, columnasNotaFinal, entrada.nota_base!);
+        registro.nota_final = calcularNotaFinal(
+          fila,
+          columnasNotaFinal,
+          entrada.nota_base!,
+          entrada.peso_evaluaciones,
+          entrada.peso_guias,
+        );
       }
       hoja.addRow(registro);
     }
