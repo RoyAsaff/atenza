@@ -210,6 +210,14 @@ export class ReportarIncidenteGuia {
   async ejecutar(entrada: { guia_intento_id: number; detalle?: string }): Promise<void> {
     const intento = await this.guiaIntentos.buscarPorId(entrada.guia_intento_id);
     if (!intento) throw new NoEncontradoError('Intento');
+    // El token del estudiante sigue siendo válido varias horas después de
+    // cancelar/terminar (ACCESO_INTENTO_SEGUNDOS) y la página externa no
+    // se entera en vivo de que ya no está "en curso" — sigue escuchando
+    // blur/visibilitychange/fullscreenchange mientras la pestaña quede
+    // abierta. Sin este corte, esas incidencias tardías le siguen
+    // llegando al docente para un intento que ya cerró. Silencioso (no
+    // error): es esperable, no algo para loguear como falla.
+    if (intento.estado !== 'en_curso' && intento.estado !== 'desconectado') return;
 
     const incidente = await this.guiaIntentos.registrarIncidente(
       intento.id,
