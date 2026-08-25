@@ -91,7 +91,7 @@ class _GuiasPageState extends State<GuiasPage>
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              ...guias.map((g) => _TarjetaGuia(guia: g)),
+              ...guias.map((g) => _TarjetaGuia(materiaId: widget.materia.materiaId, guia: g)),
               const SizedBox(height: 24),
             ],
           );
@@ -102,8 +102,9 @@ class _GuiasPageState extends State<GuiasPage>
 }
 
 class _TarjetaGuia extends StatelessWidget {
-  const _TarjetaGuia({required this.guia});
+  const _TarjetaGuia({required this.materiaId, required this.guia});
 
+  final int materiaId;
   final Guia guia;
 
   @override
@@ -113,7 +114,9 @@ class _TarjetaGuia extends StatelessWidget {
       child: Card(
         child: ListTile(
           onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => GuiaWebviewPage(guia: guia)),
+            MaterialPageRoute(
+              builder: (_) => GuiaWebviewPage(materiaId: materiaId, guia: guia),
+            ),
           ),
           leading: Container(
             width: 48,

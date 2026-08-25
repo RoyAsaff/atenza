@@ -13,4 +13,11 @@ class GuiasRepositorioApi implements GuiasRepositorio {
     final guias = (datos['guias'] as List<dynamic>? ?? const []);
     return guias.map((e) => Guia.fromJson(e as Map<String, dynamic>)).toList();
   }
+
+  @override
+  Future<String> tomar(int materiaId, int guiaId) async {
+    final datos = await api.post('/api/materias/$materiaId/guias/$guiaId/tomar');
+    final intento = datos['intento'] as Map<String, dynamic>;
+    return intento['url_acceso'] as String;
+  }
 }
