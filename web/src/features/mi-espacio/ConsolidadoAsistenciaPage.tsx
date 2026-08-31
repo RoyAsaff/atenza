@@ -75,6 +75,7 @@ export function ConsolidadoAsistenciaPage() {
                   <Th alineado="center">Falta</Th>
                   <Th alineado="center">Clases</Th>
                   <Th alineado="center">% Asistencia</Th>
+                  <Th alineado="center">% Puntualidad</Th>
                 </Tr>
               </Thead>
               <Tbody>
@@ -90,6 +91,9 @@ export function ConsolidadoAsistenciaPage() {
                     <Td alineado="center">{fila.total_clases}</Td>
                     <Td alineado="center" className="font-medium">
                       {fila.porcentaje_asistencia}%
+                    </Td>
+                    <Td alineado="center" className="font-medium">
+                      {fila.porcentaje_puntualidad}%
                     </Td>
                   </Tr>
                 ))}

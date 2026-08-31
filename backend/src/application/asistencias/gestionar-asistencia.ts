@@ -192,6 +192,7 @@ export class VerConsolidadoAsistencia {
 
       const total = registrosEstudiante.length;
       const porcentaje = total === 0 ? 0 : ((conteo.puntual + conteo.atrasado) / total) * 100;
+      const puntualidad = total === 0 ? 0 : (conteo.puntual / total) * 100;
 
       return {
         estudiante_id: i.estudiante_id,
@@ -200,6 +201,7 @@ export class VerConsolidadoAsistencia {
         ...conteo,
         total_clases: total,
         porcentaje_asistencia: Math.round(porcentaje * 10) / 10,
+        porcentaje_puntualidad: Math.round(puntualidad * 10) / 10,
       };
     });
   }

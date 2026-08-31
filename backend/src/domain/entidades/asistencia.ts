@@ -30,6 +30,7 @@ export interface FilaConsolidadoAsistencia {
   falta: number;
   total_clases: number; // clases de la materia con asistencia ya registrada
   porcentaje_asistencia: number; // (puntual + atrasado) / total_clases * 100
+  porcentaje_puntualidad: number; // puntual / total_clases * 100
 }
 
 /** Fila del historial propio del estudiante (diagrama, actor Estudiante: Ver Asistencias). */

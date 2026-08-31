@@ -154,6 +154,7 @@ export interface FilaConsolidadoAsistencia {
   falta: number;
   total_clases: number;
   porcentaje_asistencia: number;
+  porcentaje_puntualidad: number;
 }
 
 // E6: evaluaciones de selección múltiple (HU-17/18/19)
