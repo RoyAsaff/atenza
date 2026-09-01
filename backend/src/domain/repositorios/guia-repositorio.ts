@@ -1,4 +1,10 @@
-import { EstadoGuia, Guia, GuiaPregunta, TipoGuiaPregunta } from '../entidades/guia';
+import {
+  EstadoGuia,
+  FilaGuiaLanzadaDocente,
+  Guia,
+  GuiaPregunta,
+  TipoGuiaPregunta,
+} from '../entidades/guia';
 
 export interface DatosGuiaPregunta {
   referencia: string;
@@ -38,6 +44,9 @@ export interface GuiaRepositorio {
   /** Barrido en segundo plano (ver barrer-vencimientos.ts): todas las
    * guías lanzadas ahora mismo, de cualquier docente/materia. */
   listarLanzadas(): Promise<Guia[]>;
+  /** Inicio (31/08) · panel "Requiere tu atención": guías lanzadas del
+   * docente, de cualquiera de sus materias, con el dato de su materia. */
+  listarLanzadasPorDocente(docente_id: number): Promise<FilaGuiaLanzadaDocente[]>;
   /** HU-27: guías nativas ya cerradas de toda la materia (cualquier clase)
    * — equivalente de listarFinalizadasPorMateria de Evaluación, para el
    * Centralizador. Las "externa_legacy" nunca llegan a "cerrada", así que

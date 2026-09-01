@@ -90,6 +90,7 @@ function calcularEstadoDia(clases: ClaseDeHoy[], ahora: Date): EstadoDia {
 
 const ETIQUETAS_PENDIENTE: Record<TipoPendiente, { texto: string; className: string }> = {
   evaluacion_abierta: { texto: 'Evaluación abierta', className: 'bg-accent-50 text-accent-700' },
+  guia_abierta: { texto: 'Guía abierta', className: 'bg-accent-50 text-accent-700' },
   por_revisar: { texto: 'Por revisar', className: 'bg-primary-100 text-primary-800' },
 };
 

@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { EstadoGuia, Guia, GuiaPregunta } from '../../domain/entidades/guia';
+import { EstadoGuia, FilaGuiaLanzadaDocente, Guia, GuiaPregunta } from '../../domain/entidades/guia';
 import {
   DatosActualizarGuia,
   DatosNuevaGuia,
@@ -19,6 +19,23 @@ export class PrismaGuiaRepositorio implements GuiaRepositorio {
 
   async listarLanzadas(): Promise<Guia[]> {
     return this.prisma.guia.findMany({ where: { estado: 'lanzada' } });
+  }
+
+  async listarLanzadasPorDocente(docente_id: number): Promise<FilaGuiaLanzadaDocente[]> {
+    const guias = await this.prisma.guia.findMany({
+      where: { estado: 'lanzada', clase: { materia: { docente_id } } },
+      select: {
+        id: true,
+        tema: true,
+        clase: { select: { materia: { select: { id: true, nombre_materia: true } } } },
+      },
+    });
+    return guias.map((g) => ({
+      guia_id: g.id,
+      guia_tema: g.tema,
+      materia_id: g.clase.materia.id,
+      materia_nombre: g.clase.materia.nombre_materia,
+    }));
   }
 
   async listarCerradasPorMateria(materia_id: number): Promise<Guia[]> {

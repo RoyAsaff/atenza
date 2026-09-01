@@ -419,7 +419,7 @@ export interface ClasesDeHoy {
 
 // Inicio (17/08) · panel "Requiere tu atención" (GET /api/mi-espacio/pendientes).
 // Sin categoría "asistencia" en esta pasada (ver CONTEXTO.md).
-export type TipoPendiente = 'evaluacion_abierta' | 'por_revisar';
+export type TipoPendiente = 'evaluacion_abierta' | 'guia_abierta' | 'por_revisar';
 
 export interface Pendiente {
   tipo: TipoPendiente;

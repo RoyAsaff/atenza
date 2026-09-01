@@ -206,3 +206,15 @@ export interface FilaRevisionPendienteDocente {
   materia_nombre: string;
   pendientes: number;
 }
+
+/** Inicio (31/08) · panel "Requiere tu atención": guías nativas lanzadas
+ * que siguen abiertas, cruzando todas las materias del docente — recordatorio
+ * para cerrarlas (sin tiempo_limite_minutos, una guía con algún oficial que
+ * nunca terminó se queda "lanzada" indefinidamente; el barrido en segundo
+ * plano solo la cierra sola cuando todos los oficiales llegan a terminal). */
+export interface FilaGuiaLanzadaDocente {
+  guia_id: number;
+  guia_tema: string;
+  materia_id: number;
+  materia_nombre: string;
+}

@@ -752,4 +752,5 @@ export const verClasesDeHoy = new VerClasesDeHoy(
 export const verPendientesDocente = new VerPendientesDocente(
   evaluacionRepositorio,
   guiaIntentoRepositorio,
+  guiaRepositorio,
 );

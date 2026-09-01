@@ -7,8 +7,9 @@
 
 import { EvaluacionRepositorio } from '../../domain/repositorios/evaluacion-repositorio';
 import { GuiaIntentoRepositorio } from '../../domain/repositorios/guia-intento-repositorio';
+import { GuiaRepositorio } from '../../domain/repositorios/guia-repositorio';
 
-export type TipoPendiente = 'evaluacion_abierta' | 'por_revisar';
+export type TipoPendiente = 'evaluacion_abierta' | 'guia_abierta' | 'por_revisar';
 
 export interface Pendiente {
   tipo: TipoPendiente;
@@ -23,6 +24,7 @@ export class VerPendientesDocente {
   constructor(
     private readonly evaluaciones: EvaluacionRepositorio,
     private readonly guiaIntentos: GuiaIntentoRepositorio,
+    private readonly guias: GuiaRepositorio,
   ) {}
 
   async ejecutar(entrada: { docente_id: number }): Promise<Pendiente[]> {
@@ -56,11 +58,29 @@ export class VerPendientesDocente {
       url: `/materias/${g.materia_id}/guias/${g.guia_id}/revision`,
     }));
 
-    // Orden: evaluación abierta primero, después "por revisar" (guías
-    // antes que evaluaciones sin publicar — respuestas de estudiantes
-    // esperando desde antes, criterio razonable no especificado en el
-    // handoff). Sin categoría "asistencia" en esta pasada.
-    return [...abiertas, ...revisionGuias, ...sinPublicar].slice(0, MAX_PENDIENTES);
+    // Guías lanzadas sin cerrar (31/08, pedido de Roy): sin
+    // tiempo_limite_minutos una guía se queda "lanzada" para siempre si
+    // algún oficial nunca termina — el barrido en segundo plano
+    // (barrer-vencimientos.ts) solo la cierra sola cuando TODOS los
+    // oficiales llegan a terminal. Aviso para que el docente la cierre
+    // a mano (Cancelar, en el propio monitoreo).
+    const guiasLanzadas = await this.guias.listarLanzadasPorDocente(entrada.docente_id);
+    const abiertasGuias: Pendiente[] = guiasLanzadas.map((g) => ({
+      tipo: 'guia_abierta',
+      titulo: g.guia_tema,
+      detalle: `Lanzada, sin cerrar · ${g.materia_nombre}`,
+      url: `/materias/${g.materia_id}/guias/${g.guia_id}/monitoreo`,
+    }));
+
+    // Orden: lo "abierto" primero (evaluación o guía que sigue en vivo),
+    // después "por revisar" (guías antes que evaluaciones sin publicar —
+    // respuestas de estudiantes esperando desde antes, criterio razonable
+    // no especificado en el handoff). Sin categoría "asistencia" en esta
+    // pasada.
+    return [...abiertas, ...abiertasGuias, ...revisionGuias, ...sinPublicar].slice(
+      0,
+      MAX_PENDIENTES,
+    );
   }
 }
 
