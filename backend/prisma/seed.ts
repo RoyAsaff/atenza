@@ -58,6 +58,12 @@ async function main() {
       limite_materias: 1,
       permite_import_word: false,
       permite_guias: false,
+      // Gratis (a diferencia de Guías/Import Word): mismo criterio que los
+      // exámenes de opción múltiple (E7), que ya son gratis — el límite de
+      // 1 materia/50 alumnos + el rate-limit de ejecuciones acotan el
+      // costo de cómputo real (Docker) de una cuenta sin pagar. Decisión
+      // con Roy (01/09): barato de revertir si el costo se vuelve problema.
+      permite_examenes_codigo: true,
       monto_mensual: 0,
       orden: 1,
       activo: true,
@@ -69,6 +75,7 @@ async function main() {
       limite_materias: null,
       permite_import_word: true,
       permite_guias: true,
+      permite_examenes_codigo: true,
       monto_mensual: 99,
       orden: 2,
       activo: true,
@@ -82,6 +89,7 @@ async function main() {
       limite_materias: null,
       permite_import_word: true,
       permite_guias: true,
+      permite_examenes_codigo: true,
       monto_mensual: 0,
       orden: 3,
       activo: true,

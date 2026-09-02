@@ -13,4 +13,7 @@ export interface TiempoRealEmisor {
    * incidentes, cambios de estado de sus intentos — mismo espíritu que
    * emitirAEvaluacion. */
   emitirAGuia(guiaId: number, evento: string, datos: unknown): void;
+  /** E9: a quienes monitorean un examen de código lanzado (docente) —
+   * mismo espíritu que emitirAEvaluacion/emitirAGuia. */
+  emitirAExamenCodigo(examenCodigoId: number, evento: string, datos: unknown): void;
 }

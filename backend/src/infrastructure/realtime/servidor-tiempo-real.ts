@@ -12,6 +12,8 @@ import { EvaluacionRepositorio } from '../../domain/repositorios/evaluacion-repo
 import { ClaseRepositorio } from '../../domain/repositorios/clase-repositorio';
 import { MateriaRepositorio } from '../../domain/repositorios/materia-repositorio';
 import { GuiaRepositorio } from '../../domain/repositorios/guia-repositorio';
+import { ExamenCodigoRepositorio } from '../../domain/repositorios/examen-codigo-repositorio';
+import { IntentoCodigoRepositorio } from '../../domain/repositorios/intento-codigo-repositorio';
 
 interface Dependencias {
   tokenService: TokenService;
@@ -21,6 +23,8 @@ interface Dependencias {
   claseRepositorio: ClaseRepositorio;
   materiaRepositorio: MateriaRepositorio;
   guiaRepositorio: GuiaRepositorio;
+  examenCodigoRepositorio: ExamenCodigoRepositorio;
+  intentoCodigoRepositorio: IntentoCodigoRepositorio;
 }
 
 export function crearServidorTiempoReal(
@@ -69,11 +73,28 @@ export function crearServidorTiempoReal(
           });
         }
       });
+      // E9: mismo criterio para exámenes de código.
+      deps.intentoCodigoRepositorio.marcarConexion(auth.sub, true).then((intentos) => {
+        for (const intento of intentos) {
+          io.to(`examen-codigo:${intento.examen_codigo_id}`).emit('intento-actualizado', {
+            intento_id: intento.id,
+            estado: intento.estado,
+          });
+        }
+      });
 
       socket.on('disconnect', () => {
         deps.intentoRepositorio.marcarConexion(auth.sub, false).then((intentos) => {
           for (const intento of intentos) {
             io.to(`evaluacion:${intento.evaluacion_id}`).emit('intento-actualizado', {
+              intento_id: intento.id,
+              estado: intento.estado,
+            });
+          }
+        });
+        deps.intentoCodigoRepositorio.marcarConexion(auth.sub, false).then((intentos) => {
+          for (const intento of intentos) {
+            io.to(`examen-codigo:${intento.examen_codigo_id}`).emit('intento-actualizado', {
               intento_id: intento.id,
               estado: intento.estado,
             });
@@ -127,6 +148,23 @@ export function crearServidorTiempoReal(
           const materia = await deps.materiaRepositorio.buscarPorId(clase.materia_id);
           if (materia && materia.docente_id === auth.sub) {
             socket.join(`guia:${guiaId}`);
+          }
+        } catch {
+          // el docente simplemente no se une a la sala
+        }
+      });
+
+      // E9: monitoreo en vivo de UN examen de código lanzado — mismo
+      // criterio que 'monitorear-evaluacion'/'monitorear-guia'.
+      socket.on('monitorear-examen-codigo', async (examenCodigoId: number) => {
+        try {
+          const examen = await deps.examenCodigoRepositorio.buscarPorId(Number(examenCodigoId));
+          if (!examen) return;
+          const clase = await deps.claseRepositorio.buscarPorId(examen.clase_id);
+          if (!clase) return;
+          const materia = await deps.materiaRepositorio.buscarPorId(clase.materia_id);
+          if (materia && materia.docente_id === auth.sub) {
+            socket.join(`examen-codigo:${examenCodigoId}`);
           }
         } catch {
           // el docente simplemente no se une a la sala

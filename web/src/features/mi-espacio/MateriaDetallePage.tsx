@@ -15,6 +15,7 @@ import {
   BookOpen,
   ClipboardCheck,
   ClipboardList,
+  Code2,
   FileSpreadsheet,
   ListChecks,
   Plus,
@@ -512,6 +513,14 @@ function PanelClase({
             className={botonClases('secondary', 'md') + ' mt-2 w-full'}
           >
             <ListChecks size={16} /> Evaluaciones
+          </Link>
+
+          <Link
+            to={`/materias/${materiaId}/clases/${clase.id}/examenes-codigo`}
+            onClick={onCerrar}
+            className={botonClases('secondary', 'md') + ' mt-2 w-full'}
+          >
+            <Code2 size={16} /> Exámenes de código
           </Link>
 
           <Link

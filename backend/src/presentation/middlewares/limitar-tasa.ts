@@ -80,3 +80,19 @@ export const limitarResetPasswordPorCuenta = rateLimit({
   keyGenerator: emailDelCuerpo,
   message: MENSAJE_DEMASIADOS_INTENTOS,
 });
+
+// E9 (01/09): cada "Ejecutar"/"Enviar" de un examen de código gasta un
+// contenedor Docker real (dockerode-python-runner.ts) — a diferencia de
+// login, acá SÍ hay un costo de infraestructura real por request, no solo
+// riesgo de fuerza bruta. Por estudiante (req.auth.sub, ya autenticado a
+// esta altura — nunca por IP: varios estudiantes del mismo laboratorio
+// comparten IP, igual que el bug de login del 13/08), generoso para no
+// entorpecer una sesión real de prueba-y-error durante el examen.
+export const limitarEjecucionCodigo = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => String(req.auth?.sub ?? req.ip),
+  message: MENSAJE_DEMASIADOS_INTENTOS,
+});

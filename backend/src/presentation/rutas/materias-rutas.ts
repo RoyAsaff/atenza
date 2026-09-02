@@ -21,6 +21,7 @@ import {
   verListaAsistencia,
   verMiAsistencia,
   verMisNotas,
+  verMisNotasCodigo,
   verNomina,
 } from '../dependencias';
 import { crearAutenticar } from '../middlewares/autenticar';
@@ -407,6 +408,24 @@ materiasRouter.get(
   async (req, res, next) => {
     try {
       const notas = await verMisNotas.ejecutar({
+        materia_id: idNumerico.parse(req.params.id),
+        estudiante_id: req.auth!.sub,
+      });
+      res.json({ notas });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// GET /api/materias/:id/mis-notas-codigo — E9 (estudiante), mismo criterio que mis-notas
+materiasRouter.get(
+  '/:id/mis-notas-codigo',
+  autenticar,
+  autorizarContexto('docente', 'estudiante'),
+  async (req, res, next) => {
+    try {
+      const notas = await verMisNotasCodigo.ejecutar({
         materia_id: idNumerico.parse(req.params.id),
         estudiante_id: req.auth!.sub,
       });

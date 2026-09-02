@@ -19,6 +19,10 @@ import { RevisarGuiaPage } from '../features/mi-espacio/RevisarGuiaPage';
 import { EvaluacionEditorPage } from '../features/mi-espacio/EvaluacionEditorPage';
 import { MonitoreoPage } from '../features/mi-espacio/MonitoreoPage';
 import { ResultadosPage } from '../features/mi-espacio/ResultadosPage';
+import { ExamenesCodigoClasePage } from '../features/mi-espacio/ExamenesCodigoClasePage';
+import { ExamenCodigoEditorPage } from '../features/mi-espacio/ExamenCodigoEditorPage';
+import { MonitoreoCodigoPage } from '../features/mi-espacio/MonitoreoCodigoPage';
+import { ResultadosCodigoPage } from '../features/mi-espacio/ResultadosCodigoPage';
 import { CentralizadorPage } from '../features/mi-espacio/CentralizadorPage';
 import { MiSuscripcionPage } from '../features/suscripcion/MiSuscripcionPage';
 import { PlanesPage } from '../features/suscripcion/PlanesPage';
@@ -121,6 +125,24 @@ export function App() {
               element={<ResultadosPage />}
             />
             <Route path="materias/:id/centralizador" element={<CentralizadorPage />} />
+
+            {/* Docente (E9): exámenes de código Python, calcado de E6/E7/E8 */}
+            <Route
+              path="materias/:id/clases/:claseId/examenes-codigo"
+              element={<ExamenesCodigoClasePage />}
+            />
+            <Route
+              path="materias/:id/examenes-codigo/:examenId"
+              element={<ExamenCodigoEditorPage />}
+            />
+            <Route
+              path="materias/:id/examenes-codigo/:examenId/monitoreo"
+              element={<MonitoreoCodigoPage />}
+            />
+            <Route
+              path="materias/:id/examenes-codigo/:examenId/resultados"
+              element={<ResultadosCodigoPage />}
+            />
 
             {/* Rol dual (HU-03), unificación de identidad en web (05/08):
                 la misma cuenta también puede estar inscrita como estudiante

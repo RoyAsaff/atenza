@@ -23,6 +23,7 @@ export interface Plan {
   limite_materias: number | null; // null = sin límite; Gratis = 1 (17/08)
   permite_import_word: boolean; // 17/08: feature premium (Pro/Institucional)
   permite_guias: boolean; // 17/08: feature premium (Pro/Institucional)
+  permite_examenes_codigo: boolean; // E9 (01/09): feature premium (Pro/Institucional)
   monto_mensual: number;
   orden: number;
   activo: boolean;

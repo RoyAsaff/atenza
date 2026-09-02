@@ -7,7 +7,7 @@ import { NextFunction, Request, Response } from 'express';
 import { FeatureNoDisponibleError } from '../../domain/errores';
 import { ObtenerEstadoCuenta } from '../../application/cuenta/obtener-estado-cuenta';
 
-type FeaturePlan = 'permite_import_word' | 'permite_guias';
+type FeaturePlan = 'permite_import_word' | 'permite_guias' | 'permite_examenes_codigo';
 
 export function crearExigirFeaturePlan(estadoCuenta: ObtenerEstadoCuenta, feature: FeaturePlan) {
   return async (req: Request, _res: Response, next: NextFunction) => {

@@ -9,6 +9,7 @@ import {
   Download,
   FileSpreadsheet,
   ListChecks,
+  Monitor,
   ShieldCheck,
   Smartphone,
   SquareUser,
@@ -19,6 +20,8 @@ import { LogoLockup, LogoMark } from '../../core/ui/Logo';
 // Apunta siempre al asset del último release en GitHub — no hay que
 // actualizar este link cada vez que se publique una versión nueva.
 const URL_APK_ANDROID = 'https://github.com/RoyAsaff/atenza/releases/latest/download/app-release.apk';
+const URL_DESKTOP_WINDOWS =
+  'https://github.com/RoyAsaff/atenza/releases/latest/download/Atenza-Examenes-Setup.exe';
 
 const CARACTERISTICAS = [
   {
@@ -138,6 +141,27 @@ export function LandingPage() {
             </div>
             <a href={URL_APK_ANDROID} className={`${botonClases('primary', 'lg')} shrink-0`}>
               <Download size={18} /> Descargar APK
+            </a>
+          </div>
+        </section>
+
+        <section className="border-t border-border bg-canvas py-20">
+          <div className="mx-auto flex max-w-6xl flex-col items-center gap-8 px-6 text-center lg:flex-row lg:text-left">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700">
+              <Monitor size={32} />
+            </span>
+            <div className="flex-1">
+              <h2 className="text-2xl font-extrabold tracking-tight text-text">
+                App de escritorio para exámenes de código (Windows)
+              </h2>
+              <p className="mx-auto mt-2 max-w-2xl text-text-secondary lg:mx-0">
+                Pensada para exámenes de programación: los estudiantes rinden en modo kiosco,
+                con editor Monaco y reporte de incidentes si salen de la app, desde su
+                notebook.
+              </p>
+            </div>
+            <a href={URL_DESKTOP_WINDOWS} className={`${botonClases('primary', 'lg')} shrink-0`}>
+              <Download size={18} /> Descargar para Windows
             </a>
           </div>
         </section>

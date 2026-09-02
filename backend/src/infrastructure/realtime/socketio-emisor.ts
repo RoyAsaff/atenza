@@ -30,4 +30,8 @@ export class SocketIoEmisor implements TiempoRealEmisor {
   emitirAGuia(guiaId: number, evento: string, datos: unknown): void {
     this.io?.to(`guia:${guiaId}`).emit(evento, datos);
   }
+
+  emitirAExamenCodigo(examenCodigoId: number, evento: string, datos: unknown): void {
+    this.io?.to(`examen-codigo:${examenCodigoId}`).emit(evento, datos);
+  }
 }

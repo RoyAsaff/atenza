@@ -13,6 +13,7 @@ export interface PlanRepositorio {
       limite_materias?: number | null;
       permite_import_word?: boolean;
       permite_guias?: boolean;
+      permite_examenes_codigo?: boolean;
       monto_mensual?: number;
       // tipo NO es editable desde el admin: los 3 planes tienen roles fijos por seed.
     },

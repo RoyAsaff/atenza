@@ -15,9 +15,12 @@ import { EvaluacionRepositorio } from '../../domain/repositorios/evaluacion-repo
 import { IntentoRepositorio } from '../../domain/repositorios/intento-repositorio';
 import { GuiaRepositorio } from '../../domain/repositorios/guia-repositorio';
 import { GuiaIntentoRepositorio } from '../../domain/repositorios/guia-intento-repositorio';
+import { ExamenCodigoRepositorio } from '../../domain/repositorios/examen-codigo-repositorio';
+import { IntentoCodigoRepositorio } from '../../domain/repositorios/intento-codigo-repositorio';
 import { TiempoRealEmisor } from '../../domain/repositorios/tiempo-real';
 import { cerrarSiTerminaron } from './gestionar-examen';
 import { calcularNotaSiCorresponde } from '../guias/rendir-guia';
+import { cerrarSiTerminaron as cerrarSiTerminaronCodigo } from '../examenes-codigo/gestionar-examen-codigo';
 
 export class BarrerVencimientos {
   constructor(
@@ -25,6 +28,8 @@ export class BarrerVencimientos {
     private readonly intentos: IntentoRepositorio,
     private readonly guias: GuiaRepositorio,
     private readonly guiaIntentos: GuiaIntentoRepositorio,
+    private readonly examenesCodigo: ExamenCodigoRepositorio,
+    private readonly intentosCodigo: IntentoCodigoRepositorio,
     private readonly bitacora: BitacoraRepositorio,
     private readonly tiempoReal: TiempoRealEmisor,
   ) {}
@@ -32,6 +37,7 @@ export class BarrerVencimientos {
   async ejecutar(): Promise<void> {
     await this.barrerEvaluaciones();
     await this.barrerGuias();
+    await this.barrerExamenesCodigo();
   }
 
   private async barrerEvaluaciones(): Promise<void> {
@@ -91,6 +97,30 @@ export class BarrerVencimientos {
 
       await this.guias.cambiarEstado(guia.id, 'cerrada');
       this.tiempoReal.emitirAGuia(guia.id, 'estado-actualizado', {});
+    }
+  }
+
+  // E9 · Mismo criterio que barrerEvaluaciones: vencidos por tiempo límite
+  // de cualquier examen de código, notificados al toque, más cierre
+  // automático (y calificación) cuando ya todos los convocados terminaron.
+  private async barrerExamenesCodigo(): Promise<void> {
+    const vencidos = await this.intentosCodigo.finalizarVencidosGlobal();
+    for (const intento of vencidos) {
+      this.tiempoReal.emitirAExamenCodigo(intento.examen_codigo_id, 'intento-actualizado', {
+        intento_id: intento.id,
+        estado: intento.estado,
+      });
+    }
+
+    const lanzados = await this.examenesCodigo.listarLanzados();
+    for (const examen of lanzados) {
+      await cerrarSiTerminaronCodigo(
+        this.examenesCodigo,
+        this.intentosCodigo,
+        this.bitacora,
+        this.tiempoReal,
+        examen,
+      );
     }
   }
 }

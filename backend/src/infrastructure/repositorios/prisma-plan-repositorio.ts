@@ -10,6 +10,7 @@ function aDominio(p: {
   limite_materias: number | null;
   permite_import_word: boolean;
   permite_guias: boolean;
+  permite_examenes_codigo: boolean;
   monto_mensual: unknown;
   orden: number;
   activo: boolean;
@@ -22,6 +23,7 @@ function aDominio(p: {
     limite_materias: p.limite_materias,
     permite_import_word: p.permite_import_word,
     permite_guias: p.permite_guias,
+    permite_examenes_codigo: p.permite_examenes_codigo,
     monto_mensual: Number(p.monto_mensual),
     orden: p.orden,
     activo: p.activo,
@@ -60,6 +62,7 @@ export class PrismaPlanRepositorio implements PlanRepositorio {
       limite_materias?: number | null;
       permite_import_word?: boolean;
       permite_guias?: boolean;
+      permite_examenes_codigo?: boolean;
       monto_mensual?: number;
     },
   ): Promise<Plan> {

@@ -42,16 +42,17 @@ model Usuario {
   // HU-04 (acordado 12/07): verificación de correo — pendiente reflejar en diagrama
   email_verificado Boolean @default(false)
 
-  materias      Materia[] // materias que dicta (docente)
-  pagos         Pago[]
-  sesiones      Sesion[]
-  tokens        TokenUsuario[]
+  materias          Materia[] // materias que dicta (docente)
+  pagos             Pago[]
+  sesiones          Sesion[]
+  tokens            TokenUsuario[]
   inscripciones     Inscripcion[] // materias donde está inscrito (estudiante, E3)
   asistencias       Asistencia[] // marcajes como estudiante (E5)
   intentos          Intento[] // exámenes rendidos como estudiante (E7)
   guias_completadas GuiaCompletada[] // guías de pre-clase completadas (estudiante)
   guia_intentos     GuiaIntento[] // guías nativas rendidas como estudiante (16/08)
-  guias_revisadas   GuiaRespuesta[] @relation("GuiaRespuestasRevisadas") // preguntas abiertas que calificó como docente
+  guias_revisadas   GuiaRespuesta[]  @relation("GuiaRespuestasRevisadas") // preguntas abiertas que calificó como docente
+  intentos_codigo   IntentoCodigo[] // exámenes de código Python rendidos como estudiante (E9)
 
   // SaaS por cuenta (reemplaza el pago por materia, decisión con Roy 17/07;
   // pasa a Gratis permanente + Pro único + Institucional el 17/08 — ver Plan.tipo):
@@ -77,20 +78,21 @@ enum TipoPlan {
 
 // Tabla editable por el admin (mismo espíritu que el viejo Precio).
 model Plan {
-  id     Int      @id @default(autoincrement())
-  nombre String // Gratis, Pro, Institucional
+  id                      Int       @id @default(autoincrement())
+  nombre                  String // Gratis, Pro, Institucional
   // 17/08: reemplaza la señal vieja "limite_estudiantes === null" para
   // detectar Institucional — ya no sirve porque Pro también es ilimitado.
-  tipo                TipoPlan @default(pago)
-  limite_estudiantes  Int? // null = sin límite (Pro) / "a medida" (Institucional)
-  limite_materias     Int? // null = sin límite; Gratis = 1 (17/08)
-  permite_import_word Boolean  @default(false) // 17/08: feature premium (Pro/Institucional)
-  permite_guias       Boolean  @default(false) // 17/08: feature premium (Pro/Institucional)
-  monto_mensual       Decimal  @db.Decimal(10, 2) // precio anual = monto_mensual * 10 (2 meses gratis)
-  orden               Int // orden de presentación / plan por defecto = menor orden
-  activo              Boolean  @default(true)
-  usuarios            Usuario[]
-  pagos               Pago[]
+  tipo                    TipoPlan  @default(pago)
+  limite_estudiantes      Int? // null = sin límite (Pro) / "a medida" (Institucional)
+  limite_materias         Int? // null = sin límite; Gratis = 1 (17/08)
+  permite_import_word     Boolean   @default(false) // 17/08: feature premium (Pro/Institucional)
+  permite_guias           Boolean   @default(false) // 17/08: feature premium (Pro/Institucional)
+  permite_examenes_codigo Boolean   @default(false) // E9 (01/09): feature premium (Pro/Institucional)
+  monto_mensual           Decimal   @db.Decimal(10, 2) // precio anual = monto_mensual * 10 (2 meses gratis)
+  orden                   Int // orden de presentación / plan por defecto = menor orden
+  activo                  Boolean   @default(true)
+  usuarios                Usuario[]
+  pagos                   Pago[]
 
   @@map("planes")
 }
@@ -111,24 +113,24 @@ enum CicloAplicablePromocion {
 }
 
 model Promocion {
-  id             Int                     @id @default(autoincrement())
-  nombre         String
-  codigo         String?                 @unique // null = automática por temporada
-  tipo_descuento TipoDescuentoPromocion
-  valor          Decimal                 @db.Decimal(10, 2)
-  ciclo_aplicable CicloAplicablePromocion @default(ambos)
+  id                      Int                     @id @default(autoincrement())
+  nombre                  String
+  codigo                  String?                 @unique // null = automática por temporada
+  tipo_descuento          TipoDescuentoPromocion
+  valor                   Decimal                 @db.Decimal(10, 2)
+  ciclo_aplicable         CicloAplicablePromocion @default(ambos)
   // Un pago anual ya trae su propio descuento estructural (10x, 2 meses
   // gratis) — este flag decide si el descuento de la promo se suma encima.
-  combinable_con_anual Boolean  @default(true)
-  solo_cuentas_nuevas  Boolean  @default(false) // true = nunca tuvo un pago aprobado
-  fecha_inicio         DateTime
-  fecha_fin            DateTime
-  activo               Boolean  @default(true) // kill switch manual del admin
+  combinable_con_anual    Boolean                 @default(true)
+  solo_cuentas_nuevas     Boolean                 @default(false) // true = nunca tuvo un pago aprobado
+  fecha_inicio            DateTime
+  fecha_fin               DateTime
+  activo                  Boolean                 @default(true) // kill switch manual del admin
   usos_maximos            Int? // null = ilimitado (tope global de canjes)
   usos_maximos_por_cuenta Int? // null = ilimitado
   // Se incrementa solo al APROBAR un pago (no al crearlo) — ver ResolverSuscripcion.
-  usos_actuales Int    @default(0)
-  pagos         Pago[]
+  usos_actuales           Int                     @default(0)
+  pagos                   Pago[]
 
   @@index([codigo])
   @@index([activo, fecha_inicio, fecha_fin])
@@ -161,16 +163,16 @@ enum CicloPago {
 }
 
 model Pago {
-  id          Int      @id @default(autoincrement())
-  fecha       DateTime @default(now())
-  usuario     Usuario  @relation(fields: [usuario_id], references: [id])
-  usuario_id  Int
+  id             Int        @id @default(autoincrement())
+  fecha          DateTime   @default(now())
+  usuario        Usuario    @relation(fields: [usuario_id], references: [id])
+  usuario_id     Int
   // 17/08: monto_lista es el precio de plan sin descuento (para mostrarlo
   // tachado); monto sigue significando lo mismo que siempre — lo que
   // realmente hay que transferir/se transfirió (con descuento ya aplicado,
   // si hubo promo) — el admin valida el comprobante contra `monto`.
-  monto_lista Decimal @db.Decimal(10, 2)
-  monto       Decimal @db.Decimal(10, 2) // conserva el precio mostrado (D-09)
+  monto_lista    Decimal    @db.Decimal(10, 2)
+  monto          Decimal    @db.Decimal(10, 2) // conserva el precio mostrado (D-09)
   comprobante    String? // ruta/URL de imagen o PDF; null hasta subirlo
   estado         EstadoPago @default(pendiente)
   // HU-08 Esc. 2 (acordado 12/07): motivo visible para el docente al rechazar
@@ -183,8 +185,8 @@ model Pago {
   plan           Plan       @relation(fields: [plan_id], references: [id])
   plan_id        Int
   // 17/08: promo aplicada al elegir el plan, si hubo alguna (código o automática).
-  promocion    Promocion? @relation(fields: [promocion_id], references: [id])
-  promocion_id Int?
+  promocion      Promocion? @relation(fields: [promocion_id], references: [id])
+  promocion_id   Int?
 
   @@index([usuario_id, estado])
   @@map("pagos")
@@ -216,15 +218,16 @@ model Materia {
 // hora se guarda como texto "HH:MM" (el diagrama la tipa como time;
 // evitamos el DateTime ficticio de Prisma para columnas TIME).
 model Clase {
-  id           Int          @id @default(autoincrement())
-  fecha        DateTime     @db.Date
-  hora         String       @db.VarChar(5) // "08:00"
-  tema         String
-  materia      Materia      @relation(fields: [materia_id], references: [id])
-  materia_id   Int
-  asistencias  Asistencia[]
-  evaluaciones Evaluacion[]
-  guias        Guia[]
+  id              Int            @id @default(autoincrement())
+  fecha           DateTime       @db.Date
+  hora            String         @db.VarChar(5) // "08:00"
+  tema            String
+  materia         Materia        @relation(fields: [materia_id], references: [id])
+  materia_id      Int
+  asistencias     Asistencia[]
+  evaluaciones    Evaluacion[]
+  guias           Guia[]
+  examenes_codigo ExamenCodigo[] // E9: exámenes de código Python
 
   // HU-14: la generación masiva no debe duplicar una clase ya creada
   // en la misma fecha y hora.
@@ -260,11 +263,11 @@ model Guia {
 
   // Guías nativas (16/08) — null en las creadas antes de este cambio
   // (`estado` queda en "externa_legacy" para esas, ver migración de datos).
-  nota                   Float?
-  estado                 EstadoGuia @default(publicada)
-  tiempo_limite_minutos  Int?
-  preguntas              GuiaPregunta[]
-  intentos               GuiaIntento[]
+  nota                  Float?
+  estado                EstadoGuia     @default(publicada)
+  tiempo_limite_minutos Int?
+  preguntas             GuiaPregunta[]
+  intentos              GuiaIntento[]
 
   // Nivel 1 de detección de integración (17/08): resultado de la última vez
   // que "Analizar link" bajó la página del docente y buscó el marcador de
@@ -670,4 +673,151 @@ model Bitacora {
   @@index([entidad, entidad_id])
   @@index([usuario_id, fecha_hora])
   @@map("bitacora")
+}
+
+// ── E9 (01/09) — Exámenes de código Python ──────────────────────
+// Calcado deliberadamente de Evaluacion/Pregunta/Opcion/Intento/Respuesta/
+// Incidente/Nota (E6-E8), igual que Guías lo hizo el 16-17/08: un sistema
+// paralelo, no una extensión de Evaluacion, porque Respuesta.opcion_id
+// es NOT NULL con cascada a Opcion — no hay dónde colgar código fuente ni
+// resultados de ejecución, y acá se califica por % de casos de prueba
+// pasados, no por "una opción correcta". Reusa los enums EstadoEvaluacion
+// y EstadoIntento (mismo ciclo de vida, no hace falta uno propio).
+model ExamenCodigo {
+  id       Int              @id @default(autoincrement())
+  tema     String
+  clase    Clase            @relation(fields: [clase_id], references: [id])
+  clase_id Int
+  nota     Int // nota total (igual D-05 de Evaluacion): se reparte entre ejercicios por su peso
+  estado   EstadoEvaluacion @default(borrador)
+
+  tiempo_limite_minutos Int? // null = sin límite (igual D-07)
+  fecha_lanzamiento     DateTime?
+  intentos              IntentoCodigo[]
+
+  publicada         Boolean   @default(false) // HU-26: el docente decide cuándo se ve la nota
+  fecha_publicacion DateTime?
+
+  ejercicios Ejercicio[]
+  creado_en  DateTime    @default(now())
+
+  @@index([clase_id])
+  @@map("examenes_codigo")
+}
+
+model Ejercicio {
+  id               Int               @id @default(autoincrement())
+  enunciado        String // texto/markdown del ejercicio
+  plantilla_codigo String? // starter code opcional, precargado en el editor
+  examen_codigo    ExamenCodigo      @relation(fields: [examen_codigo_id], references: [id], onDelete: Cascade)
+  examen_codigo_id Int
+  nota             Int // peso de este ejercicio dentro de la nota total del examen
+  orden            Int
+  casos_prueba     CasoPrueba[]
+  respuestas       RespuestaCodigo[]
+
+  @@index([examen_codigo_id, orden])
+  @@map("ejercicios")
+}
+
+model CasoPrueba {
+  id              Int       @id @default(autoincrement())
+  ejercicio       Ejercicio @relation(fields: [ejercicio_id], references: [id], onDelete: Cascade)
+  ejercicio_id    Int
+  entrada         String // stdin que recibe el programa del estudiante
+  salida_esperada String // stdout esperado, comparado tal cual (trim) por el ejecutor
+  // true = nunca se muestra al estudiante ni cuenta en "Ejecutar" (solo
+  // en "Enviar", igual que un caso de examen tomado en serio); false =
+  // visible en el panel de pruebas para que pueda depurar mientras rinde.
+  es_oculto       Boolean   @default(false)
+  orden           Int
+
+  @@index([ejercicio_id, orden])
+  @@map("casos_prueba")
+}
+
+model IntentoCodigo {
+  id               Int               @id @default(autoincrement())
+  examen_codigo    ExamenCodigo      @relation(fields: [examen_codigo_id], references: [id], onDelete: Cascade)
+  examen_codigo_id Int
+  estudiante       Usuario           @relation(fields: [estudiante_id], references: [id])
+  estudiante_id    Int
+  estado           EstadoIntento     @default(en_curso)
+  // Orden barajado y fijo desde que se lanza (igual HU-20 Esc. 3 de Evaluacion).
+  orden_ejercicios Json // number[] de Ejercicio.id
+  fecha_inicio     DateTime          @default(now())
+  fecha_limite     DateTime?
+  fecha_fin        DateTime?
+  respuestas       RespuestaCodigo[]
+  incidentes       IncidenteCodigo[]
+  notas            NotaCodigo[]
+
+  // Un intento por estudiante y examen (igual Intento — no como GuiaIntento,
+  // que sí permite repasos: acá no hay "repasar un examen sin que cuente").
+  @@unique([examen_codigo_id, estudiante_id])
+  @@index([examen_codigo_id])
+  @@index([estudiante_id])
+  @@map("intentos_codigo")
+}
+
+// Reenviar el mismo ejercicio sobrescribe la fila (igual @@unique de
+// Respuesta) — el estudiante puede corregir y reenviar hasta que se acabe
+// el tiempo o envíe el examen completo.
+model RespuestaCodigo {
+  id              Int           @id @default(autoincrement())
+  intento         IntentoCodigo @relation(fields: [intento_id], references: [id], onDelete: Cascade)
+  intento_id      Int
+  ejercicio       Ejercicio     @relation(fields: [ejercicio_id], references: [id], onDelete: Cascade)
+  ejercicio_id    Int
+  codigo_fuente   String
+  casos_acertados Int
+  casos_totales   Int
+  // Detalle por caso (paso/falla, stdout/stderr truncado, tiempo) para que
+  // el docente pueda ver qué falló en Resultados sin volver a ejecutar nada.
+  resultado_json  Json
+  respondida_en   DateTime      @default(now())
+
+  @@unique([intento_id, ejercicio_id])
+  @@map("respuestas_codigo")
+}
+
+// Lo que la app de escritorio puede detectar de forma confiable en Windows
+// vía Tauri — a diferencia de TipoIncidente (mobile), acá no hay "salida de
+// pantalla" (no existe multitarea con apps en background como en Android),
+// el análogo real es pérdida de foco de ventana / minimizado / cierre.
+enum TipoIncidenteCodigo {
+  perdida_foco
+  ventana_minimizada
+  intento_cierre
+}
+
+model IncidenteCodigo {
+  id         Int                 @id @default(autoincrement())
+  intento    IntentoCodigo       @relation(fields: [intento_id], references: [id], onDelete: Cascade)
+  intento_id Int
+  tipo       TipoIncidenteCodigo
+  detalle    String?
+  fecha_hora DateTime            @default(now())
+
+  @@index([intento_id])
+  @@map("incidentes_codigo")
+}
+
+// D-12 (igual Nota): insert-only, versionado, nunca se sobreescribe.
+// "Vigente" = mayor version por intento_id.
+model NotaCodigo {
+  id               Int           @id @default(autoincrement())
+  intento          IntentoCodigo @relation(fields: [intento_id], references: [id], onDelete: Cascade)
+  intento_id       Int
+  examen_codigo_id Int
+  estudiante_id    Int
+  version          Int           @default(1)
+  casos_acertados  Int
+  casos_totales    Int
+  nota_obtenida    Float // suma por ejercicio de (casos_acertados/casos_totales * ejercicio.nota)
+  calculada_en     DateTime      @default(now())
+
+  @@index([examen_codigo_id])
+  @@index([estudiante_id])
+  @@map("notas_codigo")
 }

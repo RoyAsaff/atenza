@@ -9,6 +9,8 @@ import { inscripcionesRouter } from './rutas/inscripciones-rutas';
 import { evaluacionesRouter } from './rutas/evaluaciones-rutas';
 import { intentosRouter } from './rutas/intentos-rutas';
 import { guiasRouter, guiasCompletarRouter } from './rutas/guias-rutas';
+import { examenesCodigoRouter } from './rutas/examenes-codigo-rutas';
+import { intentosCodigoRouter } from './rutas/intentos-codigo-rutas';
 import { manejarErrores } from './middlewares/manejar-errores';
 import { CARPETA_UPLOADS } from './middlewares/subir-archivos';
 
@@ -33,9 +35,11 @@ export function createApp() {
   app.use('/api/materias', materiasRouter); // E3: HU-11, HU-12 · E4 · E5
   app.use('/api/materias', evaluacionesRouter); // E6: HU-17, HU-18, HU-19
   app.use('/api/materias', guiasRouter); // Guías de pre-clase (fusión con PaginaGuias, 05/08)
+  app.use('/api/materias', examenesCodigoRouter); // E9: exámenes de código Python (01/09)
   app.use('/api/admin', adminRouter); // planes/QR, verificación de pagos, HU-09
   app.use('/api/inscripciones', inscripcionesRouter); // E3: HU-10
   app.use('/api/intentos', intentosRouter); // E7: HU-21
+  app.use('/api/intentos-codigo', intentosCodigoRouter); // E9: rendir examen de código
   // Completar guía: la llama la propia página en PaginaGuias (dominio
   // externo), sin sesión de ATENZA — ver verificar-token-guia.ts.
   app.use('/api/guias', guiasCompletarRouter);

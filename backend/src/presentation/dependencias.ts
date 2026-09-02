@@ -146,6 +146,46 @@ import {
   crearVerificarTokenGuiaIntento,
 } from './middlewares/verificar-token-guia';
 
+// E9 — exámenes de código Python (01/09)
+import { PrismaExamenCodigoRepositorio } from '../infrastructure/repositorios/prisma-examen-codigo-repositorio';
+import { PrismaIntentoCodigoRepositorio } from '../infrastructure/repositorios/prisma-intento-codigo-repositorio';
+import { DockerodePythonRunner } from '../infrastructure/ejecucion/dockerode-python-runner';
+import {
+  ActualizarExamenCodigo,
+  AgregarEjercicio,
+  ActualizarEjercicio,
+  CrearExamenCodigo,
+  EliminarEjercicio,
+  EliminarExamenCodigo,
+  GuardarExamenCodigo,
+  ReordenarEjercicios,
+  VerExamenCodigo,
+  VerExamenesCodigo,
+  VerExamenesCodigoMateria,
+} from '../application/examenes-codigo/gestionar-examenes-codigo';
+import {
+  CancelarExamenCodigo,
+  LanzarExamenCodigo,
+  PausarExamenCodigo,
+  PausarIntentoCodigo,
+  ReactivarExamenCodigo,
+  ReactivarIntentoCodigo,
+  VerMonitoreoCodigo,
+} from '../application/examenes-codigo/gestionar-examen-codigo';
+import {
+  EjecutarCodigo,
+  EnviarRespuestaCodigo,
+  FinalizarIntentoCodigo,
+  ReportarIncidenteCodigo,
+  VerIntentoCodigoActual,
+} from '../application/intentos-codigo/rendir-examen-codigo';
+import {
+  PublicarNotasCodigo,
+  VerDetalleIntentoCodigo,
+  VerMisNotasCodigo,
+  VerResultadosCodigo,
+} from '../application/examenes-codigo/ver-resultados-codigo';
+
 /** Convierte duraciones tipo "8h", "30d", "45m" a segundos. */
 export function duracionASegundos(duracion: string): number {
   const match = /^(\d+)([smhd])$/.exec(duracion.trim());
@@ -272,6 +312,7 @@ export const cuentaActiva = crearVerificarCuentaActiva(estadoCuenta);
 // 17/08: gating de features premium (Word/Guías) — mismo molde que cuentaActiva
 export const exigirImportarWord = crearExigirFeaturePlan(estadoCuenta, 'permite_import_word');
 export const exigirGuias = crearExigirFeaturePlan(estadoCuenta, 'permite_guias');
+export const exigirExamenesCodigo = crearExigirFeaturePlan(estadoCuenta, 'permite_examenes_codigo'); // E9
 export const crearMateria = new CrearMateria(materiaRepositorio, bitacoraRepositorio, estadoCuenta);
 
 // E3
@@ -727,14 +768,205 @@ export const verMonitoreoGuia = new VerMonitoreoGuia(
   guiaIntentoRepositorio,
 );
 
-// Barrido en segundo plano (13/08, extendido a guías 16/08 — ver
-// barrer-vencimientos.ts) — index.ts lo corre en un setInterval, no
-// depende de ninguna petición HTTP.
+// E9 (01/09) — exámenes de código Python. Calcado del wiring de E7
+// (evaluaciones): pythonRunner se instancia una sola vez (mantiene el
+// cliente de Docker abierto) y se inyecta como EjecutorCodigo en las dos
+// clases del lado estudiante que corren código.
+export const examenCodigoRepositorio = new PrismaExamenCodigoRepositorio(prisma);
+export const intentoCodigoRepositorio = new PrismaIntentoCodigoRepositorio(prisma);
+// DOCKER_SOCKET_PATH es opcional: sin ella, dockerode autodetecta el socket
+// correcto por plataforma (ver comentario en el constructor). Solo hace
+// falta setearla para forzar una ruta puntual (p.ej. un contexto de Docker
+// no estándar en local).
+export const pythonRunner = new DockerodePythonRunner(process.env.DOCKER_SOCKET_PATH);
+
+export const crearExamenCodigo = new CrearExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const verExamenesCodigo = new VerExamenesCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+);
+export const verExamenesCodigoMateria = new VerExamenesCodigoMateria(
+  examenCodigoRepositorio,
+  materiaRepositorio,
+);
+export const verExamenCodigo = new VerExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+);
+export const actualizarExamenCodigo = new ActualizarExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const eliminarExamenCodigo = new EliminarExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const agregarEjercicio = new AgregarEjercicio(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const actualizarEjercicio = new ActualizarEjercicio(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const eliminarEjercicio = new EliminarEjercicio(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const reordenarEjercicios = new ReordenarEjercicios(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const guardarExamenCodigo = new GuardarExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+
+export const lanzarExamenCodigo = new LanzarExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  asistenciaRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const verMonitoreoCodigo = new VerMonitoreoCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const pausarExamenCodigo = new PausarExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const reactivarExamenCodigo = new ReactivarExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const cancelarExamenCodigo = new CancelarExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const pausarIntentoCodigo = new PausarIntentoCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const reactivarIntentoCodigo = new ReactivarIntentoCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+
+export const verIntentoCodigoActual = new VerIntentoCodigoActual(
+  intentoCodigoRepositorio,
+  examenCodigoRepositorio,
+  socketIoEmisor,
+);
+export const ejecutarCodigo = new EjecutarCodigo(
+  intentoCodigoRepositorio,
+  examenCodigoRepositorio,
+  pythonRunner,
+  socketIoEmisor,
+);
+export const enviarRespuestaCodigo = new EnviarRespuestaCodigo(
+  intentoCodigoRepositorio,
+  examenCodigoRepositorio,
+  pythonRunner,
+  socketIoEmisor,
+);
+export const reportarIncidenteCodigo = new ReportarIncidenteCodigo(
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const finalizarIntentoCodigo = new FinalizarIntentoCodigo(
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+
+export const verResultadosCodigo = new VerResultadosCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const verDetalleIntentoCodigo = new VerDetalleIntentoCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoCodigoRepositorio,
+);
+export const publicarNotasCodigo = new PublicarNotasCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+);
+export const verMisNotasCodigo = new VerMisNotasCodigo(
+  materiaRepositorio,
+  inscripcionRepositorio,
+  examenCodigoRepositorio,
+  intentoCodigoRepositorio,
+);
+
+// Barrido en segundo plano (13/08, extendido a guías 16/08 y a exámenes de
+// código 01/09 — ver barrer-vencimientos.ts) — index.ts lo corre en un
+// setInterval, no depende de ninguna petición HTTP.
 export const barrerVencimientos = new BarrerVencimientos(
   evaluacionRepositorio,
   intentoRepositorio,
   guiaRepositorio,
   guiaIntentoRepositorio,
+  examenCodigoRepositorio,
+  intentoCodigoRepositorio,
   bitacoraRepositorio,
   socketIoEmisor,
 );

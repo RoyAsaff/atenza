@@ -338,6 +338,112 @@ export interface DetalleIntento {
   preguntas: PreguntaDetalleIntento[];
 }
 
+// ── E9: exámenes de código Python — calcado 1:1 del bloque de arriba
+// (Evaluacion/Pregunta/Opcion → ExamenCodigo/Ejercicio/CasoPrueba), mismo
+// ciclo de vida (EstadoEvaluacion) y mismo EstadoIntento en la ejecución.
+
+export interface ExamenCodigo {
+  id: number;
+  tema: string;
+  clase_id: number;
+  nota: number;
+  estado: EstadoEvaluacion;
+  tiempo_limite_minutos: number | null;
+  fecha_lanzamiento: string | null;
+  publicada: boolean;
+  fecha_publicacion: string | null;
+  creado_en: string;
+}
+
+export interface CasoPrueba {
+  id: number;
+  ejercicio_id: number;
+  entrada: string;
+  salida_esperada: string;
+  es_oculto: boolean;
+  orden: number;
+}
+
+export interface Ejercicio {
+  id: number;
+  enunciado: string;
+  plantilla_codigo: string | null;
+  examen_codigo_id: number;
+  nota: number;
+  orden: number;
+  casos_prueba: CasoPrueba[];
+}
+
+export interface ExamenCodigoConEjercicios extends ExamenCodigo {
+  ejercicios: Ejercicio[];
+}
+
+export interface ExamenCodigoConClase extends ExamenCodigo {
+  clase: {
+    id: number;
+    fecha: string;
+    hora: string;
+    tema: string;
+  };
+}
+
+export type TipoIncidenteCodigo = 'perdida_foco' | 'ventana_minimizada' | 'intento_cierre';
+
+export interface FilaMonitoreoCodigo {
+  intento_id: number;
+  estudiante_id: number;
+  nombres: string;
+  apellidos: string;
+  estado: EstadoIntento;
+  ejercicios_enviados: number;
+  total_ejercicios: number;
+  incidentes: number;
+  fecha_inicio: string;
+  fecha_limite: string | null;
+}
+
+export interface ResultadoCaso {
+  caso_id: number;
+  paso: boolean;
+  stdout: string;
+  stderr: string;
+  tiempo_ms: number;
+}
+
+export interface FilaResultadoCodigo {
+  estudiante_id: number;
+  nombres: string;
+  apellidos: string;
+  casos_acertados: number;
+  casos_totales: number;
+  nota_obtenida: number;
+  incidentes: number;
+}
+
+export interface ResultadosCodigo {
+  examen_codigo_id: number;
+  nota_total: number;
+  filas: FilaResultadoCodigo[];
+  estadisticas: EstadisticasResultados;
+}
+
+export interface EjercicioConRespuesta {
+  id: number;
+  enunciado: string;
+  orden: number;
+  codigo_fuente: string | null;
+  casos_acertados: number;
+  casos_totales: number;
+  resultado_json: ResultadoCaso[] | null;
+}
+
+export interface DetalleIntentoCodigo {
+  intento_id: number;
+  examen_codigo_id: number;
+  estudiante_id: number;
+  ejercicios: EjercicioConRespuesta[];
+}
+
 // Fusión con guías (24/08): una columna es una evaluación finalizada o una
 // guía cerrada — `id` es el evaluacion_id o guia_id según `tipo` (dos
 // secuencias separadas, por eso la celda se indexa por clave compuesta,

@@ -38,6 +38,7 @@ function aDominio(p: PagoConPlanPrisma): PagoConPlan {
       limite_materias: p.plan.limite_materias,
       permite_import_word: p.plan.permite_import_word,
       permite_guias: p.plan.permite_guias,
+      permite_examenes_codigo: p.plan.permite_examenes_codigo,
       monto_mensual: Number(p.plan.monto_mensual),
       orden: p.plan.orden,
       activo: p.plan.activo,
