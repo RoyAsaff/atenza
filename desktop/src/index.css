@@ -1,0 +1,14 @@
+@import './core/ui/tokens.css';
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-primary-900);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
