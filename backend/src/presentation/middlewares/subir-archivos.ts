@@ -50,3 +50,16 @@ export const subirDocumento = multer({
     cb(null, true);
   },
 });
+
+// E9 · Importar ejercicios de código desde Markdown — mismo motivo que
+// subirDocumento (solo se parsea, memoria en vez de disco).
+export const subirDocumentoMd = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (extname(file.originalname).toLowerCase() !== '.md') {
+      return cb(new Error('Solo se permiten archivos .md'));
+    }
+    cb(null, true);
+  },
+});

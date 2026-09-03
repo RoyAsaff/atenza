@@ -144,6 +144,18 @@ export interface FilaListaAsistencia {
   marcaje: MarcajeAsistencia | null;
 }
 
+// Habilitación tardía (02/09): lo que guardarAsistencia devuelve cuando la
+// corrección sumó a alguien a una evaluación/guía/examen de código ya
+// lanzada — ver habilitar-tardios.ts en el backend.
+export type TipoConvocatoriaTardia = 'evaluacion' | 'guia' | 'examen_codigo';
+
+export interface ConvocatoriaTardia {
+  tipo: TipoConvocatoriaTardia;
+  id: number;
+  tema: string;
+  estudiante_id: number;
+}
+
 export interface FilaConsolidadoAsistencia {
   estudiante_id: number;
   nombres: string;
@@ -244,6 +256,20 @@ export interface PreguntaParseada {
 }
 
 export interface ErrorParseoPregunta {
+  bloque: string;
+  motivo: string;
+}
+
+// E9: importar ejercicios de código desde Markdown — plantilla fija + parser
+// simple (calcado de PreguntaParseada/ErrorParseoPregunta).
+export interface EjercicioParseado {
+  enunciado: string;
+  plantilla_codigo: string | null;
+  nota: number;
+  casos_prueba: { entrada: string; salida_esperada: string; es_oculto: boolean }[];
+}
+
+export interface ErrorParseoEjercicio {
   bloque: string;
   motivo: string;
 }

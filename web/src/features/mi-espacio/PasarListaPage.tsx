@@ -22,7 +22,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Search } from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
-import { Clase, FilaListaAsistencia, Materia, MarcajeAsistencia } from '../../core/tipos';
+import {
+  Clase,
+  ConvocatoriaTardia,
+  FilaListaAsistencia,
+  Materia,
+  MarcajeAsistencia,
+} from '../../core/tipos';
 import { Input, PageBreadcrumb, cn } from '../../core/ui/ui';
 
 type Modo = 'lista' | 'llamado';
@@ -111,6 +117,13 @@ const MAPA_OPCIONES = Object.fromEntries(OPCIONES.map((o) => [o.valor, o])) as R
   MarcajeAsistencia,
   OpcionEstado
 >;
+
+// Habilitación tardía (02/09): etiqueta legible por tipo de convocatoria.
+const TIPO_CONVOCATORIA_TEXTO: Record<ConvocatoriaTardia['tipo'], string> = {
+  evaluacion: 'la evaluación',
+  guia: 'la guía',
+  examen_codigo: 'el examen de código',
+};
 
 // ── Conmutador de modo (encabezado) ───────────────────────────────
 
@@ -402,6 +415,23 @@ function ResumenPie({ conteos }: { conteos: Record<MarcajeAsistencia, number> })
         </span>
       ))}
     </p>
+  );
+}
+
+// Habilitación tardía (02/09): quién quedó habilitado para qué, tras
+// corregir su asistencia mientras esa evaluación/guía/examen ya estaba en
+// curso — nombres resueltos por el llamador contra la nómina.
+function AvisoConvocados({ lineas }: { lineas: string[] }) {
+  if (lineas.length === 0) return null;
+  return (
+    <div className="mx-6 mb-4 rounded-lg border border-accent-300 bg-accent-50 px-4 py-3 text-[14px] text-accent-800">
+      <p className="font-semibold">Se habilitó el acceso para quien llegó tarde:</p>
+      <ul className="mt-1 list-disc pl-5">
+        {lineas.map((linea, i) => (
+          <li key={i}>{linea}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -839,6 +869,7 @@ export function PasarListaPage() {
   const [indice, setIndice] = useState(0);
   const [error, setError] = useState('');
   const [guardadoOk, setGuardadoOk] = useState(false);
+  const [convocados, setConvocados] = useState<ConvocatoriaTardia[]>([]);
 
   const filaRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   // Estudiante al que hay que hacer scroll apenas se vuelva a 1a — se llena
@@ -898,6 +929,7 @@ export function PasarListaPage() {
   // se cambiaran marcajes).
   useEffect(() => {
     setGuardadoOk(false);
+    setConvocados([]);
   }, [marcajes]);
 
   // Scroll al volver de 1b a 1a — con scrollTo sobre el <main> real de
@@ -985,16 +1017,21 @@ export function PasarListaPage() {
   }, [listaOrdenada, marcajes]);
 
   const guardar = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const marcajesEnviar = listaOrdenada.map((f) => ({
         estudiante_id: f.estudiante_id,
         marcaje: marcajes[f.estudiante_id] ?? 'puntual',
       }));
-      return api.post(`/api/materias/${id}/clases/${claseId}/asistencia`, { marcajes: marcajesEnviar });
+      const { data } = await api.post<{ convocados: ConvocatoriaTardia[] }>(
+        `/api/materias/${id}/clases/${claseId}/asistencia`,
+        { marcajes: marcajesEnviar },
+      );
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setError('');
       setGuardadoOk(true);
+      setConvocados(data.convocados);
       queryClient.invalidateQueries({ queryKey: ['lista-asistencia', claseId] });
       queryClient.invalidateQueries({ queryKey: ['consolidado-asistencia', id] });
     },
@@ -1003,6 +1040,18 @@ export function PasarListaPage() {
       setError(mensajeDeError(err));
     },
   });
+
+  // Habilitación tardía: nombre resuelto contra la nómina ya cargada, un
+  // renglón por convocatoria (un mismo estudiante puede aparecer más de
+  // una vez si llegó tarde a una clase con varias cosas lanzadas a la vez).
+  const lineasConvocados = useMemo(() => {
+    const porId = new Map(listaOrdenada.map((f) => [f.estudiante_id, f]));
+    return convocados.map((c) => {
+      const fila = porId.get(c.estudiante_id);
+      const nombre = fila ? `${fila.apellidos}, ${fila.nombres}` : `Estudiante #${c.estudiante_id}`;
+      return `${nombre} → ${TIPO_CONVOCATORIA_TEXTO[c.tipo]} "${c.tema}"`;
+    });
+  }, [convocados, listaOrdenada]);
 
   return (
     <div>
@@ -1037,6 +1086,8 @@ export function PasarListaPage() {
           Aún no hay estudiantes inscritos en esta materia.
         </p>
       )}
+
+      {guardadoOk && <AvisoConvocados lineas={lineasConvocados} />}
 
       {lista &&
         lista.length > 0 &&

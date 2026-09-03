@@ -345,7 +345,7 @@ materiasRouter.post(
       const { marcajes } = z
         .object({ marcajes: z.array(esquemaMarcaje) })
         .parse(req.body);
-      const asistencias = await guardarAsistencia.ejecutar({
+      const { asistencias, convocados } = await guardarAsistencia.ejecutar({
         materia_id: idNumerico.parse(req.params.id),
         clase_id: idNumerico.parse(req.params.claseId),
         docente_id: req.auth!.sub,
@@ -353,7 +353,7 @@ materiasRouter.post(
         ip: req.ip,
         dispositivo: req.headers['user-agent'],
       });
-      res.json({ asistencias });
+      res.json({ asistencias, convocados });
     } catch (error) {
       next(error);
     }

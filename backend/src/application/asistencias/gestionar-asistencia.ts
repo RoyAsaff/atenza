@@ -4,6 +4,7 @@
 
 import {
   Asistencia,
+  ConvocatoriaTardia,
   FilaConsolidadoAsistencia,
   FilaListaAsistencia,
   FilaMiAsistencia,
@@ -15,6 +16,11 @@ import { ClaseRepositorio } from '../../domain/repositorios/clase-repositorio';
 import { InscripcionRepositorio } from '../../domain/repositorios/inscripcion-repositorio';
 import { MateriaRepositorio } from '../../domain/repositorios/materia-repositorio';
 import { BitacoraRepositorio } from '../../domain/repositorios/bitacora-repositorio';
+import { HabilitarLanzamientosTardios } from './habilitar-tardios';
+
+// Puntual y Atrasado cuentan como "presente" en todo E5/E7/E8/E9 — mismo
+// filtro que LanzarEvaluacion/LanzarGuia/LanzarExamenCodigo.
+const PRESENTE: ReadonlySet<MarcajeAsistencia> = new Set(['puntual', 'atrasado']);
 
 interface Auditoria {
   ip?: string;
@@ -87,6 +93,9 @@ export class GuardarAsistencia {
     private readonly materias: MateriaRepositorio,
     private readonly inscripciones: InscripcionRepositorio,
     private readonly bitacora: BitacoraRepositorio,
+    // 02/09: quien llega tarde y se corrige a Puntual/Atrasado se suma acá
+    // mismo a lo que ya esté lanzado en la clase — ver habilitar-tardios.ts.
+    private readonly habilitarTardios: HabilitarLanzamientosTardios,
   ) {}
 
   async ejecutar(
@@ -98,7 +107,7 @@ export class GuardarAsistencia {
       // el resto de la nómina queda en Falta (HU-15 Esc. 1).
       marcajes: { estudiante_id: number; marcaje: MarcajeAsistencia }[];
     },
-  ): Promise<Asistencia[]> {
+  ): Promise<{ asistencias: Asistencia[]; convocados: ConvocatoriaTardia[] }> {
     await exigirMateriaPropia(this.materias, entrada.materia_id, entrada.docente_id);
     await exigirClaseDeMateria(this.clases, entrada.materia_id, entrada.clase_id);
 
@@ -122,6 +131,11 @@ export class GuardarAsistencia {
     }));
 
     const guardadas = await this.asistencias.guardarVarias(datos);
+
+    // HU-15 (extendido, 02/09): quien pasa a Puntual/Atrasado por primera
+    // vez en esta clase —nuevo o corregido desde Falta/Licencia— se suma a
+    // lo que ya esté lanzado (evaluación/guía/examen de código en curso).
+    const idsRecienPresentes: number[] = [];
 
     for (const asistencia of guardadas) {
       const anterior = mapaAnterior.get(asistencia.estudiante_id);
@@ -154,9 +168,22 @@ export class GuardarAsistencia {
           dispositivo: entrada.dispositivo,
         });
       }
+
+      const eraPresente = anterior ? PRESENTE.has(anterior.marcaje) : false;
+      if (!eraPresente && PRESENTE.has(asistencia.marcaje)) {
+        idsRecienPresentes.push(asistencia.estudiante_id);
+      }
     }
 
-    return guardadas;
+    const convocados = await this.habilitarTardios.ejecutar({
+      clase_id: entrada.clase_id,
+      estudiante_ids: idsRecienPresentes,
+      docente_id: entrada.docente_id,
+      ip: entrada.ip,
+      dispositivo: entrada.dispositivo,
+    });
+
+    return { asistencias: guardadas, convocados };
   }
 }
 

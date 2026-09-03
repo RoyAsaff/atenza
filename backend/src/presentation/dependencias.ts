@@ -55,6 +55,7 @@ import {
   VerListaAsistencia,
   VerMiAsistencia,
 } from '../application/asistencias/gestionar-asistencia';
+import { HabilitarLanzamientosTardios } from '../application/asistencias/habilitar-tardios';
 import { PrismaEvaluacionRepositorio } from '../infrastructure/repositorios/prisma-evaluacion-repositorio';
 import {
   ActualizarEvaluacion,
@@ -163,6 +164,11 @@ import {
   VerExamenesCodigo,
   VerExamenesCodigoMateria,
 } from '../application/examenes-codigo/gestionar-examenes-codigo';
+import {
+  ConfirmarImportacionEjercicios,
+  PrevisualizarImportacionEjercicios,
+} from '../application/examenes-codigo/importar-ejercicios';
+import { extraerTextoMd } from '../infrastructure/parsers/extraer-texto-md';
 import {
   CancelarExamenCodigo,
   LanzarExamenCodigo,
@@ -375,13 +381,9 @@ export const verListaAsistencia = new VerListaAsistencia(
   inscripcionRepositorio,
   asistenciaRepositorio,
 );
-export const guardarAsistencia = new GuardarAsistencia(
-  asistenciaRepositorio,
-  claseRepositorio,
-  materiaRepositorio,
-  inscripcionRepositorio,
-  bitacoraRepositorio,
-);
+// guardarAsistencia se instancia más abajo (junto a
+// habilitarLanzamientosTardios, ver comentario ahí) — necesita repos de E6-E9
+// que todavía no existen en este punto del archivo.
 export const verConsolidadoAsistencia = new VerConsolidadoAsistencia(
   materiaRepositorio,
   inscripcionRepositorio,
@@ -780,6 +782,29 @@ export const intentoCodigoRepositorio = new PrismaIntentoCodigoRepositorio(prism
 // no estándar en local).
 export const pythonRunner = new DockerodePythonRunner(process.env.DOCKER_SOCKET_PATH);
 
+// Habilitación tardía (02/09): depende de los repos/emisor de las tres
+// convocatorias por asistencia (evaluación, guía, examen de código), así
+// que se instancia acá abajo, una vez que todos ya existen — y
+// guardarAsistencia se mueve junto a ella (ver más abajo) por la misma razón.
+export const habilitarLanzamientosTardios = new HabilitarLanzamientosTardios(
+  evaluacionRepositorio,
+  intentoRepositorio,
+  guiaRepositorio,
+  guiaIntentoRepositorio,
+  examenCodigoRepositorio,
+  intentoCodigoRepositorio,
+  bitacoraRepositorio,
+  socketIoEmisor,
+);
+export const guardarAsistencia = new GuardarAsistencia(
+  asistenciaRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  inscripcionRepositorio,
+  bitacoraRepositorio,
+  habilitarLanzamientosTardios,
+);
+
 export const crearExamenCodigo = new CrearExamenCodigo(
   examenCodigoRepositorio,
   claseRepositorio,
@@ -837,6 +862,18 @@ export const reordenarEjercicios = new ReordenarEjercicios(
   bitacoraRepositorio,
 );
 export const guardarExamenCodigo = new GuardarExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+);
+export const previsualizarImportacionEjercicios = new PrevisualizarImportacionEjercicios(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  extraerTextoMd,
+);
+export const confirmarImportacionEjercicios = new ConfirmarImportacionEjercicios(
   examenCodigoRepositorio,
   claseRepositorio,
   materiaRepositorio,

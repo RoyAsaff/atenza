@@ -8,15 +8,18 @@ import {
   actualizarExamenCodigo,
   agregarEjercicio,
   cancelarExamenCodigo,
+  confirmarImportacionEjercicios,
   crearExamenCodigo,
   cuentaActiva,
   eliminarEjercicio,
   eliminarExamenCodigo,
   exigirExamenesCodigo,
+  exigirImportarWord,
   guardarExamenCodigo,
   lanzarExamenCodigo,
   pausarExamenCodigo,
   pausarIntentoCodigo,
+  previsualizarImportacionEjercicios,
   publicarNotasCodigo,
   reactivarExamenCodigo,
   reactivarIntentoCodigo,
@@ -32,6 +35,7 @@ import {
 } from '../dependencias';
 import { crearAutenticar } from '../middlewares/autenticar';
 import { autorizarContexto } from '../middlewares/autorizar';
+import { subirDocumentoMd } from '../middlewares/subir-archivos';
 
 export const examenesCodigoRouter = Router();
 
@@ -204,6 +208,63 @@ examenesCodigoRouter.post(
         dispositivo: req.headers['user-agent'],
       });
       res.status(201).json({ ejercicio });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST /api/materias/:id/examenes-codigo/:examenId/ejercicios/importar/previsualizar
+// Importar ejercicios desde Markdown: parsea el .md y devuelve lo que
+// entendió, sin escribir nada todavía (el docente revisa antes de confirmar).
+examenesCodigoRouter.post(
+  '/:id/examenes-codigo/:examenId/ejercicios/importar/previsualizar',
+  autenticar,
+  soloDocente,
+  cuentaActiva,
+  exigirImportarWord,
+  subirDocumentoMd.single('archivo'),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          error: 'ARCHIVO_REQUERIDO',
+          mensaje: 'Adjunta el archivo .md en el campo "archivo"',
+        });
+      }
+      const resultado = await previsualizarImportacionEjercicios.ejecutar({
+        materia_id: idNumerico.parse(req.params.id),
+        examen_codigo_id: idNumerico.parse(req.params.examenId),
+        docente_id: req.auth!.sub,
+        archivo: req.file.buffer,
+      });
+      res.json(resultado);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST /api/materias/:id/examenes-codigo/:examenId/ejercicios/importar/confirmar
+// Crea los ejercicios ya parseados (y revisados por el docente en el frontend).
+examenesCodigoRouter.post(
+  '/:id/examenes-codigo/:examenId/ejercicios/importar/confirmar',
+  autenticar,
+  soloDocente,
+  cuentaActiva,
+  exigirImportarWord,
+  async (req, res, next) => {
+    try {
+      const { ejercicios } = z.object({ ejercicios: z.array(esquemaEjercicio).min(1) }).parse(req.body);
+      const creados = await confirmarImportacionEjercicios.ejecutar({
+        materia_id: idNumerico.parse(req.params.id),
+        examen_codigo_id: idNumerico.parse(req.params.examenId),
+        docente_id: req.auth!.sub,
+        ejercicios: ejercicios.map((e) => ({ ...e, plantilla_codigo: e.plantilla_codigo ?? null })),
+        ip: req.ip,
+        dispositivo: req.headers['user-agent'],
+      });
+      res.status(201).json({ ejercicios: creados });
     } catch (error) {
       next(error);
     }

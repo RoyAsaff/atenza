@@ -41,3 +41,17 @@ export interface FilaMiAsistencia {
   tema: string;
   marcaje: MarcajeAsistencia;
 }
+
+/** Habilitación tardía (extensión de HU-15, 02/09): un estudiante que
+ * llega después de que la evaluación/guía/examen de código ya estaba
+ * lanzada, y al que la corrección de asistencia (Falta/Licencia → Puntual
+ * o Atrasado) le habilita el intento que se hubiera creado si hubiera
+ * estado presente al lanzar — ver HabilitarLanzamientosTardios. */
+export type TipoConvocatoriaTardia = 'evaluacion' | 'guia' | 'examen_codigo';
+
+export interface ConvocatoriaTardia {
+  tipo: TipoConvocatoriaTardia;
+  id: number;
+  tema: string;
+  estudiante_id: number;
+}

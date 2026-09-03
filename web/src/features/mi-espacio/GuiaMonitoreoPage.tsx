@@ -290,10 +290,18 @@ export function GuiaMonitoreoPage() {
       parcharFila(payload.intento_id, { incidentes: payload.incidentes });
     };
 
+    // Habilitación tardía (02/09): alguien se sumó a mitad de camino
+    // (corrigieron su asistencia) — no hay fila que parchear, hay que
+    // pedirla de vuelta completa (poco frecuente, igual que estado-actualizado).
+    const alEstudianteConvocado = () => {
+      queryClient.invalidateQueries({ queryKey: claveMonitoreo });
+    };
+
     socket.on('progreso', alProgreso);
     socket.on('incidente', alIncidente);
     socket.on('intento-actualizado', alIntentoActualizado);
     socket.on('estado-actualizado', alEstadoActualizado);
+    socket.on('estudiante-convocado', alEstudianteConvocado);
 
     return () => {
       socket.off('connect', unirseASala);
@@ -302,6 +310,7 @@ export function GuiaMonitoreoPage() {
       socket.off('incidente', alIncidente);
       socket.off('intento-actualizado', alIntentoActualizado);
       socket.off('estado-actualizado', alEstadoActualizado);
+      socket.off('estudiante-convocado', alEstudianteConvocado);
     };
   }, [guiaId, queryClient]);
 
