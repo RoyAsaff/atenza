@@ -42,6 +42,7 @@ import { api, mensajeDeError } from '../../core/api/cliente';
 import { obtenerSocket } from '../../core/realtime/socket';
 import { useAuth } from '../../core/auth/AuthContext';
 import { useModoKiosko } from '../../core/kiosco/useModoKiosko';
+import { marcarExamenActivo } from '../../core/actualizacion/estadoExamen';
 import {
   CasoParaRendir,
   EjercicioParaRendir,
@@ -970,14 +971,22 @@ export function ExamenCodigoPage({ onTerminado }: { onTerminado?: () => void } =
 
   // Modo kiosko nativo — arma los listeners de ventana solo mientras el
   // examen está efectivamente en curso.
+  const examenEnCurso = comenzado && !enviado && !cancelado;
   const intentoId = intento?.intento_id;
-  useModoKiosko(comenzado && !enviado && !cancelado, (tipo) => {
+  useModoKiosko(examenEnCurso, (tipo) => {
     setIncidentes((n) => n + 1);
     setAvisoIncidente(tipo);
     if (intentoId != null) {
       api.post(`/api/intentos-codigo/${intentoId}/incidente`, { tipo }).catch(() => {});
     }
   });
+
+  // Misma condición que el kiosko, espejada para useActualizarApp.ts: una
+  // actualización nunca se instala/reinicia con un examen activo.
+  useEffect(() => {
+    marcarExamenActivo(examenEnCurso);
+    return () => marcarExamenActivo(false);
+  }, [examenEnCurso]);
 
   function manejarComenzar() {
     setComenzado(true);

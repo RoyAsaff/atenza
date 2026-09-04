@@ -6,6 +6,7 @@
 // rendir exámenes de código.
 
 import { useAuth } from './core/auth/AuthContext';
+import { useActualizarApp } from './core/actualizacion/useActualizarApp';
 import { LoginPage } from './features/login/LoginPage';
 import { ExamenCodigoPage } from './features/examen/ExamenCodigoPage';
 
@@ -15,6 +16,9 @@ function PantallaCargando() {
 
 export default function App() {
   const { sesion, listo } = useAuth();
+  // Una sola vez por arranque, en paralelo — nunca bloquea login/uso (ver
+  // core/actualizacion/useActualizarApp.ts).
+  useActualizarApp();
 
   if (!listo) return <PantallaCargando />;
   if (!sesion) return <LoginPage />;

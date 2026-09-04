@@ -1,0 +1,59 @@
+name: Publicar app de escritorio
+
+# Genera el instalador de desktop/ (Windows — la app solo se distribuye para
+# Windows hoy, ver desktop/README.md) y lo publica como GitHub Release. Esa
+# release es también el "servidor de actualizaciones": el updater de la app
+# (desktop/src/core/actualizacion/) apunta a
+# releases/latest/download/latest.json, que tauri-action genera solo si
+# encuentra el plugin updater configurado en tauri.conf.json.
+#
+# A diferencia de deploy-backend.yml/deploy-web.yml, esto NO se dispara con
+# cada push — un instalador nuevo es una decisión consciente de Roy (bump de
+# "version" en desktop/src-tauri/tauri.conf.json, commit, después correr
+# este workflow a mano desde la pestaña Actions).
+#
+# El repo es público, así que releases/latest/download/*.json y el
+# instalador se sirven directo desde GitHub sin ningún servidor propio ni
+# acceso SSH — evita el problema de siempre en este repo (sin SSH access
+# desde la máquina de desarrollo) para esta parte del proyecto.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publicar:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Instalar dependencias
+        working-directory: desktop
+        run: npm ci
+      - name: Buildear y publicar la release (con el instalador firmado)
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # VITE_API_URL: mismo "Repository variable" que usa deploy-web.yml
+          # (la URL pública del backend en Hetzner) — queda quemada en el
+          # build, igual que hoy en desktop/.env de producción.
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: desktop
+          tagName: desktop-v__VERSION__
+          releaseName: 'Atenza Exámenes v__VERSION__'
+          releaseBody: 'Ver los assets para descargar el instalador. Quien ya tenga la app instalada la recibe sola la próxima vez que la abra.'
+          releaseDraft: false
+          prerelease: false
+          # Default true, pero explícito a propósito: es la única razón de
+          # que releases/latest/download/latest.json exista y el updater
+          # de la app funcione.
+          uploadUpdaterJson: true

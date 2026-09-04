@@ -60,6 +60,47 @@ Genera el `.msi`/`.exe` (NSIS) en `src-tauri/target/release/bundle/`. El
 (`src-tauri/icons/`) — reemplazar con `npm run tauri icon <ruta-al-logo>`
 cuando haya un ícono de Atenza en alta resolución.
 
+Esto es para probar un build local — para **repartir una versión nueva a
+los estudiantes** ver "Publicar una actualización" abajo, que además firma
+el instalador (un build local sin las variables `TAURI_SIGNING_PRIVATE_KEY*`
+no lo firma, y el updater rechaza instaladores sin firma).
+
+## Actualización automática
+
+La app se actualiza sola: al arrancar (una sola vez, nunca en medio de la
+sesión) chequea si hay una versión nueva contra
+`releases/latest/download/latest.json` de este repo en GitHub (es público,
+no hace falta servidor propio ni SSH al VPS — ver
+`desktop/src/core/actualizacion/`). Si hay una, la descarga en segundo
+plano; recién si en ESE momento no hay un examen en curso la instala y
+reinicia la app sola. Si el estudiante arrancó un examen mientras se
+descargaba, la actualización se descarta y se reintenta en el próximo
+arranque en frío — nunca interrumpe un intento activo.
+
+Los instaladores no se firman con cualquier clave: hay un keypair de
+actualización propio de Atenza (generado con `tauri signer generate`). La
+privada + su contraseña ya están cargadas como secrets del repo en GitHub
+(`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) — **no
+existen en ningún lado del código ni de este README**. La pública vive en
+`src-tauri/tauri.conf.json` (`plugins.updater.pubkey`), esa sí es pública a
+propósito. Si esa clave privada se pierde, no se puede firmar una
+actualización nueva y hay que generar un keypair nuevo (lo que además
+invalida el `pubkey` quemado en todos los instaladores ya repartidos —
+tendrían que reinstalarse a mano una última vez).
+
+### Publicar una actualización
+
+1. Subir `version` en `src-tauri/tauri.conf.json` (semver, ej. `0.1.0` →
+   `0.2.0`) y commitear a `main`.
+2. Correr el workflow **"Publicar app de escritorio"** a mano desde la
+   pestaña Actions del repo (`workflow_dispatch` — a propósito no se
+   dispara solo con cada push, un instalador nuevo es una decisión
+   consciente, mismo criterio que las migraciones de `deploy-backend.yml`).
+3. Eso buildea el `.msi`, lo firma, y crea una GitHub Release con el
+   instalador + `latest.json`. Quien instale desde cero baja el instalador
+   de esa release; quien ya tenga la app abierta la recibe sola la próxima
+   vez que la abra (ver arriba).
+
 ## Decisiones aplicadas (ver plan completo en el epic E9)
 
 - Sesión persistida en disco (Tauri Store), igual que mobile
