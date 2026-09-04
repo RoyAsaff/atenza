@@ -47,6 +47,7 @@ export interface EjercicioParaRendir {
   total_casos: number;
   ultimo_codigo: string | null;
   ultimo_resultado: ResultadoCaso[] | null;
+  enviado_en: string | null;
 }
 
 export interface IntentoCodigoParaRendir {
@@ -55,6 +56,7 @@ export interface IntentoCodigoParaRendir {
   tema: string;
   nota: number;
   estado: EstadoIntento;
+  fecha_inicio: string;
   fecha_limite: string | null;
   ejercicios: EjercicioParaRendir[];
 }
@@ -63,4 +65,5 @@ export interface ResultadoEnvio {
   casos_acertados: number;
   casos_totales: number;
   resultados_visibles: ResultadoCaso[];
+  enviado_en: string;
 }

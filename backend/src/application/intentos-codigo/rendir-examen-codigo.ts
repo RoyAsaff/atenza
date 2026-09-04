@@ -113,6 +113,7 @@ export class VerIntentoCodigoActual {
           total_casos: ejercicio.casos_prueba.length,
           ultimo_codigo: respuesta?.codigo_fuente ?? null,
           ultimo_resultado: filtrarResultadosVisibles(respuesta?.resultado_json ?? null, idsVisibles),
+          enviado_en: respuesta?.respondida_en ?? null,
         };
       });
 
@@ -122,6 +123,7 @@ export class VerIntentoCodigoActual {
       tema: conEjercicios.tema,
       nota: conEjercicios.nota,
       estado: intento.estado,
+      fecha_inicio: intento.fecha_inicio,
       fecha_limite: intento.fecha_limite,
       ejercicios,
     };
@@ -196,7 +198,7 @@ export class EnviarRespuestaCodigo {
     const casos_acertados = resultado_json.filter((r) => r.paso).length;
     const casos_totales = ejercicio.casos_prueba.length;
 
-    await this.intentos.guardarRespuesta({
+    const guardada = await this.intentos.guardarRespuesta({
       intento_id: intento.id,
       ejercicio_id: ejercicio.id,
       codigo_fuente: entrada.codigo_fuente,
@@ -216,6 +218,7 @@ export class EnviarRespuestaCodigo {
       casos_acertados,
       casos_totales,
       resultados_visibles: resultado_json.filter((r) => idsVisibles.has(r.caso_id)),
+      enviado_en: guardada.respondida_en,
     };
   }
 }

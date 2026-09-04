@@ -86,6 +86,9 @@ export interface EjercicioParaRendir {
   /** Resultado de la última corrida, si la hay (para repintar el panel de
    * pruebas al reanudar sin que el estudiante tenga que volver a correr). */
   ultimo_resultado: ResultadoCaso[] | null;
+  /** Cuándo se hizo el último "Enviar" (RespuestaCodigo.respondida_en), para
+   * que la hora de entrega sobreviva a un refresh/reconexión del cliente. */
+  enviado_en: Date | null;
 }
 
 export interface IntentoCodigoParaRendir {
@@ -94,6 +97,10 @@ export interface IntentoCodigoParaRendir {
   tema: string;
   nota: number;
   estado: EstadoIntento;
+  /** Junto con `fecha_limite`, le da al cliente la duración total del
+   * examen (para la barra de progreso de tiempo) sin depender de que el
+   * cliente haya estado presente al lanzarlo. */
+  fecha_inicio: Date;
   fecha_limite: Date | null;
   ejercicios: EjercicioParaRendir[];
 }
@@ -106,6 +113,7 @@ export interface ResultadoEnvio {
   casos_acertados: number;
   casos_totales: number;
   resultados_visibles: ResultadoCaso[];
+  enviado_en: Date;
 }
 
 // ── HU-25-equivalente · "Ver examen" del docente ────────────────────

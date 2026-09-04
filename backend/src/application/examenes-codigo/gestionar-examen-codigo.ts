@@ -199,6 +199,21 @@ export class LanzarExamenCodigo {
       throw new EstadoInvalidoError('El examen no tiene ejercicios');
     }
 
+    // Anti-hardcodeo: un ejercicio sin ningún caso oculto expone TODA su
+    // entrada/salida_esperada al estudiante (ver EjercicioParaRendir) — le
+    // alcanzaría con un print() del valor esperado para pasar todos los
+    // casos. Exigir al menos un caso oculto por ejercicio antes de lanzar.
+    const sinOcultos = conEjercicios.ejercicios.filter(
+      (e) => !e.casos_prueba.some((c) => c.es_oculto),
+    );
+    if (sinOcultos.length > 0) {
+      throw new EstadoInvalidoError(
+        `Cada ejercicio necesita al menos un caso de prueba oculto antes de lanzar (falta en: ${sinOcultos
+          .map((e) => `#${e.orden + 1}`)
+          .join(', ')})`,
+      );
+    }
+
     const fecha_limite = examen.tiempo_limite_minutos
       ? new Date(Date.now() + examen.tiempo_limite_minutos * 60_000)
       : null;

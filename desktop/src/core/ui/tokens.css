@@ -6,11 +6,13 @@
 
 @import 'tailwindcss';
 @import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource-variable/jetbrains-mono';
 
 @theme {
   /* ── Tipografía ── */
   --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system,
     'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace;
 
   /* ── Primary (navy) ── */
   --color-primary-50: #f2f5fa;
@@ -91,4 +93,15 @@
   --duration-base: 200ms;
   --duration-slow: 250ms;
   --ease-atenza: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Superficies del examen de código en curso (ver handoff de diseño
+     "Examen en curso (rediseño)") — literales porque hoy solo las usa esa
+     pantalla; si otra pantalla las necesita vale la pena repensarlas como
+     tokens de marca en vez de exam-*. ── */
+  --color-exam-root: #142334;
+  --color-exam-panel: #182c49; /* nav de ejercicios, panel de resultados */
+  --color-exam-statement: #1a2f4d; /* columna de enunciado y casos */
+  --color-exam-bar: #16283f; /* barras de archivo/acciones, celdas de código */
+  --color-exam-editor: #0f1d31; /* fondo del editor */
+  --color-exam-on-teal: #0c2436; /* texto sobre secondary-600 */
 }

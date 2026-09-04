@@ -337,6 +337,13 @@ function TarjetaEjercicio({
               {ocultos.length > 0 &&
                 ` · ${ocultos.length} oculto${ocultos.length === 1 ? '' : 's'}`}
             </p>
+            {ocultos.length === 0 && (
+              <p className="mt-1 flex items-center gap-1 text-xs text-warning">
+                <Badge tone="warning">Sin casos ocultos</Badge>
+                Cualquier estudiante puede pasar este ejercicio con un simple print() de la
+                salida esperada. Marca al menos un caso como oculto antes de lanzar.
+              </p>
+            )}
           </div>
         </div>
         {editable && (
