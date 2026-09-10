@@ -1,4 +1,5 @@
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from './cn';
 import { useUnmountAnim } from './useUnmountAnim';
 
@@ -12,12 +13,17 @@ export function Dropdown({
   children: ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
+  const [posicion, setPosicion] = useState<{ top: number; left?: number; right?: number } | null>(null);
   const raizRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { montado, saliendo } = useUnmountAnim(abierto);
 
   useEffect(() => {
     function alClicFuera(e: MouseEvent) {
-      if (raizRef.current && !raizRef.current.contains(e.target as Node)) setAbierto(false);
+      const objetivo = e.target as Node;
+      const dentroDelTrigger = raizRef.current?.contains(objetivo);
+      const dentroDelMenu = menuRef.current?.contains(objetivo);
+      if (!dentroDelTrigger && !dentroDelMenu) setAbierto(false);
     }
     function alTeclado(e: KeyboardEvent) {
       if (e.key === 'Escape') setAbierto(false);
@@ -32,24 +38,54 @@ export function Dropdown({
     };
   }, [abierto]);
 
+  // El menú se renderiza en un portal a <body> (ver return más abajo) para
+  // no quedar recortado por algún ancestro con overflow-hidden/auto — p.ej.
+  // el contenedor redondeado del header de Monitoreo, que antes cortaba el
+  // último ítem ("Cancelar examen") cuando el menú se abría ahí. Al vivir
+  // fuera del árbol del trigger, su posición hay que calcularla a mano en
+  // base al rect real del trigger, y recalcularla si se hace scroll/resize
+  // mientras está abierto.
+  useLayoutEffect(() => {
+    if (!abierto || !raizRef.current) return;
+    function actualizarPosicion() {
+      const rect = raizRef.current!.getBoundingClientRect();
+      setPosicion(
+        align === 'end'
+          ? { top: rect.bottom + 8, right: window.innerWidth - rect.right }
+          : { top: rect.bottom + 8, left: rect.left },
+      );
+    }
+    actualizarPosicion();
+    window.addEventListener('scroll', actualizarPosicion, true);
+    window.addEventListener('resize', actualizarPosicion);
+    return () => {
+      window.removeEventListener('scroll', actualizarPosicion, true);
+      window.removeEventListener('resize', actualizarPosicion);
+    };
+  }, [abierto, align]);
+
   return (
     <div ref={raizRef} className="relative inline-block" onClick={() => setAbierto((v) => !v)}>
       {trigger({ abierto })}
-      {montado && (
-        <div
-          role="menu"
-          onClick={(e) => e.stopPropagation()}
-          className={cn(
-            'absolute z-30 mt-2 min-w-48 rounded-lg border border-border bg-surface p-1 shadow-md',
-            align === 'end' ? 'right-0' : 'left-0',
-          )}
-          style={{
-            animation: `${saliendo ? 'atenza-fade-out' : 'atenza-scale-in'} var(--duration-fast) var(--ease-atenza)`,
-          }}
-        >
-          {children}
-        </div>
-      )}
+      {montado &&
+        posicion &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            onClick={(e) => e.stopPropagation()}
+            className={cn('fixed z-30 min-w-48 rounded-lg border border-border bg-surface p-1 shadow-md')}
+            style={{
+              top: posicion.top,
+              left: posicion.left,
+              right: posicion.right,
+              animation: `${saliendo ? 'atenza-fade-out' : 'atenza-scale-in'} var(--duration-fast) var(--ease-atenza)`,
+            }}
+          >
+            {children}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

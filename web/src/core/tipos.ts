@@ -413,6 +413,21 @@ export interface ExamenCodigoConClase extends ExamenCodigo {
   };
 }
 
+// "Reutilizar examen de código": todos los del docente en cualquiera de sus
+// materias, con el dato de la materia — para el selector cross-materia.
+export interface ExamenCodigoConMateria extends ExamenCodigo {
+  clase: {
+    id: number;
+    fecha: string;
+    hora: string;
+    tema: string;
+  };
+  materia: {
+    id: number;
+    nombre_materia: string;
+  };
+}
+
 export type TipoIncidenteCodigo = 'perdida_foco' | 'ventana_minimizada' | 'intento_cierre';
 
 export interface FilaMonitoreoCodigo {

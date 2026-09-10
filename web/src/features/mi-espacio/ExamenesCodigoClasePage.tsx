@@ -1,24 +1,28 @@
 // E9 · Exámenes de código Python de una clase — calcado de
-// EvaluacionesClasePage.tsx (E6). Sin pestaña "Reutilizar existente": el
-// backend de E9 todavía no tiene un endpoint de duplicar examen de código.
+// EvaluacionesClasePage.tsx (E6), con pestaña "Reutilizar existente" (10/09).
 
 import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Code2, Plus } from 'lucide-react';
+import { Code2, Plus, Search } from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
-import { EstadoEvaluacion, ExamenCodigo, Materia } from '../../core/tipos';
+import { EstadoEvaluacion, ExamenCodigo, ExamenCodigoConMateria, Materia } from '../../core/tipos';
 import {
   Badge,
   Button,
   Campo,
   Card,
+  cn,
   EmptyState,
   Input,
   Modal,
   PageBreadcrumb,
   PageHeader,
   Spinner,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '../../core/ui/ui';
 
 const ESTADO_TONO: Record<EstadoEvaluacion, { texto: string; tono: 'neutral' | 'success' | 'info' | 'dark' }> = {
@@ -27,6 +31,14 @@ const ESTADO_TONO: Record<EstadoEvaluacion, { texto: string; tono: 'neutral' | '
   lanzada: { texto: 'Lanzada', tono: 'info' },
   finalizada: { texto: 'Finalizada', tono: 'dark' },
 };
+
+function fechaClaseCorta(iso: string): string {
+  return new Date(iso).toLocaleDateString('es', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'UTC', // la fecha viaja como medianoche UTC
+  });
+}
 
 // ── Modal "+ Nuevo examen de código" ──────────────────────────────
 
@@ -41,9 +53,19 @@ function ModalNuevoExamenCodigo({
 }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [modo, setModo] = useState<'nuevo' | 'reutilizar'>('nuevo');
   const [tema, setTema] = useState('');
   const [nota, setNota] = useState('100');
+  const [busqueda, setBusqueda] = useState('');
+  const [origenId, setOrigenId] = useState<number | null>(null);
   const [error, setError] = useState('');
+
+  const invalidarYCerrar = (nuevoExamenId: number) => {
+    setError('');
+    queryClient.invalidateQueries({ queryKey: ['examenes-codigo', String(claseId)] });
+    onCerrar();
+    navigate(`/materias/${materiaId}/examenes-codigo/${nuevoExamenId}`);
+  };
 
   const crear = useMutation({
     mutationFn: () =>
@@ -51,56 +73,165 @@ function ModalNuevoExamenCodigo({
         `/api/materias/${materiaId}/clases/${claseId}/examenes-codigo`,
         { tema, nota: Number(nota) },
       ),
-    onSuccess: ({ data }) => {
-      setError('');
-      queryClient.invalidateQueries({ queryKey: ['examenes-codigo', String(claseId)] });
-      onCerrar();
-      navigate(`/materias/${materiaId}/examenes-codigo/${data.examen.id}`);
-    },
+    onSuccess: ({ data }) => invalidarYCerrar(data.examen.id),
     onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
-  function manejarEnvio(e: FormEvent) {
+  const { data: misExamenes, isLoading: cargandoMisExamenes } = useQuery({
+    queryKey: ['mis-examenes-codigo'],
+    queryFn: async () => {
+      const { data } = await api.get<{ examenes: ExamenCodigoConMateria[] }>(
+        '/api/mi-espacio/examenes-codigo',
+      );
+      return data.examenes;
+    },
+    enabled: modo === 'reutilizar',
+  });
+
+  const duplicar = useMutation({
+    mutationFn: () =>
+      api.post<{ examen: { id: number } }>(
+        `/api/materias/${materiaId}/clases/${claseId}/examenes-codigo/duplicar`,
+        { examen_origen_id: origenId },
+      ),
+    onSuccess: ({ data }) => invalidarYCerrar(data.examen.id),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
+  });
+
+  function manejarEnvioNuevo(e: FormEvent) {
     e.preventDefault();
     crear.mutate();
   }
 
+  function manejarEnvioDuplicar(e: FormEvent) {
+    e.preventDefault();
+    duplicar.mutate();
+  }
+
+  const examenesFiltrados = (misExamenes ?? []).filter((ex) => {
+    const texto = `${ex.materia.nombre_materia} ${ex.tema}`.toLowerCase();
+    return texto.includes(busqueda.toLowerCase());
+  });
+
   return (
-    <Modal onCerrar={onCerrar} eyebrow="Nuevo examen de código" titulo="Datos generales">
-      <p className="mb-4 text-sm text-text-secondary">
-        Queda en <span className="font-medium text-text">Borrador</span>, invisible para los
-        estudiantes, hasta que lo guardes.
-      </p>
-      <form onSubmit={manejarEnvio} className="space-y-4">
-        <Campo etiqueta="Título / tema">
-          <Input
-            required
-            autoFocus
-            value={tema}
-            onChange={(e) => setTema(e.target.value)}
-            placeholder="p. ej. Práctica de bucles y funciones"
-          />
-        </Campo>
-        <Campo etiqueta="Nota total" ayuda="Cada ejercicio valdrá su propia nota, hasta sumar esta.">
-          <Input
-            type="number"
-            min={1}
-            required
-            value={nota}
-            onChange={(e) => setNota(e.target.value)}
-            className="w-32"
-          />
-        </Campo>
-        <div className="flex items-center gap-3 pt-1">
-          <Button type="submit" disabled={crear.isPending}>
-            {crear.isPending ? 'Creando…' : 'Crear examen'}
-          </Button>
-          <Button type="button" variante="ghost" onClick={onCerrar}>
-            Cancelar
-          </Button>
-        </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </form>
+    <Modal
+      onCerrar={onCerrar}
+      eyebrow="Nuevo examen de código"
+      titulo="Datos generales"
+      maxWidth={modo === 'reutilizar' ? 'max-w-2xl' : 'max-w-lg'}
+    >
+      <Tabs
+        value={modo}
+        onValueChange={(v) => {
+          setModo(v as 'nuevo' | 'reutilizar');
+          setError('');
+        }}
+      >
+        <TabsList className="mb-4">
+          <TabsTrigger value="nuevo">Desde cero</TabsTrigger>
+          <TabsTrigger value="reutilizar">Reutilizar existente</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="nuevo">
+          <p className="mb-4 text-sm text-text-secondary">
+            Queda en <span className="font-medium text-text">Borrador</span>, invisible para los
+            estudiantes, hasta que lo guardes.
+          </p>
+          <form onSubmit={manejarEnvioNuevo} className="space-y-4">
+            <Campo etiqueta="Título / tema">
+              <Input
+                required
+                autoFocus
+                value={tema}
+                onChange={(e) => setTema(e.target.value)}
+                placeholder="p. ej. Práctica de bucles y funciones"
+              />
+            </Campo>
+            <Campo etiqueta="Nota total" ayuda="Cada ejercicio valdrá su propia nota, hasta sumar esta.">
+              <Input
+                type="number"
+                min={1}
+                required
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                className="w-32"
+              />
+            </Campo>
+            <div className="flex items-center gap-3 pt-1">
+              <Button type="submit" disabled={crear.isPending}>
+                {crear.isPending ? 'Creando…' : 'Crear examen'}
+              </Button>
+              <Button type="button" variante="ghost" onClick={onCerrar}>
+                Cancelar
+              </Button>
+            </div>
+            {error && modo === 'nuevo' && <p className="text-sm text-red-600">{error}</p>}
+          </form>
+        </TabsContent>
+
+        <TabsContent value="reutilizar">
+          <p className="mb-4 text-sm text-text-secondary">
+            Se copian el tema, la nota y todos los ejercicios (con sus casos de prueba) del examen
+            elegido en esta clase; la copia queda en{' '}
+            <span className="font-medium text-text">Borrador</span> para que la revises antes de
+            lanzarla.
+          </p>
+          <form onSubmit={manejarEnvioDuplicar} className="space-y-4">
+            <Campo etiqueta="Buscar examen de código">
+              <Input
+                iconoIzq={<Search size={16} />}
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Por materia o tema…"
+              />
+            </Campo>
+
+            <div className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-border p-1">
+              {cargandoMisExamenes && (
+                <div className="flex items-center gap-2 p-3 text-sm text-text-secondary">
+                  <Spinner /> Cargando…
+                </div>
+              )}
+              {!cargandoMisExamenes && examenesFiltrados.length === 0 && (
+                <p className="p-3 text-sm text-text-secondary">
+                  No se encontraron exámenes de código para reutilizar.
+                </p>
+              )}
+              {examenesFiltrados.map((ex) => (
+                <button
+                  key={ex.id}
+                  type="button"
+                  onClick={() => setOrigenId(ex.id)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition',
+                    origenId === ex.id
+                      ? 'bg-primary-50 ring-1 ring-primary-200'
+                      : 'hover:bg-surface-hover',
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-text">{ex.tema}</p>
+                    <p className="truncate text-xs text-text-secondary">
+                      {ex.materia.nombre_materia} · {fechaClaseCorta(ex.clase.fecha)}
+                    </p>
+                  </div>
+                  <Badge tone={ESTADO_TONO[ex.estado].tono}>{ESTADO_TONO[ex.estado].texto}</Badge>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <Button type="submit" disabled={duplicar.isPending || !origenId}>
+                {duplicar.isPending ? 'Duplicando…' : 'Duplicar examen'}
+              </Button>
+              <Button type="button" variante="ghost" onClick={onCerrar}>
+                Cancelar
+              </Button>
+            </div>
+            {error && modo === 'reutilizar' && <p className="text-sm text-red-600">{error}</p>}
+          </form>
+        </TabsContent>
+      </Tabs>
     </Modal>
   );
 }

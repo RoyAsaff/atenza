@@ -51,3 +51,19 @@ export interface ExamenCodigoConClase extends ExamenCodigo {
     tema: string;
   };
 }
+
+/** "Reutilizar examen de código": todos los exámenes del docente en
+ * cualquiera de sus materias, con el dato de la materia — para el selector
+ * cross-materia (calcado de EvaluacionConMateria). */
+export interface ExamenCodigoConMateria extends ExamenCodigo {
+  clase: {
+    id: number;
+    fecha: Date;
+    hora: string;
+    tema: string;
+  };
+  materia: {
+    id: number;
+    nombre_materia: string;
+  };
+}

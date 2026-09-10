@@ -11,6 +11,7 @@ import {
   confirmarImportacionEjercicios,
   crearExamenCodigo,
   cuentaActiva,
+  duplicarExamenCodigo,
   eliminarEjercicio,
   eliminarExamenCodigo,
   exigirExamenesCodigo,
@@ -74,6 +75,33 @@ examenesCodigoRouter.post(
         docente_id: req.auth!.sub,
         tema,
         nota,
+        ip: req.ip,
+        dispositivo: req.headers['user-agent'],
+      });
+      res.status(201).json({ examen });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// POST /api/materias/:id/clases/:claseId/examenes-codigo/duplicar — "Reutilizar
+// examen de código": clona tema/nota/ejercicios/casos de uno propio (de
+// cualquier materia) en esta clase.
+examenesCodigoRouter.post(
+  '/:id/clases/:claseId/examenes-codigo/duplicar',
+  autenticar,
+  soloDocente,
+  cuentaActiva,
+  exigirExamenesCodigo,
+  async (req, res, next) => {
+    try {
+      const { examen_origen_id } = z.object({ examen_origen_id: idNumerico }).parse(req.body);
+      const examen = await duplicarExamenCodigo.ejecutar({
+        materia_id: idNumerico.parse(req.params.id),
+        clase_id: idNumerico.parse(req.params.claseId),
+        examen_origen_id,
+        docente_id: req.auth!.sub,
         ip: req.ip,
         dispositivo: req.headers['user-agent'],
       });

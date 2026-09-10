@@ -9,6 +9,7 @@ import {
   tokenService,
   verClasesDeHoy,
   verEvaluacionesDocente,
+  verExamenesCodigoDocente,
   verPendientesDocente,
 } from '../dependencias';
 import { crearAutenticar } from '../middlewares/autenticar';
@@ -59,6 +60,18 @@ miEspacioRouter.get('/evaluaciones', autenticar, soloDocente, async (req, res, n
   try {
     const evaluaciones = await verEvaluacionesDocente.ejecutar({ docente_id: req.auth!.sub });
     res.json({ evaluaciones });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/mi-espacio/examenes-codigo — todos los exámenes de código del
+// docente en cualquiera de sus materias, para el selector de "Reutilizar
+// examen de código" (E9, calcado de /mi-espacio/evaluaciones).
+miEspacioRouter.get('/examenes-codigo', autenticar, soloDocente, async (req, res, next) => {
+  try {
+    const examenes = await verExamenesCodigoDocente.ejecutar({ docente_id: req.auth!.sub });
+    res.json({ examenes });
   } catch (error) {
     next(error);
   }

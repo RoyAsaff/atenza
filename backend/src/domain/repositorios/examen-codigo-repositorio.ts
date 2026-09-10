@@ -5,6 +5,7 @@ import {
   ExamenCodigo,
   ExamenCodigoConClase,
   ExamenCodigoConEjercicios,
+  ExamenCodigoConMateria,
 } from '../entidades/examen-codigo';
 
 export interface DatosNuevoExamenCodigo {
@@ -31,6 +32,9 @@ export interface ExamenCodigoRepositorio {
   buscarConEjercicios(id: number): Promise<ExamenCodigoConEjercicios | null>;
   listarPorClase(clase_id: number): Promise<ExamenCodigo[]>;
   listarPorMateriaConClase(materia_id: number): Promise<ExamenCodigoConClase[]>;
+  /** "Reutilizar examen de código": todos los del docente en cualquiera de
+   * sus materias, ordenados por fecha de creación descendente. */
+  listarPorDocente(docente_id: number): Promise<ExamenCodigoConMateria[]>;
   crear(datos: DatosNuevoExamenCodigo): Promise<ExamenCodigo>;
   actualizar(
     id: number,

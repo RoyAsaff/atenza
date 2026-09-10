@@ -156,12 +156,14 @@ import {
   AgregarEjercicio,
   ActualizarEjercicio,
   CrearExamenCodigo,
+  DuplicarExamenCodigo,
   EliminarEjercicio,
   EliminarExamenCodigo,
   GuardarExamenCodigo,
   ReordenarEjercicios,
   VerExamenCodigo,
   VerExamenesCodigo,
+  VerExamenesCodigoDocente,
   VerExamenesCodigoMateria,
 } from '../application/examenes-codigo/gestionar-examenes-codigo';
 import {
@@ -819,6 +821,13 @@ export const verExamenesCodigo = new VerExamenesCodigo(
 export const verExamenesCodigoMateria = new VerExamenesCodigoMateria(
   examenCodigoRepositorio,
   materiaRepositorio,
+);
+export const verExamenesCodigoDocente = new VerExamenesCodigoDocente(examenCodigoRepositorio);
+export const duplicarExamenCodigo = new DuplicarExamenCodigo(
+  examenCodigoRepositorio,
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
 );
 export const verExamenCodigo = new VerExamenCodigo(
   examenCodigoRepositorio,

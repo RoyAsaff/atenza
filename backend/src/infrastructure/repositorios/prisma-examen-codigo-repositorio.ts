@@ -6,6 +6,7 @@ import {
   ExamenCodigo,
   ExamenCodigoConClase,
   ExamenCodigoConEjercicios,
+  ExamenCodigoConMateria,
 } from '../../domain/entidades/examen-codigo';
 import {
   DatosCasoPrueba,
@@ -43,6 +44,29 @@ export class PrismaExamenCodigoRepositorio implements ExamenCodigoRepositorio {
       include: { clase: { select: { id: true, fecha: true, hora: true, tema: true } } },
       orderBy: [{ clase: { fecha: 'desc' } }, { id: 'desc' }],
     });
+  }
+
+  async listarPorDocente(docente_id: number): Promise<ExamenCodigoConMateria[]> {
+    const examenes = await this.prisma.examenCodigo.findMany({
+      where: { clase: { materia: { docente_id } } },
+      include: {
+        clase: {
+          select: {
+            id: true,
+            fecha: true,
+            hora: true,
+            tema: true,
+            materia: { select: { id: true, nombre_materia: true } },
+          },
+        },
+      },
+      orderBy: { creado_en: 'desc' },
+    });
+    return examenes.map(({ clase: { materia, ...clase }, ...examen }) => ({
+      ...examen,
+      clase,
+      materia,
+    }));
   }
 
   async crear(datos: DatosNuevoExamenCodigo): Promise<ExamenCodigo> {

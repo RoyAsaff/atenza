@@ -57,3 +57,23 @@ jobs:
           # que releases/latest/download/latest.json exista y el updater
           # de la app funcione.
           uploadUpdaterJson: true
+
+      - name: Publicar copia del instalador con nombre fijo (para el link de la landing)
+        # tauri-action nombra el .exe con productName+versión (ej.
+        # "Atenza Exámenes_0.1.1_x64-setup.exe", con espacios/acentos que
+        # GitHub normaliza a puntos al subirlo) — ese nombre cambia en cada
+        # release, así que la landing (web/src/features/landing/LandingPage.tsx,
+        # URL_DESKTOP_WINDOWS) no puede apuntarle directo sin actualizarse a
+        # mano cada vez. Subimos además una copia con nombre fijo para que
+        # ese link ("releases/latest/download/Atenza-Examenes-Setup.exe")
+        # siga funcionando siempre, igual que el del APK.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eo pipefail
+          VERSION=$(node -p "require('./desktop/src-tauri/tauri.conf.json').version")
+          TAG="desktop-v${VERSION}"
+          SETUP=$(find desktop/src-tauri/target/release/bundle/nsis -name '*-setup.exe' | head -n1)
+          cp "$SETUP" Atenza-Examenes-Setup.exe
+          gh release upload "$TAG" Atenza-Examenes-Setup.exe --clobber -R "$GITHUB_REPOSITORY"
