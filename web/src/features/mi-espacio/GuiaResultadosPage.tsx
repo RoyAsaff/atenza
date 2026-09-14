@@ -2,6 +2,11 @@
 // intentos totales (oficial + repasos), incidencias, y las acciones de
 // pausar/reactivar/cancelar del intento oficial. Calca ResultadosPage y
 // MonitoreoPage de exámenes.
+//
+// 13/09: mismo lenguaje visual que MonitoreoPage (design_handoff_monitoreo,
+// 18/08) — encabezado con punto de estado, tabla nativa con encabezado
+// uppercase y pie con el total, en vez del Card/PageHeader/Tabla genérico
+// de antes.
 
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -9,24 +14,8 @@ import { Link, useParams } from 'react-router-dom';
 import { AlertTriangle, ClipboardCheck } from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
 import { obtenerSocket } from '../../core/realtime/socket';
-import { EstadoIntento, FilaResultadoGuia, Guia } from '../../core/tipos';
-import {
-  Alert,
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  PageBreadcrumb,
-  PageHeader,
-  Spinner,
-  Tabla,
-  Tbody,
-  Td,
-  Th,
-  Thead,
-  Tr,
-} from '../../core/ui/ui';
+import { EstadoGuia, EstadoIntento, FilaResultadoGuia, Guia } from '../../core/tipos';
+import { Alert, Badge, cn, PageBreadcrumb } from '../../core/ui/ui';
 
 const ESTADO_INTENTO_TONO: Record<
   EstadoIntento,
@@ -37,6 +26,13 @@ const ESTADO_INTENTO_TONO: Record<
   finalizado: { texto: 'Finalizado', tono: 'dark' },
   desconectado: { texto: 'Desconectado', tono: 'neutral' },
   cancelado: { texto: 'Cancelado', tono: 'neutral' },
+};
+
+const ESTADO_GUIA_TEXTO: Record<EstadoGuia, string> = {
+  publicada: 'Publicada',
+  lanzada: 'Lanzada',
+  cerrada: 'Cerrada',
+  externa_legacy: 'Externa',
 };
 
 function FilaResultado({
@@ -77,51 +73,52 @@ function FilaResultado({
   });
 
   return (
-    <Tr>
-      <Td className="font-medium">
+    <tr className="border-b border-neutral-100 transition last:border-b-0 hover:bg-surface-hover">
+      <td className="px-4 py-2 text-[14px] font-semibold text-text">
         {fila.apellidos} {fila.nombres}
-      </Td>
-      <Td>
+      </td>
+      <td className="px-4 py-2">
         {fila.estado_oficial ? (
           <Badge tone={ESTADO_INTENTO_TONO[fila.estado_oficial].tono}>
             {ESTADO_INTENTO_TONO[fila.estado_oficial].texto}
           </Badge>
         ) : (
-          <span className="text-text-disabled">—</span>
+          <span className="font-mono text-[12px] text-text-disabled">—</span>
         )}
-      </Td>
-      <Td className="text-text-secondary">
+      </td>
+      <td className="px-4 py-2 text-text-secondary">
         {fila.aciertos !== null ? (
           `${fila.aciertos}/${fila.total_preguntas}`
         ) : (
-          <span className="text-text-disabled">—</span>
+          <span className="font-mono text-[12px] text-text-disabled">—</span>
         )}
-      </Td>
-      <Td className="text-text-secondary">
+      </td>
+      <td className="px-4 py-2 text-text-secondary">
         {fila.nota_obtenida !== null ? (
           `${fila.nota_obtenida}/${fila.nota_total}`
         ) : (
           <span className="text-accent-700">Pendiente</span>
         )}
-      </Td>
-      <Td className="text-text-secondary">{fila.total_intentos}</Td>
-      <Td>
+      </td>
+      <td className="px-4 py-2 text-text-secondary">{fila.total_intentos}</td>
+      <td className="px-4 py-2">
         {fila.incidentes > 0 ? (
-          <span className="inline-flex items-center gap-1 font-medium text-red-600">
-            <AlertTriangle size={14} /> {fila.incidentes}
+          <span className="inline-flex items-center gap-1 rounded-full bg-accent-50 px-2 py-[2px] text-[11px] font-bold text-accent-700">
+            <AlertTriangle size={11} />
+            {fila.incidentes}
           </span>
         ) : (
-          <span className="text-text-disabled">—</span>
+          <span className="font-mono text-[12px] text-text-disabled">—</span>
         )}
-      </Td>
-      <Td alineado="right">
+      </td>
+      <td className="px-4 py-2 text-right">
         {puedeGestionar && fila.intento_id && (
           <>
             {(fila.estado_oficial === 'en_curso' || fila.estado_oficial === 'desconectado') && (
               <button
                 onClick={() => pausar.mutate()}
                 disabled={pausar.isPending}
-                className="text-sm font-medium text-accent-700 hover:text-accent-800 disabled:opacity-50"
+                className="text-[13px] font-semibold text-accent-700 hover:text-accent-800 disabled:opacity-50"
               >
                 Pausar
               </button>
@@ -130,16 +127,36 @@ function FilaResultado({
               <button
                 onClick={() => reactivar.mutate()}
                 disabled={reactivar.isPending}
-                className="text-sm font-medium text-primary-700 hover:text-primary-800 disabled:opacity-50"
+                className="text-[13px] font-semibold text-link hover:text-primary-800 disabled:opacity-50"
               >
                 Reactivar
               </button>
             )}
           </>
         )}
-        {error && <p className="text-xs text-red-600">{error}</p>}
-      </Td>
-    </Tr>
+        {error && <p className="mt-0.5 text-[11px] text-red-600">{error}</p>}
+      </td>
+    </tr>
+  );
+}
+
+function EsqueletoGuiaResultados() {
+  return (
+    <div className="animate-pulse">
+      <div className="overflow-hidden rounded-xl border border-border">
+        <div className="h-[70px] bg-surface" />
+      </div>
+      <div className="mt-[18px] overflow-hidden rounded-xl border border-border bg-surface">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="flex h-9 items-center gap-4 border-b border-neutral-100 px-4 last:border-b-0">
+            <div className="h-3 flex-1 rounded bg-neutral-100" />
+            <div className="h-3 w-[90px] rounded bg-neutral-100" />
+            <div className="h-3 w-[60px] rounded bg-neutral-100" />
+            <div className="h-3 w-[60px] rounded bg-neutral-100" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -159,7 +176,11 @@ export function GuiaResultadosPage() {
     },
   });
 
-  const { data: resultados, isLoading } = useQuery({
+  const {
+    data: resultados,
+    isLoading,
+    dataUpdatedAt,
+  } = useQuery({
     queryKey: ['guia-resultados', guiaId],
     queryFn: async () => {
       const { data } = await api.get<{ resultados: FilaResultadoGuia[] }>(
@@ -240,36 +261,60 @@ export function GuiaResultadosPage() {
   const puedeGestionar = guia?.estado === 'lanzada';
 
   return (
-    <div className="space-y-6">
-      <div>
-        <PageBreadcrumb>
-          <Link to={`/materias/${id}`}>‹ Materia</Link>
-        </PageBreadcrumb>
-        <PageHeader
-          eyebrow="Guía"
-          title={guia?.tema ?? 'Resultados'}
-          description="Nota del intento oficial, intentos totales e incidencias por estudiante."
-          actions={
-            puedeGestionar ? (
-              <>
-                <Link
-                  to={`/materias/${id}/guias/${guiaId}/monitoreo`}
-                  className="inline-flex items-center rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium text-text transition hover:bg-surface-hover"
-                >
-                  Monitoreo en vivo
-                </Link>
-                <Button variante="danger" onClick={manejarCancelar} disabled={cancelar.isPending}>
-                  Cancelar lanzamiento
-                </Button>
-              </>
-            ) : undefined
-          }
-        />
-        {errorAccion && <p className="mt-2 text-sm text-red-600">{errorAccion}</p>}
+    <div>
+      <PageBreadcrumb>
+        <Link to={`/materias/${id}`}>‹ Materia</Link>
+      </PageBreadcrumb>
+
+      <div className="overflow-hidden rounded-xl border border-border">
+        <div className="flex items-center gap-5 bg-surface px-[22px] py-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn('h-[7px] w-[7px] shrink-0 rounded-full', puedeGestionar ? 'bg-secondary-500' : 'bg-neutral-300')}
+              />
+              <p
+                className={cn(
+                  'font-mono text-[10px] font-medium uppercase tracking-[0.1em]',
+                  puedeGestionar ? 'text-secondary-700' : 'text-text-muted',
+                )}
+              >
+                {guia ? ESTADO_GUIA_TEXTO[guia.estado] : 'Guía'}
+              </p>
+            </div>
+            <h1 className="mt-[5px] truncate text-[19px] font-extrabold tracking-tight text-text">
+              {guia?.tema ?? 'Resultados'}
+            </h1>
+            <p className="mt-0.5 text-sm text-text-secondary">
+              Nota del intento oficial, intentos totales e incidencias por estudiante.
+            </p>
+          </div>
+
+          {puedeGestionar && (
+            <div className="flex shrink-0 items-center gap-2">
+              <Link
+                to={`/materias/${id}/guias/${guiaId}/monitoreo`}
+                className="rounded-lg border border-border bg-surface px-[15px] py-2.5 text-sm font-semibold text-text-secondary transition hover:bg-surface-hover"
+              >
+                Monitoreo en vivo
+              </Link>
+              <button
+                type="button"
+                onClick={manejarCancelar}
+                disabled={cancelar.isPending}
+                className="rounded-lg bg-red-600 px-[15px] py-2.5 text-sm font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                Cancelar lanzamiento
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
+      {errorAccion && <p className="mt-2 text-sm text-red-600">{errorAccion}</p>}
+
       {!!pendientes && pendientes > 0 && (
-        <Alert tone="warning" icon={<ClipboardCheck size={16} />}>
+        <Alert tone="warning" icon={<ClipboardCheck size={16} />} className="mt-[18px]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span>
               Hay {pendientes} respuesta{pendientes === 1 ? '' : 's'} abierta
@@ -286,52 +331,62 @@ export function GuiaResultadosPage() {
         </Alert>
       )}
 
-      <Card>
-        <CardHeader
-          title={`Estudiantes (${resultados?.length ?? 0})`}
-          description="Nota = aciertos / total de preguntas × nota máxima, solo del intento oficial."
-        />
-        <CardBody>
-          {isLoading && (
-            <div className="flex items-center gap-2 py-4 text-sm text-text-secondary">
-              <Spinner /> Cargando…
-            </div>
-          )}
+      {isLoading && <EsqueletoGuiaResultados />}
 
-          {resultados && resultados.length === 0 && (
-            <p className="py-4 text-center text-sm text-text-secondary">
-              Todavía no se lanzó esta guía a nadie.
+      {resultados && resultados.length === 0 && (
+        <p className="mt-[18px] py-8 text-center text-sm text-text-secondary">
+          Todavía no se lanzó esta guía a nadie.
+        </p>
+      )}
+
+      {resultados && resultados.length > 0 && (
+        <div className="mt-[18px] overflow-hidden rounded-xl border border-border bg-surface">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border bg-neutral-50">
+              <tr>
+                <th className="px-4 py-[9px] text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted">
+                  Estudiante
+                </th>
+                <th className="px-4 py-[9px] text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted">
+                  Estado
+                </th>
+                <th className="px-4 py-[9px] text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted">
+                  Aciertos
+                </th>
+                <th className="px-4 py-[9px] text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted">
+                  Nota
+                </th>
+                <th className="px-4 py-[9px] text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted">
+                  Intentos
+                </th>
+                <th className="px-4 py-[9px] text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted">
+                  Incidencias
+                </th>
+                <th className="px-4 py-[9px]" />
+              </tr>
+            </thead>
+            <tbody>
+              {resultados.map((fila) => (
+                <FilaResultado
+                  key={fila.estudiante_id}
+                  fila={fila}
+                  materiaId={materiaId}
+                  guiaId={Number(guiaId)}
+                  puedeGestionar={puedeGestionar}
+                />
+              ))}
+            </tbody>
+          </table>
+          <div className="border-t border-neutral-100 bg-neutral-50 px-4 py-[9px]">
+            <p className="font-mono text-[11px] tracking-[0.04em] text-text-disabled">
+              {resultados.length} {resultados.length === 1 ? 'estudiante' : 'estudiantes'} · actualizado{' '}
+              {dataUpdatedAt
+                ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+                : '—'}
             </p>
-          )}
-
-          {resultados && resultados.length > 0 && (
-            <Tabla>
-              <Thead>
-                <Tr>
-                  <Th>Estudiante</Th>
-                  <Th>Estado</Th>
-                  <Th>Aciertos</Th>
-                  <Th>Nota</Th>
-                  <Th>Intentos</Th>
-                  <Th>Incidencias</Th>
-                  <Th />
-                </Tr>
-              </Thead>
-              <Tbody>
-                {resultados.map((fila) => (
-                  <FilaResultado
-                    key={fila.estudiante_id}
-                    fila={fila}
-                    materiaId={materiaId}
-                    guiaId={Number(guiaId)}
-                    puedeGestionar={puedeGestionar}
-                  />
-                ))}
-              </Tbody>
-            </Tabla>
-          )}
-        </CardBody>
-      </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
