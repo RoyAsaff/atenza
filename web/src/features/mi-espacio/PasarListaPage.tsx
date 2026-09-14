@@ -88,10 +88,12 @@ const OPCIONES: OpcionEstado[] = [
     valor: 'atrasado',
     texto: 'Atraso',
     atajo: '2',
-    colorActivo: 'bg-accent-600 text-white',
-    colorPunto: 'bg-accent-600',
-    colorTexto: 'text-accent-700',
-    resaltadoFila: { fondo: 'bg-accent-50', borde: 'border-accent-600', bordeControl: 'border-accent-300' },
+    // Ámbar en vez de accent (naranja): junto al rojo de Falta se confundían
+    // a simple vista. El ámbar queda lejos del rojo en el círculo de color.
+    colorActivo: 'bg-amber-500 text-white',
+    colorPunto: 'bg-amber-500',
+    colorTexto: 'text-amber-700',
+    resaltadoFila: { fondo: 'bg-amber-50', borde: 'border-amber-500', bordeControl: 'border-amber-300' },
   },
   {
     valor: 'licencia',
@@ -117,6 +119,13 @@ const MAPA_OPCIONES = Object.fromEntries(OPCIONES.map((o) => [o.valor, o])) as R
   MarcajeAsistencia,
   OpcionEstado
 >;
+
+// Clic en la fila completa (fuera de los botones de estado): avanza al
+// siguiente estado en el mismo orden que ya usan los atajos 1–4.
+function siguienteEstado(actual: MarcajeAsistencia): MarcajeAsistencia {
+  const i = OPCIONES.findIndex((o) => o.valor === actual);
+  return OPCIONES[(i + 1) % OPCIONES.length].valor;
+}
 
 // Habilitación tardía (02/09): etiqueta legible por tipo de convocatoria.
 const TIPO_CONVOCATORIA_TEXTO: Record<ConvocatoriaTardia['tipo'], string> = {
@@ -267,7 +276,10 @@ function ControlEstadoFila({
               type="button"
               role="radio"
               aria-checked={activo}
-              onClick={() => onCambiar(op.valor)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCambiar(op.valor);
+              }}
               className={cn(
                 'flex h-[38px] items-center px-[15px] text-[14px] transition',
                 i > 0 && 'border-l',
@@ -292,7 +304,10 @@ function ControlEstadoFila({
               type="button"
               role="radio"
               aria-checked={activo}
-              onClick={() => onCambiar(op.valor)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCambiar(op.valor);
+              }}
               className={cn(
                 'flex h-11 items-center justify-center rounded-lg border text-[14px] transition',
                 activo
@@ -324,9 +339,12 @@ function FilaEstudianteLista({
   return (
     <div
       ref={filaRef}
+      onClick={() => onCambiar(siguienteEstado(valor))}
       className={cn(
-        'flex flex-col gap-2 border-b border-neutral-100 px-4 py-3 last:border-b-0 sm:h-[52px] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-0',
-        resaltado && cn(resaltado.fondo, 'border-l-[3px]', resaltado.borde, 'sm:pl-[13px] sm:pr-4'),
+        'flex cursor-pointer flex-col gap-2 border-b border-neutral-100 px-4 py-3 last:border-b-0 sm:h-[52px] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-0',
+        resaltado
+          ? cn(resaltado.fondo, 'border-l-[3px]', resaltado.borde, 'hover:brightness-[0.97]', 'sm:pl-[13px] sm:pr-4')
+          : 'hover:bg-surface-hover',
       )}
     >
       <p className="truncate text-[16px] font-semibold text-text">
