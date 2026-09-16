@@ -1,18 +1,35 @@
 // E6 · HU-18 (preguntas/opciones/imagen/reordenar) + HU-19 (guardar →
 // Lista, demostración aleatorizada, bloqueo de edición si ya se lanzó)
+//
+// Rediseño (design_handoff_editor_evaluacion, dirección 1b): el trabajo
+// real (preguntas) va a la izquierda; todo lo que describe o gobierna la
+// evaluación (estado, qué falta para lanzar, configuración, acción
+// principal) vive en una ficha fija a la derecha — mismo patrón de dos
+// columnas que CentralizadorPage. Autoguardado de tema/nota/tiempo (adiós
+// "Guardar datos"), un único Alert de errores, y el modal de eliminación
+// reemplaza los window.confirm. Ver FichaEditor.tsx para las piezas
+// compartidas con ExamenCodigoEditorPage.
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { HelpCircle, Lock, Plus, Sparkles, Upload } from 'lucide-react';
+import {
+  ChevronDown,
+  HelpCircle,
+  MoreHorizontal,
+  Plus,
+  Sparkles,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { api, mensajeDeError, urlArchivo } from '../../core/api/cliente';
 import {
   Demostracion,
   ErrorParseoPregunta,
   EstadoCuenta,
-  EstadoEvaluacion,
   EvaluacionConPreguntas,
   FilaListaAsistencia,
+  FilaMonitoreo,
   Materia,
   Pregunta,
   PreguntaParseada,
@@ -20,31 +37,28 @@ import {
 import {
   Alert,
   Badge,
-  botonClases,
   Button,
   Campo,
-  Card,
-  CardBody,
-  CardHeader,
   Checkbox,
+  Dropdown,
+  DropdownItem,
   EmptyState,
   Input,
   Modal,
-  PageBreadcrumb,
-  PageHeader,
   Spinner,
   Textarea,
+  cn,
+  useToast,
 } from '../../core/ui/ui';
-
-const ESTADO_TONO: Record<
-  EstadoEvaluacion,
-  { texto: string; tono: 'neutral' | 'success' | 'info' | 'dark' }
-> = {
-  borrador: { texto: 'Borrador', tono: 'neutral' },
-  lista: { texto: 'Lista', tono: 'success' },
-  lanzada: { texto: 'Lanzada', tono: 'info' },
-  finalizada: { texto: 'Finalizada', tono: 'dark' },
-};
+import {
+  BloqueAhoraMismo,
+  BloqueAntesDeLanzar,
+  ComprobacionFicha,
+  EncabezadoEditor,
+  FichaEstado,
+  ModalConfirmarEliminar,
+  formatoHora,
+} from './FichaEditor';
 
 interface OpcionForm {
   texto: string;
@@ -320,17 +334,10 @@ function TarjetaPregunta({
   onMover: (direccion: -1 | 1) => void;
 }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [editando, setEditando] = useState(false);
+  const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
   const [error, setError] = useState('');
-
-  const alTerminar = {
-    onSuccess: () => {
-      setError('');
-      setEditando(false);
-      queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
-    },
-    onError: (err: unknown) => setError(mensajeDeError(err)),
-  };
 
   const actualizar = useMutation({
     mutationFn: async (datos: {
@@ -352,7 +359,13 @@ function TarjetaPregunta({
         );
       }
     },
-    ...alTerminar,
+    onSuccess: () => {
+      setError('');
+      setEditando(false);
+      toast({ tone: 'success', titulo: 'Pregunta actualizada' });
+      queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
   const eliminar = useMutation({
@@ -360,23 +373,23 @@ function TarjetaPregunta({
       api.delete(
         `/api/materias/${materiaId}/evaluaciones/${evaluacionId}/preguntas/${pregunta.id}`,
       ),
-    ...alTerminar,
+    onSuccess: () => {
+      setError('');
+      setModalEliminarAbierto(false);
+      toast({ tone: 'success', titulo: 'Pregunta eliminada' });
+      queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
-  function manejarEliminar() {
-    if (window.confirm('¿Eliminar esta pregunta? Esta acción no se puede deshacer.')) {
-      eliminar.mutate();
-    }
-  }
-
   return (
-    <div className="rounded-xl border border-border p-4 transition hover:border-border-hover">
+    <div className="rounded-xl border border-border bg-surface p-4 transition hover:border-border-hover">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-text-muted">
+          <span className="mt-0.5 flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-bold text-text-muted">
             {numero}
           </span>
-          <p className="font-medium text-text">
+          <p className="text-[15px] font-semibold text-text">
             {pregunta.pregunta}
             {esVerdaderoFalso(pregunta.opciones) && (
               <Badge tone="neutral" className="ml-2 align-middle">
@@ -386,43 +399,57 @@ function TarjetaPregunta({
           </p>
         </div>
         {editable && (
-          <div className="flex shrink-0 items-center rounded-lg border border-border">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex items-center overflow-hidden rounded-lg border border-border">
+              <button
+                onClick={() => onMover(-1)}
+                disabled={esPrimera}
+                className="flex h-[30px] w-[30px] items-center justify-center text-text-disabled transition hover:bg-surface-hover hover:text-text disabled:opacity-30"
+                title="Subir"
+              >
+                ▲
+              </button>
+              <span className="h-4 w-px bg-border" />
+              <button
+                onClick={() => onMover(1)}
+                disabled={esUltima}
+                className="flex h-[30px] w-[30px] items-center justify-center text-text-disabled transition hover:bg-surface-hover hover:text-text disabled:opacity-30"
+                title="Bajar"
+              >
+                ▼
+              </button>
+            </div>
             <button
-              onClick={() => onMover(-1)}
-              disabled={esPrimera}
-              className="px-2 py-1 text-text-disabled transition hover:bg-surface-hover hover:text-text disabled:opacity-30"
-              title="Subir"
+              onClick={() => setEditando(true)}
+              className="flex h-[30px] items-center rounded-lg border border-border px-[11px] text-[13px] font-semibold text-text-secondary transition hover:bg-surface-hover"
             >
-              ▲
+              Editar
             </button>
-            <span className="h-4 w-px bg-border" />
             <button
-              onClick={() => onMover(1)}
-              disabled={esUltima}
-              className="px-2 py-1 text-text-disabled transition hover:bg-surface-hover hover:text-text disabled:opacity-30"
-              title="Bajar"
+              onClick={() => setModalEliminarAbierto(true)}
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-border text-text-disabled transition hover:bg-surface-hover hover:text-red-600"
+              aria-label="Eliminar pregunta"
             >
-              ▼
+              <Trash2 size={14} />
             </button>
           </div>
         )}
       </div>
-        {pregunta.url_imagen && (
+      {pregunta.url_imagen && (
         <img
           src={urlArchivo(pregunta.url_imagen)}
           alt=""
           className="ml-9 mt-2 max-h-32 rounded-xl border border-border"
         />
       )}
-      <ul className="ml-9 mt-2 space-y-1">
+      <ul className="ml-9 mt-2 flex flex-col gap-1">
         {pregunta.opciones.map((op) => (
           <li
             key={op.id}
-            className={`rounded-lg px-2 py-1 text-sm ${
-              op.es_correcta
-                ? 'bg-secondary-50 font-medium text-secondary-800'
-                : 'text-text-secondary'
-            }`}
+            className={cn(
+              'rounded-[7px] px-[9px] py-1 text-sm',
+              op.es_correcta ? 'bg-secondary-50 font-semibold text-secondary-800' : 'text-text-secondary',
+            )}
           >
             {op.es_correcta ? '✓ ' : '· '}
             {op.texto}
@@ -430,25 +457,6 @@ function TarjetaPregunta({
         ))}
       </ul>
 
-
-
-      {editable && (
-        <div className="ml-9 mt-3 flex gap-4 text-sm">
-          <button
-            onClick={() => setEditando(true)}
-            className="font-medium text-primary-700 hover:text-primary-800"
-          >
-            Editar
-          </button>
-          <button
-            onClick={manejarEliminar}
-            disabled={eliminar.isPending}
-            className="font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
-          >
-            Eliminar
-          </button>
-        </div>
-      )}
       {error && <p className="ml-9 mt-2 text-sm text-red-600">{error}</p>}
 
       {editando && (
@@ -460,6 +468,17 @@ function TarjetaPregunta({
           textoBoton="Guardar cambios"
           onGuardar={(datos) => actualizar.mutate(datos)}
           onCerrar={() => setEditando(false)}
+        />
+      )}
+
+      {modalEliminarAbierto && (
+        <ModalConfirmarEliminar
+          titulo={`Eliminar la pregunta ${numero}`}
+          cuerpo="Esta acción no se puede deshacer."
+          textoBoton="Eliminar pregunta"
+          eliminando={eliminar.isPending}
+          onConfirmar={() => eliminar.mutate()}
+          onCerrar={() => setModalEliminarAbierto(false)}
         />
       )}
     </div>
@@ -476,7 +495,7 @@ function ModalImportarPreguntas({
 }: {
   materiaId: number;
   evaluacionId: number;
-  onImportado: () => void;
+  onImportado: (n: number) => void;
   onCerrar: () => void;
 }) {
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -517,7 +536,7 @@ function ModalImportarPreguntas({
       ),
     onSuccess: () => {
       setError('');
-      onImportado();
+      onImportado(resultado!.preguntas.length - excluidas.size);
     },
     onError: (err: unknown) => setError(mensajeDeError(err)),
   });
@@ -939,27 +958,51 @@ function ModalSeleccionarPresentes({
   );
 }
 
+// ── Esqueleto de carga: silueta real (encabezado de una línea, dos
+// tarjetas a la izquierda, ficha de 340px a la derecha). ──────────────
+function EsqueletoEditor() {
+  return (
+    <div className="space-y-5">
+      <div className="animate-pulse rounded-xl border border-border bg-surface px-6 py-4">
+        <div className="h-3 w-40 rounded bg-neutral-100" />
+        <div className="mt-2.5 h-6 w-64 rounded bg-neutral-100" />
+      </div>
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="animate-pulse space-y-3">
+          <div className="h-[52px] rounded-xl bg-neutral-100" />
+          <div className="h-28 rounded-xl bg-neutral-100" />
+          <div className="h-28 rounded-xl bg-neutral-100" />
+        </div>
+        <div className="hidden animate-pulse flex-col gap-3 xl:flex">
+          <div className="h-64 rounded-[14px] bg-neutral-100" />
+          <div className="h-[46px] rounded-[10px] bg-neutral-100" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EvaluacionEditorPage() {
   const { id, evalId } = useParams();
   const materiaId = Number(id);
   const evaluacionId = Number(evalId);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const [tema, setTema] = useState('');
   const [nota, setNota] = useState('');
   const [tiempoLimite, setTiempoLimite] = useState('');
-  const [errorDatos, setErrorDatos] = useState('');
+  const [guardadoEn, setGuardadoEn] = useState<Date | null>(null);
+  const [error, setError] = useState('');
   const [errorPregunta, setErrorPregunta] = useState('');
-  const [errorGuardar, setErrorGuardar] = useState('');
-  const [errorDemo, setErrorDemo] = useState('');
-  const [errorLanzar, setErrorLanzar] = useState('');
-  const [errorEliminar, setErrorEliminar] = useState('');
   const [demo, setDemo] = useState<Demostracion | null>(null);
   const [modalPreguntaAbierto, setModalPreguntaAbierto] = useState(false);
   const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
   const [modalPromptAbierto, setModalPromptAbierto] = useState(false);
   const [modalLanzarAbierto, setModalLanzarAbierto] = useState(false);
+  const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
+  const evitarAutoguardadoRef = useRef(true);
 
   const { data: evaluacion, isLoading, isError } = useQuery({
     queryKey: ['evaluacion', String(evaluacionId)],
@@ -989,6 +1032,41 @@ export function EvaluacionEditorPage() {
     },
   });
 
+  const editable = evaluacion
+    ? evaluacion.estado === 'borrador' || evaluacion.estado === 'lista'
+    : false;
+
+  // Fila de convocatoria de "Antes de lanzar": misma query que
+  // ModalSeleccionarPresentes (mismo queryKey) — al levantarla acá, el
+  // modal la encuentra en caché y abre instantáneo.
+  const { data: listaAsistencia } = useQuery({
+    queryKey: ['asistencia', String(materiaId), evaluacion ? String(evaluacion.clase_id) : ''],
+    queryFn: async () => {
+      const { data } = await api.get<{ lista: FilaListaAsistencia[] }>(
+        `/api/materias/${materiaId}/clases/${evaluacion!.clase_id}/asistencia`,
+      );
+      return data.lista;
+    },
+    enabled: !!evaluacion,
+  });
+  const presentes = (listaAsistencia ?? []).filter(
+    (f) => f.marcaje === 'puntual' || f.marcaje === 'atrasado',
+  );
+
+  // "Ahora mismo" (estado lanzada) y cifras del modal de eliminación: sin
+  // socket ni refetch agresivo, el monitoreo real está a un clic.
+  const { data: monitoreo } = useQuery({
+    queryKey: ['monitoreo', String(evaluacionId)],
+    queryFn: async () => {
+      const { data } = await api.get<{ monitoreo: FilaMonitoreo[] }>(
+        `/api/materias/${materiaId}/evaluaciones/${evaluacionId}/monitoreo`,
+      );
+      return data.monitoreo;
+    },
+    enabled: !!evaluacion && evaluacion.estado === 'lanzada',
+    refetchInterval: 30000,
+  });
+
   useEffect(() => {
     if (evaluacion) {
       setTema(evaluacion.tema);
@@ -996,12 +1074,13 @@ export function EvaluacionEditorPage() {
       setTiempoLimite(
         evaluacion.tiempo_limite_minutos ? String(evaluacion.tiempo_limite_minutos) : '',
       );
+      evitarAutoguardadoRef.current = true;
     }
   }, [evaluacion]);
 
-  const editable = evaluacion
-    ? evaluacion.estado === 'borrador' || evaluacion.estado === 'lista'
-    : false;
+  const notaValida = Number(nota) > 0 && !Number.isNaN(Number(nota));
+  const temaValido = tema.trim() !== '';
+  const configuracionValida = temaValido && notaValida;
 
   const actualizarDatos = useMutation({
     mutationFn: () =>
@@ -1011,11 +1090,25 @@ export function EvaluacionEditorPage() {
         tiempo_limite_minutos: tiempoLimite ? Number(tiempoLimite) : null,
       }),
     onSuccess: () => {
-      setErrorDatos('');
+      setGuardadoEn(new Date());
       queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
     },
-    onError: (err: unknown) => setErrorDatos(mensajeDeError(err)),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
+
+  // Autoguardado: 800ms de debounce sobre tema/nota/tiempo, sin disparar
+  // en el primer render ni cuando los valores vienen de hidratar la query.
+  useEffect(() => {
+    if (evitarAutoguardadoRef.current) {
+      evitarAutoguardadoRef.current = false;
+      return;
+    }
+    if (!editable || !configuracionValida) return;
+    setError('');
+    const id = setTimeout(() => actualizarDatos.mutate(), 800);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tema, nota, tiempoLimite, editable]);
 
   // HU-20: lanzar a Puntual/Atraso, con opción de elegir solo algunos
   // (ModalSeleccionarPresentes). Esc. 2: si falta asistencia, el modal ya
@@ -1026,16 +1119,16 @@ export function EvaluacionEditorPage() {
         estudiante_ids: estudianteIds,
       }),
     onSuccess: () => {
-      setErrorLanzar('');
+      setError('');
       setModalLanzarAbierto(false);
       queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
       navigate(`/materias/${id}/evaluaciones/${evalId}/monitoreo`);
     },
-    onError: (err: unknown) => setErrorLanzar(mensajeDeError(err)),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
   function abrirModalLanzar() {
-    setErrorLanzar('');
+    setError('');
     setModalLanzarAbierto(true);
   }
 
@@ -1054,18 +1147,8 @@ export function EvaluacionEditorPage() {
         navigate(`/materias/${id}/evaluaciones`);
       }
     },
-    onError: (err: unknown) => setErrorEliminar(mensajeDeError(err)),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
-
-  function manejarEliminar() {
-    if (
-      window.confirm(
-        'Se eliminará la evaluación por completo: preguntas, intentos, respuestas y notas. No se puede deshacer. ¿Continuar?',
-      )
-    ) {
-      eliminar.mutate();
-    }
-  }
 
   const agregarPregunta = useMutation({
     mutationFn: async (datos: {
@@ -1089,6 +1172,7 @@ export function EvaluacionEditorPage() {
     },
     onSuccess: () => {
       setErrorPregunta('');
+      toast({ tone: 'success', titulo: 'Pregunta agregada' });
       queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
     },
     onError: (err: unknown) => setErrorPregunta(mensajeDeError(err)),
@@ -1107,10 +1191,11 @@ export function EvaluacionEditorPage() {
   const guardar = useMutation({
     mutationFn: () => api.post(`/api/materias/${materiaId}/evaluaciones/${evaluacionId}/guardar`),
     onSuccess: () => {
-      setErrorGuardar('');
+      setError('');
+      toast({ tone: 'success', titulo: 'Evaluación lista para lanzar' });
       queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
     },
-    onError: (err: unknown) => setErrorGuardar(mensajeDeError(err)),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
   async function verDemostracion() {
@@ -1118,10 +1203,10 @@ export function EvaluacionEditorPage() {
       const { data } = await api.get<{ demostracion: Demostracion }>(
         `/api/materias/${materiaId}/evaluaciones/${evaluacionId}/demostracion`,
       );
-      setErrorDemo('');
+      setError('');
       setDemo(data.demostracion);
     } catch (err) {
-      setErrorDemo(mensajeDeError(err));
+      setError(mensajeDeError(err));
     }
   }
 
@@ -1135,13 +1220,36 @@ export function EvaluacionEditorPage() {
     reordenar.mutate(ids);
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface p-5 text-sm text-text-secondary">
-        <Spinner /> Cargando…
-      </div>
-    );
-  }
+  const puntosPorPregunta = useMemo(
+    () => (evaluacion && evaluacion.preguntas.length > 0 ? evaluacion.nota / evaluacion.preguntas.length : 0),
+    [evaluacion],
+  );
+
+  const comprobaciones: ComprobacionFicha[] = useMemo(() => {
+    if (!evaluacion) return [];
+    const totalPreguntas = evaluacion.preguntas.length;
+    return [
+      {
+        ok: totalPreguntas > 0,
+        textoOk: `${totalPreguntas} pregunta${totalPreguntas === 1 ? '' : 's'} cargadas`,
+        textoFalta: 'Sin preguntas: no se puede lanzar',
+      },
+      {
+        ok: configuracionValida,
+        textoOk: `Nota total ${evaluacion.nota}${
+          evaluacion.tiempo_limite_minutos ? ` · ${evaluacion.tiempo_limite_minutos} min` : ''
+        }`,
+        textoFalta: 'Falta la nota total',
+      },
+      {
+        ok: presentes.length > 0,
+        textoOk: `${presentes.length} presente${presentes.length === 1 ? '' : 's'} en la clase de hoy`,
+        textoFalta: 'Falta pasar lista de esta clase',
+      },
+    ];
+  }, [evaluacion, configuracionValida, presentes.length]);
+
+  if (isLoading) return <EsqueletoEditor />;
   if (isError || !evaluacion) {
     return (
       <p className="rounded-lg border border-red-100 bg-red-50 p-5 text-sm text-red-600">
@@ -1150,162 +1258,136 @@ export function EvaluacionEditorPage() {
     );
   }
 
+  const textoEstadoActual =
+    evaluacion.estado === 'borrador'
+      ? 'Borrador · falta dejarla lista'
+      : evaluacion.estado === 'lista'
+        ? 'Lista · se puede editar y lanzar'
+        : evaluacion.estado === 'lanzada'
+          ? `Lanzada${evaluacion.fecha_lanzamiento ? ` ${formatoHora(evaluacion.fecha_lanzamiento)}` : ''} · edición cerrada`
+          : 'Finalizada · notas al centralizador';
+
+  const sello = !editable ? null : actualizarDatos.isPending ? (
+    <span className="font-mono text-[12px] text-text-disabled">Guardando…</span>
+  ) : !configuracionValida ? (
+    <span className="font-mono text-[12px] text-accent-700">Sin guardar</span>
+  ) : guardadoEn ? (
+    <span className="font-mono text-[12px] text-text-disabled">Guardado {formatoHora(guardadoEn.toISOString())}</span>
+  ) : null;
+
+  const menuItems: { texto: string; onSelect: () => void }[] = [];
+  if (evaluacion.estado === 'lanzada' || evaluacion.estado === 'finalizada') {
+    menuItems.push({ texto: 'Realizar demostración', onSelect: verDemostracion });
+  }
+  if (evaluacion.estado === 'finalizada') {
+    menuItems.push({
+      texto: 'Ver monitoreo',
+      onSelect: () => navigate(`/materias/${id}/evaluaciones/${evalId}/monitoreo`),
+    });
+  }
+
+  const filasEliminar: string[] = [];
+  if (evaluacion.preguntas.length > 0) {
+    filasEliminar.push(
+      `${evaluacion.preguntas.length} pregunta${evaluacion.preguntas.length === 1 ? '' : 's'}`,
+    );
+  }
+  if (monitoreo) {
+    const intentos = monitoreo.length;
+    if (intentos > 0) filasEliminar.push(`${intentos} intento${intentos === 1 ? '' : 's'} con sus respuestas`);
+    const notas = monitoreo.filter((f) => f.estado === 'finalizado').length;
+    if (notas > 0) filasEliminar.push(`${notas} nota${notas === 1 ? '' : 's'}, que salen del centralizador`);
+    const incidentes = monitoreo.reduce((acc, f) => acc + f.incidentes, 0);
+    if (incidentes > 0) {
+      filasEliminar.push(`${incidentes} incidente${incidentes === 1 ? '' : 's'} registrado${incidentes === 1 ? '' : 's'}`);
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <PageBreadcrumb>
-          <Link to={`/materias/${id}/clases/${evaluacion.clase_id}/evaluaciones`}>
-            ‹ Evaluaciones de la clase
-          </Link>
-        </PageBreadcrumb>
-        <PageHeader
-          eyebrow="Evaluación"
-          title={
-            <span className="inline-flex flex-wrap items-center gap-3">
-              {evaluacion.tema}
-              <Badge tone={ESTADO_TONO[evaluacion.estado].tono}>
-                {ESTADO_TONO[evaluacion.estado].texto}
-              </Badge>
-            </span>
-          }
-          description={`Nota total: ${evaluacion.nota} · ${evaluacion.preguntas.length} pregunta${evaluacion.preguntas.length === 1 ? '' : 's'}`}
-          actions={
-            <>
-              {evaluacion.estado === 'borrador' && (
-                <Button onClick={() => guardar.mutate()} disabled={guardar.isPending}>
-                  {guardar.isPending ? 'Guardando…' : 'Guardar evaluación'}
-                </Button>
-              )}
-              {evaluacion.estado !== 'borrador' && (
-                <Button variante="secondary" onClick={verDemostracion}>
-                  Realizar demostración
-                </Button>
-              )}
-              {evaluacion.estado === 'lista' && (
-                <Button onClick={abrirModalLanzar} disabled={lanzar.isPending}>
-                  {lanzar.isPending ? 'Lanzando…' : 'Lanzar evaluación'}
-                </Button>
-              )}
-              {(evaluacion.estado === 'lanzada' || evaluacion.estado === 'finalizada') && (
-                <Link
-                  to={`/materias/${id}/evaluaciones/${evalId}/monitoreo`}
-                  className={botonClases('accent', 'md')}
+    <div className="space-y-5">
+      <EncabezadoEditor
+        volverA={`/materias/${id}/clases/${evaluacion.clase_id}/evaluaciones`}
+        volverTexto="Evaluaciones de la clase"
+        titulo={evaluacion.tema}
+        estado={evaluacion.estado}
+        sello={sello}
+        menu={
+          menuItems.length > 0 && (
+            <Dropdown
+              trigger={() => (
+                <button
+                  type="button"
+                  aria-label="Más acciones"
+                  className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-border bg-surface text-text-secondary transition hover:bg-surface-hover"
                 >
-                  Ver monitoreo en vivo
-                </Link>
+                  <MoreHorizontal size={16} />
+                </button>
               )}
-              {evaluacion.estado === 'finalizada' && (
-                <Link
-                  to={`/materias/${id}/evaluaciones/${evalId}/resultados`}
-                  className={botonClases('primary', 'md')}
-                >
-                  Ver resultados →
-                </Link>
-              )}
-              <Button variante="danger" onClick={manejarEliminar} disabled={eliminar.isPending}>
-                {eliminar.isPending ? 'Eliminando…' : 'Eliminar evaluación'}
-              </Button>
-            </>
-          }
-        />
-        {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
-        {errorDemo && <p className="mt-2 text-sm text-red-600">{errorDemo}</p>}
-        {errorEliminar && <p className="mt-2 text-sm text-red-600">{errorEliminar}</p>}
-      </div>
-
-      {!editable && (
-        <Alert tone="warning" icon={<Lock size={16} />}>
-          Esta evaluación ya fue lanzada: no se puede editar.
-        </Alert>
-      )}
-
-      {editable && (
-        <Card>
-          <CardHeader title="Configuración" description="Título y nota total de la evaluación" />
-          <CardBody>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                actualizarDatos.mutate();
-              }}
-              className="flex flex-wrap items-end gap-3"
             >
-              <Campo etiqueta="Título / tema" className="min-w-48 flex-1">
-                <Input
-                  required
-                  value={tema}
-                  onChange={(e) => setTema(e.target.value)}
-                />
-              </Campo>
-              <Campo etiqueta="Nota total">
-                <Input
-                  type="number"
-                  min={1}
-                  required
-                  value={nota}
-                  onChange={(e) => setNota(e.target.value)}
-                  className="w-28"
-                />
-              </Campo>
-              <Campo etiqueta="Tiempo límite (min)" ayuda="Vacío = sin límite (HU-24)">
-                <Input
-                  type="number"
-                  min={1}
-                  value={tiempoLimite}
-                  onChange={(e) => setTiempoLimite(e.target.value)}
-                  placeholder="Sin límite"
-                  className="w-32"
-                />
-              </Campo>
-              <Button type="submit" variante="secondary" disabled={actualizarDatos.isPending}>
-                Guardar datos
-              </Button>
-            </form>
-            {evaluacion.preguntas.length > 0 && (
-              <p className="mt-3 text-xs text-text-secondary">
-                Cada pregunta vale{' '}
-                <span className="font-medium text-text">
-                  {(evaluacion.nota / evaluacion.preguntas.length).toFixed(2)} puntos
-                </span>{' '}
-                (nota total ÷ {evaluacion.preguntas.length} preguntas).
-              </p>
-            )}
-            {errorDatos && <p className="mt-3 text-sm text-red-600">{errorDatos}</p>}
-          </CardBody>
-        </Card>
-      )}
+              {menuItems.map((item) => (
+                <DropdownItem key={item.texto} onSelect={item.onSelect}>
+                  {item.texto}
+                </DropdownItem>
+              ))}
+            </Dropdown>
+          )
+        }
+      />
 
-      <Card>
-        <CardHeader
-          title={`Preguntas (${evaluacion.preguntas.length})`}
-          description="2 a 4 opciones cada una, con exactamente una correcta"
-          actions={
-            editable && (
-              <>
-                <Button variante="secondary" onClick={() => setModalPromptAbierto(true)}>
-                  <Sparkles size={16} /> Sugerir prompt IA
-                </Button>
-                {permiteImportWord ? (
-                  <Button variante="secondary" onClick={() => setModalImportarAbierto(true)}>
-                    <Upload size={16} /> Importar de Word
-                  </Button>
-                ) : (
-                  <Link
-                    to="/suscripcion/planes"
-                    className={botonClases('secondary')}
-                    title="Disponible en el plan Pro"
-                  >
-                    <Upload size={16} /> Importar de Word (plan Pro)
-                  </Link>
-                )}
-                <Button onClick={() => setModalPreguntaAbierto(true)}>
-                  <Plus size={16} /> Agregar pregunta
-                </Button>
-              </>
-            )
-          }
-        />
-        <CardBody className={evaluacion.preguntas.length > 0 ? 'space-y-3' : ''}>
+      {error && <Alert tone="danger">{error}</Alert>}
+
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="order-2 flex flex-col gap-3 xl:order-1">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-[18px] py-[13px]">
+            <p className="text-[15px] text-text-secondary">
+              {evaluacion.preguntas.length === 0 ? (
+                'Sin preguntas todavía'
+              ) : (
+                <>
+                  <strong className="text-text">
+                    {evaluacion.preguntas.length} pregunta{evaluacion.preguntas.length === 1 ? '' : 's'}
+                  </strong>{' '}
+                  · {puntosPorPregunta.toFixed(2).replace('.', ',')} puntos cada una
+                </>
+              )}
+            </p>
+            {editable && (
+              <div className="flex items-center gap-2">
+                <Dropdown
+                  trigger={({ abierto }) => (
+                    <button
+                      type="button"
+                      className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 text-sm font-semibold text-text-secondary transition hover:bg-surface-hover"
+                    >
+                      Agregar de a muchas
+                      <ChevronDown size={14} className={cn('transition', abierto && 'rotate-180')} />
+                    </button>
+                  )}
+                >
+                  <DropdownItem icono={<Sparkles size={15} />} onSelect={() => setModalPromptAbierto(true)}>
+                    Sugerir prompt IA
+                  </DropdownItem>
+                  {permiteImportWord ? (
+                    <DropdownItem icono={<Upload size={15} />} onSelect={() => setModalImportarAbierto(true)}>
+                      Importar de Word
+                    </DropdownItem>
+                  ) : (
+                    <DropdownItem icono={<Upload size={15} />} onSelect={() => navigate('/suscripcion/planes')}>
+                      Importar de Word (plan Pro)
+                    </DropdownItem>
+                  )}
+                </Dropdown>
+                <button
+                  type="button"
+                  onClick={() => setModalPreguntaAbierto(true)}
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-primary-800 px-4 text-sm font-bold text-white transition hover:bg-primary-900"
+                >
+                  <Plus size={15} /> Agregar pregunta
+                </button>
+              </div>
+            )}
+          </div>
+
           {evaluacion.preguntas.length === 0 && (
             <EmptyState
               icon={<HelpCircle size={32} />}
@@ -1327,8 +1409,155 @@ export function EvaluacionEditorPage() {
               onMover={(direccion) => moverPregunta(p.id, direccion)}
             />
           ))}
-        </CardBody>
-      </Card>
+        </div>
+
+        <div className="order-1 w-full xl:sticky xl:top-5 xl:order-2">
+          <div className="overflow-hidden rounded-[14px] border border-border bg-surface">
+            <FichaEstado estado={evaluacion.estado} textoActual={textoEstadoActual} />
+
+            {editable && <BloqueAntesDeLanzar items={comprobaciones} />}
+            {evaluacion.estado === 'lanzada' && monitoreo && (
+              <BloqueAhoraMismo
+                rindiendo={monitoreo.filter((f) => f.estado === 'en_curso').length}
+                terminaron={monitoreo.filter((f) => f.estado === 'finalizado').length}
+                incidentes={monitoreo.reduce((acc, f) => acc + f.incidentes, 0)}
+              />
+            )}
+
+            {editable ? (
+              <div className="flex flex-col gap-3 px-[18px] py-[15px]">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    Configuración
+                  </p>
+                  <span className="font-mono text-[11px] text-text-disabled">
+                    {actualizarDatos.isPending ? 'GUARDANDO…' : 'GUARDADO'}
+                  </span>
+                </div>
+                <Campo etiqueta="Título / tema">
+                  <Input value={tema} onChange={(e) => setTema(e.target.value)} className="h-[38px]" />
+                </Campo>
+                <div className="flex gap-[10px]">
+                  <Campo etiqueta="Nota total" className="flex-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={nota}
+                      onChange={(e) => setNota(e.target.value)}
+                      className="h-[38px] font-mono"
+                    />
+                  </Campo>
+                  <Campo etiqueta="Tiempo (min)" className="flex-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={tiempoLimite}
+                      onChange={(e) => setTiempoLimite(e.target.value)}
+                      placeholder="Sin límite"
+                      className="h-[38px] font-mono"
+                    />
+                  </Campo>
+                </div>
+                {evaluacion.preguntas.length > 0 && (
+                  <p className="text-[13px] text-text-muted">
+                    Cada pregunta vale{' '}
+                    <span className="font-mono text-text">{puntosPorPregunta.toFixed(2).replace('.', ',')}</span>{' '}
+                    puntos.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-[9px] px-[18px] py-[15px]">
+                <p className="text-[15px] text-text-secondary">
+                  Título <strong className="text-text">{evaluacion.tema}</strong>
+                </p>
+                <p className="text-[15px] text-text-secondary">
+                  Nota total <strong className="font-mono text-text">{evaluacion.nota}</strong>
+                  {evaluacion.tiempo_limite_minutos && (
+                    <>
+                      {' '}
+                      · tiempo <strong className="font-mono text-text">{evaluacion.tiempo_limite_minutos} min</strong>
+                    </>
+                  )}
+                </p>
+                <p className="text-[13px] text-text-disabled">La configuración queda fija desde el lanzamiento.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-[14px] flex flex-col gap-[9px]">
+            {evaluacion.estado === 'borrador' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  guardar.mutate();
+                }}
+                disabled={guardar.isPending}
+                className="flex h-[46px] items-center justify-center rounded-[10px] bg-primary-800 text-[15px] font-bold text-white transition hover:bg-primary-900 disabled:opacity-50"
+              >
+                {guardar.isPending ? 'Guardando…' : 'Dejar lista para lanzar'}
+              </button>
+            )}
+
+            {evaluacion.estado === 'lista' && (
+              <>
+                <button
+                  type="button"
+                  onClick={abrirModalLanzar}
+                  disabled={lanzar.isPending}
+                  className="flex h-[46px] items-center justify-center rounded-[10px] bg-primary-800 text-[15px] font-bold text-white transition hover:bg-primary-900 disabled:opacity-50"
+                >
+                  Lanzar evaluación
+                </button>
+                <p className="text-[13px] text-text-muted">
+                  {presentes.length > 0
+                    ? `Los ${presentes.length} presentes reciben el examen y la edición se cierra.`
+                    : 'Primero hay que pasar lista de esta clase.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={verDemostracion}
+                  className="flex h-10 items-center justify-center rounded-[9px] border border-border bg-surface text-sm font-semibold text-text-secondary transition hover:bg-surface-hover"
+                >
+                  Realizar demostración
+                </button>
+              </>
+            )}
+
+            {evaluacion.estado === 'lanzada' && (
+              <Link
+                to={`/materias/${id}/evaluaciones/${evalId}/monitoreo`}
+                className="flex h-[46px] items-center justify-center rounded-[10px] bg-primary-800 text-[15px] font-bold text-white transition hover:bg-primary-900"
+              >
+                Ver monitoreo en vivo
+              </Link>
+            )}
+
+            {evaluacion.estado === 'finalizada' && (
+              <Link
+                to={`/materias/${id}/evaluaciones/${evalId}/resultados`}
+                className="flex h-[46px] items-center justify-center rounded-[10px] bg-primary-800 text-[15px] font-bold text-white transition hover:bg-primary-900"
+              >
+                Ver resultados →
+              </Link>
+            )}
+
+            <div className="border-t border-border pt-[13px]">
+              <button
+                type="button"
+                onClick={() => setModalEliminarAbierto(true)}
+                className="text-sm font-semibold text-text-muted transition hover:text-text"
+              >
+                Eliminar evaluación
+              </button>
+              <p className="mt-[5px] text-[13px] text-text-disabled">
+                Borra preguntas, intentos, respuestas y notas.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {demo && <ModalDemostracion demo={demo} onCerrar={() => setDemo(null)} />}
 
@@ -1345,8 +1574,9 @@ export function EvaluacionEditorPage() {
         <ModalImportarPreguntas
           materiaId={materiaId}
           evaluacionId={evaluacionId}
-          onImportado={() => {
+          onImportado={(n) => {
             setModalImportarAbierto(false);
+            toast({ tone: 'success', titulo: `${n} pregunta${n === 1 ? '' : 's'} importadas` });
             queryClient.invalidateQueries({ queryKey: ['evaluacion', String(evaluacionId)] });
           }}
           onCerrar={() => setModalImportarAbierto(false)}
@@ -1373,9 +1603,23 @@ export function EvaluacionEditorPage() {
           materiaId={materiaId}
           claseId={evaluacion.clase_id}
           enviando={lanzar.isPending}
-          error={errorLanzar}
+          error={error}
           onCerrar={() => setModalLanzarAbierto(false)}
           onConfirmar={(estudianteIds) => lanzar.mutate(estudianteIds)}
+        />
+      )}
+
+      {modalEliminarAbierto && (
+        <ModalConfirmarEliminar
+          titulo={`Eliminar "${evaluacion.tema}"`}
+          cuerpo="Se elimina la evaluación completa. No se puede deshacer."
+          filas={filasEliminar}
+          confirmacionTexto
+          textoBoton="Eliminar evaluación"
+          eliminando={eliminar.isPending}
+          error={error}
+          onConfirmar={() => eliminar.mutate()}
+          onCerrar={() => setModalEliminarAbierto(false)}
         />
       )}
     </div>

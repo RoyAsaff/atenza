@@ -2,12 +2,27 @@
 // guardar (Borrador → Lista), lanzar. Calcado de EvaluacionEditorPage.tsx
 // (E6/E7), adaptado de "pregunta/opciones" a "ejercicio/casos de prueba" y
 // con Monaco para la plantilla de código (Python) de cada ejercicio.
+//
+// Rediseño (design_handoff_editor_evaluacion, dirección 1b) — mismo
+// tratamiento que EvaluacionEditorPage: ficha al costado, autoguardado,
+// un único Alert y modal de eliminación. Ver FichaEditor.tsx para las
+// piezas compartidas.
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
-import { Code2, Eye, EyeOff, Lock, Plus, Sparkles, Upload } from 'lucide-react';
+import {
+  ChevronDown,
+  Code2,
+  Eye,
+  EyeOff,
+  MoreHorizontal,
+  Plus,
+  Sparkles,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
 import {
   CasoPrueba,
@@ -15,39 +30,36 @@ import {
   EjercicioParseado,
   ErrorParseoEjercicio,
   EstadoCuenta,
-  EstadoEvaluacion,
   ExamenCodigoConEjercicios,
   FilaListaAsistencia,
+  FilaMonitoreoCodigo,
   Materia,
 } from '../../core/tipos';
 import {
   Alert,
   Badge,
-  botonClases,
   Button,
   Campo,
-  Card,
-  CardBody,
-  CardHeader,
   Checkbox,
+  Dropdown,
+  DropdownItem,
   EmptyState,
   Input,
   Modal,
-  PageBreadcrumb,
-  PageHeader,
   Spinner,
   Textarea,
+  cn,
+  useToast,
 } from '../../core/ui/ui';
-
-const ESTADO_TONO: Record<
-  EstadoEvaluacion,
-  { texto: string; tono: 'neutral' | 'success' | 'info' | 'dark' }
-> = {
-  borrador: { texto: 'Borrador', tono: 'neutral' },
-  lista: { texto: 'Lista', tono: 'success' },
-  lanzada: { texto: 'Lanzada', tono: 'info' },
-  finalizada: { texto: 'Finalizada', tono: 'dark' },
-};
+import {
+  BloqueAhoraMismo,
+  BloqueAntesDeLanzar,
+  ComprobacionFicha,
+  EncabezadoEditor,
+  FichaEstado,
+  ModalConfirmarEliminar,
+  formatoHora,
+} from './FichaEditor';
 
 interface CasoForm {
   entrada: string;
@@ -278,18 +290,11 @@ function TarjetaEjercicio({
   onMover: (direccion: -1 | 1) => void;
 }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [editando, setEditando] = useState(false);
   const [mostrarCasos, setMostrarCasos] = useState(false);
+  const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
   const [error, setError] = useState('');
-
-  const alTerminar = {
-    onSuccess: () => {
-      setError('');
-      setEditando(false);
-      queryClient.invalidateQueries({ queryKey: ['examen-codigo', String(examenId)] });
-    },
-    onError: (err: unknown) => setError(mensajeDeError(err)),
-  };
 
   const actualizar = useMutation({
     mutationFn: (datos: {
@@ -302,7 +307,13 @@ function TarjetaEjercicio({
         `/api/materias/${materiaId}/examenes-codigo/${examenId}/ejercicios/${ejercicio.id}`,
         datos,
       ),
-    ...alTerminar,
+    onSuccess: () => {
+      setError('');
+      setEditando(false);
+      toast({ tone: 'success', titulo: 'Ejercicio actualizado' });
+      queryClient.invalidateQueries({ queryKey: ['examen-codigo', String(examenId)] });
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
   const eliminar = useMutation({
@@ -310,32 +321,30 @@ function TarjetaEjercicio({
       api.delete(
         `/api/materias/${materiaId}/examenes-codigo/${examenId}/ejercicios/${ejercicio.id}`,
       ),
-    ...alTerminar,
+    onSuccess: () => {
+      setError('');
+      setModalEliminarAbierto(false);
+      toast({ tone: 'success', titulo: 'Ejercicio eliminado' });
+      queryClient.invalidateQueries({ queryKey: ['examen-codigo', String(examenId)] });
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
-  function manejarEliminar() {
-    if (window.confirm('¿Eliminar este ejercicio? Esta acción no se puede deshacer.')) {
-      eliminar.mutate();
-    }
-  }
-
-  const visibles = ejercicio.casos_prueba.filter((c) => !c.es_oculto);
-  const ocultos = ejercicio.casos_prueba.filter((c) => c.es_oculto);
+  const visibles = ejercicio.casos_prueba.filter((c: CasoPrueba) => !c.es_oculto);
+  const ocultos = ejercicio.casos_prueba.filter((c: CasoPrueba) => c.es_oculto);
 
   return (
-    <div className="rounded-xl border border-border p-4 transition hover:border-border-hover">
+    <div className="rounded-xl border border-border bg-surface p-4 transition hover:border-border-hover">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-text-muted">
+          <span className="mt-0.5 flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-bold text-text-muted">
             {numero}
           </span>
           <div className="min-w-0">
-            <p className="whitespace-pre-wrap font-medium text-text">{ejercicio.enunciado}</p>
-            <p className="mt-1 text-xs text-text-secondary">
-              Nota: {ejercicio.nota} · {visibles.length} caso{visibles.length === 1 ? '' : 's'}{' '}
-              visible{visibles.length === 1 ? '' : 's'}
-              {ocultos.length > 0 &&
-                ` · ${ocultos.length} oculto${ocultos.length === 1 ? '' : 's'}`}
+            <p className="whitespace-pre-wrap text-[15px] font-semibold text-text">{ejercicio.enunciado}</p>
+            <p className="mt-1 font-mono text-xs text-text-secondary">
+              {ejercicio.casos_prueba.length} caso{ejercicio.casos_prueba.length === 1 ? '' : 's'} ·{' '}
+              {visibles.length} visible{visibles.length === 1 ? '' : 's'}
             </p>
             {ocultos.length === 0 && (
               <p className="mt-1 flex items-center gap-1 text-xs text-warning">
@@ -347,23 +356,38 @@ function TarjetaEjercicio({
           </div>
         </div>
         {editable && (
-          <div className="flex shrink-0 items-center rounded-lg border border-border">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex items-center overflow-hidden rounded-lg border border-border">
+              <button
+                onClick={() => onMover(-1)}
+                disabled={esPrimera}
+                className="flex h-[30px] w-[30px] items-center justify-center text-text-disabled transition hover:bg-surface-hover hover:text-text disabled:opacity-30"
+                title="Subir"
+              >
+                ▲
+              </button>
+              <span className="h-4 w-px bg-border" />
+              <button
+                onClick={() => onMover(1)}
+                disabled={esUltima}
+                className="flex h-[30px] w-[30px] items-center justify-center text-text-disabled transition hover:bg-surface-hover hover:text-text disabled:opacity-30"
+                title="Bajar"
+              >
+                ▼
+              </button>
+            </div>
             <button
-              onClick={() => onMover(-1)}
-              disabled={esPrimera}
-              className="px-2 py-1 text-text-disabled transition hover:bg-surface-hover hover:text-text disabled:opacity-30"
-              title="Subir"
+              onClick={() => setEditando(true)}
+              className="flex h-[30px] items-center rounded-lg border border-border px-[11px] text-[13px] font-semibold text-text-secondary transition hover:bg-surface-hover"
             >
-              ▲
+              Editar
             </button>
-            <span className="h-4 w-px bg-border" />
             <button
-              onClick={() => onMover(1)}
-              disabled={esUltima}
-              className="px-2 py-1 text-text-disabled transition hover:bg-surface-hover hover:text-text disabled:opacity-30"
-              title="Bajar"
+              onClick={() => setModalEliminarAbierto(true)}
+              className="flex h-[30px] w-[30px] items-center justify-center rounded-lg border border-border text-text-disabled transition hover:bg-surface-hover hover:text-red-600"
+              aria-label="Eliminar ejercicio"
             >
-              ▼
+              <Trash2 size={14} />
             </button>
           </div>
         )}
@@ -404,23 +428,6 @@ function TarjetaEjercicio({
         </ul>
       )}
 
-      {editable && (
-        <div className="ml-9 mt-3 flex gap-4 text-sm">
-          <button
-            onClick={() => setEditando(true)}
-            className="font-medium text-primary-700 hover:text-primary-800"
-          >
-            Editar
-          </button>
-          <button
-            onClick={manejarEliminar}
-            disabled={eliminar.isPending}
-            className="font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
-          >
-            Eliminar
-          </button>
-        </div>
-      )}
       {error && <p className="ml-9 mt-2 text-sm text-red-600">{error}</p>}
 
       {editando && (
@@ -432,6 +439,17 @@ function TarjetaEjercicio({
           textoBoton="Guardar cambios"
           onGuardar={(datos) => actualizar.mutate(datos)}
           onCerrar={() => setEditando(false)}
+        />
+      )}
+
+      {modalEliminarAbierto && (
+        <ModalConfirmarEliminar
+          titulo={`Eliminar el ejercicio ${numero}`}
+          cuerpo="Esta acción no se puede deshacer."
+          textoBoton="Eliminar ejercicio"
+          eliminando={eliminar.isPending}
+          onConfirmar={() => eliminar.mutate()}
+          onCerrar={() => setModalEliminarAbierto(false)}
         />
       )}
     </div>
@@ -573,7 +591,7 @@ function ModalImportarEjercicios({
 }: {
   materiaId: number;
   examenId: number;
-  onImportado: () => void;
+  onImportado: (n: number) => void;
   onCerrar: () => void;
 }) {
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -614,7 +632,7 @@ function ModalImportarEjercicios({
       ),
     onSuccess: () => {
       setError('');
-      onImportado();
+      onImportado(resultado!.ejercicios.length - excluidos.size);
     },
     onError: (err: unknown) => setError(mensajeDeError(err)),
   });
@@ -879,25 +897,50 @@ function ModalPromptIACodigo({
   );
 }
 
+// ── Esqueleto de carga: silueta real (encabezado de una línea, dos
+// tarjetas a la izquierda, ficha de 340px a la derecha). ──────────────
+function EsqueletoEditor() {
+  return (
+    <div className="space-y-5">
+      <div className="animate-pulse rounded-xl border border-border bg-surface px-6 py-4">
+        <div className="h-3 w-40 rounded bg-neutral-100" />
+        <div className="mt-2.5 h-6 w-64 rounded bg-neutral-100" />
+      </div>
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="animate-pulse space-y-3">
+          <div className="h-[52px] rounded-xl bg-neutral-100" />
+          <div className="h-28 rounded-xl bg-neutral-100" />
+          <div className="h-28 rounded-xl bg-neutral-100" />
+        </div>
+        <div className="hidden animate-pulse flex-col gap-3 xl:flex">
+          <div className="h-64 rounded-[14px] bg-neutral-100" />
+          <div className="h-[46px] rounded-[10px] bg-neutral-100" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ExamenCodigoEditorPage() {
   const { id, examenId } = useParams();
   const materiaId = Number(id);
   const examenCodigoId = Number(examenId);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const [tema, setTema] = useState('');
   const [nota, setNota] = useState('');
   const [tiempoLimite, setTiempoLimite] = useState('');
-  const [errorDatos, setErrorDatos] = useState('');
+  const [guardadoEn, setGuardadoEn] = useState<Date | null>(null);
+  const [error, setError] = useState('');
   const [errorEjercicio, setErrorEjercicio] = useState('');
-  const [errorGuardar, setErrorGuardar] = useState('');
-  const [errorLanzar, setErrorLanzar] = useState('');
-  const [errorEliminar, setErrorEliminar] = useState('');
   const [modalEjercicioAbierto, setModalEjercicioAbierto] = useState(false);
   const [modalLanzarAbierto, setModalLanzarAbierto] = useState(false);
   const [modalImportarAbierto, setModalImportarAbierto] = useState(false);
   const [modalPromptAbierto, setModalPromptAbierto] = useState(false);
+  const [modalEliminarAbierto, setModalEliminarAbierto] = useState(false);
+  const evitarAutoguardadoRef = useRef(true);
 
   const { data: examen, isLoading, isError } = useQuery({
     queryKey: ['examen-codigo', String(examenCodigoId)],
@@ -929,15 +972,46 @@ export function ExamenCodigoEditorPage() {
     },
   });
 
+  const editable = examen ? examen.estado === 'borrador' || examen.estado === 'lista' : false;
+
+  const { data: listaAsistencia } = useQuery({
+    queryKey: ['asistencia', String(materiaId), examen ? String(examen.clase_id) : ''],
+    queryFn: async () => {
+      const { data } = await api.get<{ lista: FilaListaAsistencia[] }>(
+        `/api/materias/${materiaId}/clases/${examen!.clase_id}/asistencia`,
+      );
+      return data.lista;
+    },
+    enabled: !!examen,
+  });
+  const presentes = (listaAsistencia ?? []).filter(
+    (f) => f.marcaje === 'puntual' || f.marcaje === 'atrasado',
+  );
+
+  const { data: monitoreo } = useQuery({
+    queryKey: ['monitoreo-codigo', String(examenCodigoId)],
+    queryFn: async () => {
+      const { data } = await api.get<{ monitoreo: FilaMonitoreoCodigo[] }>(
+        `/api/materias/${materiaId}/examenes-codigo/${examenCodigoId}/monitoreo`,
+      );
+      return data.monitoreo;
+    },
+    enabled: !!examen && examen.estado === 'lanzada',
+    refetchInterval: 30000,
+  });
+
   useEffect(() => {
     if (examen) {
       setTema(examen.tema);
       setNota(String(examen.nota));
       setTiempoLimite(examen.tiempo_limite_minutos ? String(examen.tiempo_limite_minutos) : '');
+      evitarAutoguardadoRef.current = true;
     }
   }, [examen]);
 
-  const editable = examen ? examen.estado === 'borrador' || examen.estado === 'lista' : false;
+  const notaValida = Number(nota) > 0 && !Number.isNaN(Number(nota));
+  const temaValido = tema.trim() !== '';
+  const configuracionValida = temaValido && notaValida;
 
   const actualizarDatos = useMutation({
     mutationFn: () =>
@@ -947,11 +1021,23 @@ export function ExamenCodigoEditorPage() {
         tiempo_limite_minutos: tiempoLimite ? Number(tiempoLimite) : null,
       }),
     onSuccess: () => {
-      setErrorDatos('');
+      setGuardadoEn(new Date());
       queryClient.invalidateQueries({ queryKey: ['examen-codigo', String(examenCodigoId)] });
     },
-    onError: (err: unknown) => setErrorDatos(mensajeDeError(err)),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
+
+  useEffect(() => {
+    if (evitarAutoguardadoRef.current) {
+      evitarAutoguardadoRef.current = false;
+      return;
+    }
+    if (!editable || !configuracionValida) return;
+    setError('');
+    const id = setTimeout(() => actualizarDatos.mutate(), 800);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tema, nota, tiempoLimite, editable]);
 
   const lanzar = useMutation({
     mutationFn: (estudianteIds: number[]) =>
@@ -959,16 +1045,16 @@ export function ExamenCodigoEditorPage() {
         estudiante_ids: estudianteIds,
       }),
     onSuccess: () => {
-      setErrorLanzar('');
+      setError('');
       setModalLanzarAbierto(false);
       queryClient.invalidateQueries({ queryKey: ['examen-codigo', String(examenCodigoId)] });
       navigate(`/materias/${id}/examenes-codigo/${examenId}/monitoreo`);
     },
-    onError: (err: unknown) => setErrorLanzar(mensajeDeError(err)),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
   function abrirModalLanzar() {
-    setErrorLanzar('');
+    setError('');
     setModalLanzarAbierto(true);
   }
 
@@ -982,18 +1068,8 @@ export function ExamenCodigoEditorPage() {
         navigate(`/materias/${id}`);
       }
     },
-    onError: (err: unknown) => setErrorEliminar(mensajeDeError(err)),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
-
-  function manejarEliminar() {
-    if (
-      window.confirm(
-        'Se eliminará el examen por completo: ejercicios, intentos, respuestas y notas. No se puede deshacer. ¿Continuar?',
-      )
-    ) {
-      eliminar.mutate();
-    }
-  }
 
   const agregarEjercicio = useMutation({
     mutationFn: (datos: {
@@ -1005,6 +1081,7 @@ export function ExamenCodigoEditorPage() {
       api.post(`/api/materias/${materiaId}/examenes-codigo/${examenCodigoId}/ejercicios`, datos),
     onSuccess: () => {
       setErrorEjercicio('');
+      toast({ tone: 'success', titulo: 'Ejercicio agregado' });
       queryClient.invalidateQueries({ queryKey: ['examen-codigo', String(examenCodigoId)] });
     },
     onError: (err: unknown) => setErrorEjercicio(mensajeDeError(err)),
@@ -1024,10 +1101,11 @@ export function ExamenCodigoEditorPage() {
     mutationFn: () =>
       api.post(`/api/materias/${materiaId}/examenes-codigo/${examenCodigoId}/guardar`),
     onSuccess: () => {
-      setErrorGuardar('');
+      setError('');
+      toast({ tone: 'success', titulo: 'Examen listo para lanzar' });
       queryClient.invalidateQueries({ queryKey: ['examen-codigo', String(examenCodigoId)] });
     },
-    onError: (err: unknown) => setErrorGuardar(mensajeDeError(err)),
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
   function moverEjercicio(ejercicioId: number, direccion: -1 | 1) {
@@ -1040,13 +1118,42 @@ export function ExamenCodigoEditorPage() {
     reordenar.mutate(ids);
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface p-5 text-sm text-text-secondary">
-        <Spinner /> Cargando…
-      </div>
-    );
-  }
+  const puntosPorEjercicio = useMemo(
+    () => (examen && examen.ejercicios.length > 0 ? examen.nota / examen.ejercicios.length : 0),
+    [examen],
+  );
+
+  const comprobaciones: ComprobacionFicha[] = useMemo(() => {
+    if (!examen) return [];
+    const totalEjercicios = examen.ejercicios.length;
+    const sinCasos = examen.ejercicios.filter((e) => e.casos_prueba.length === 0).length;
+    return [
+      {
+        ok: totalEjercicios > 0,
+        textoOk: `${totalEjercicios} ejercicio${totalEjercicios === 1 ? '' : 's'} cargados`,
+        textoFalta: 'Sin ejercicios: no se puede lanzar',
+      },
+      {
+        ok: sinCasos === 0 && totalEjercicios > 0,
+        textoOk: 'Todos los ejercicios tienen casos de prueba',
+        textoFalta: `${sinCasos} ejercicio${sinCasos === 1 ? '' : 's'} sin casos de prueba`,
+      },
+      {
+        ok: configuracionValida,
+        textoOk: `Nota total ${examen.nota}${
+          examen.tiempo_limite_minutos ? ` · ${examen.tiempo_limite_minutos} min` : ''
+        }`,
+        textoFalta: 'Falta la nota total',
+      },
+      {
+        ok: presentes.length > 0,
+        textoOk: `${presentes.length} presente${presentes.length === 1 ? '' : 's'} en la clase de hoy`,
+        textoFalta: 'Falta pasar lista de esta clase',
+      },
+    ];
+  }, [examen, configuracionValida, presentes.length]);
+
+  if (isLoading) return <EsqueletoEditor />;
   if (isError || !examen) {
     return (
       <p className="rounded-lg border border-red-100 bg-red-50 p-5 text-sm text-red-600">
@@ -1055,141 +1162,133 @@ export function ExamenCodigoEditorPage() {
     );
   }
 
+  const textoEstadoActual =
+    examen.estado === 'borrador'
+      ? 'Borrador · falta dejarlo listo'
+      : examen.estado === 'lista'
+        ? 'Lista · se puede editar y lanzar'
+        : examen.estado === 'lanzada'
+          ? `Lanzado${examen.fecha_lanzamiento ? ` ${formatoHora(examen.fecha_lanzamiento)}` : ''} · edición cerrada`
+          : 'Finalizado · notas al centralizador';
+
+  const sello = !editable ? null : actualizarDatos.isPending ? (
+    <span className="font-mono text-[12px] text-text-disabled">Guardando…</span>
+  ) : !configuracionValida ? (
+    <span className="font-mono text-[12px] text-accent-700">Sin guardar</span>
+  ) : guardadoEn ? (
+    <span className="font-mono text-[12px] text-text-disabled">Guardado {formatoHora(guardadoEn.toISOString())}</span>
+  ) : null;
+
+  const menuItems: { texto: string; onSelect: () => void }[] = [];
+  if (examen.estado === 'finalizada') {
+    menuItems.push({
+      texto: 'Ver monitoreo',
+      onSelect: () => navigate(`/materias/${id}/examenes-codigo/${examenId}/monitoreo`),
+    });
+  }
+
+  const filasEliminar: string[] = [];
+  if (examen.ejercicios.length > 0) {
+    filasEliminar.push(
+      `${examen.ejercicios.length} ejercicio${examen.ejercicios.length === 1 ? '' : 's'}`,
+    );
+  }
+  if (monitoreo) {
+    const intentos = monitoreo.length;
+    if (intentos > 0) filasEliminar.push(`${intentos} intento${intentos === 1 ? '' : 's'} con sus respuestas`);
+    const notas = monitoreo.filter((f) => f.estado === 'finalizado').length;
+    if (notas > 0) filasEliminar.push(`${notas} nota${notas === 1 ? '' : 's'}, que salen del centralizador`);
+    const incidentes = monitoreo.reduce((acc, f) => acc + f.incidentes, 0);
+    if (incidentes > 0) {
+      filasEliminar.push(`${incidentes} incidente${incidentes === 1 ? '' : 's'} registrado${incidentes === 1 ? '' : 's'}`);
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <PageBreadcrumb>
-          <Link to={`/materias/${id}/clases/${examen.clase_id}/examenes-codigo`}>
-            ‹ Exámenes de código de la clase
-          </Link>
-        </PageBreadcrumb>
-        <PageHeader
-          eyebrow="Examen de código"
-          title={
-            <span className="inline-flex flex-wrap items-center gap-3">
-              {examen.tema}
-              <Badge tone={ESTADO_TONO[examen.estado].tono}>{ESTADO_TONO[examen.estado].texto}</Badge>
-            </span>
-          }
-          description={`Nota total: ${examen.nota} · ${examen.ejercicios.length} ejercicio${examen.ejercicios.length === 1 ? '' : 's'}`}
-          actions={
-            <>
-              {examen.estado === 'borrador' && (
-                <Button onClick={() => guardar.mutate()} disabled={guardar.isPending}>
-                  {guardar.isPending ? 'Guardando…' : 'Guardar examen'}
-                </Button>
-              )}
-              {examen.estado === 'lista' && (
-                <Button onClick={abrirModalLanzar} disabled={lanzar.isPending}>
-                  {lanzar.isPending ? 'Lanzando…' : 'Lanzar examen'}
-                </Button>
-              )}
-              {(examen.estado === 'lanzada' || examen.estado === 'finalizada') && (
-                <Link
-                  to={`/materias/${id}/examenes-codigo/${examenId}/monitoreo`}
-                  className={botonClases('accent', 'md')}
+    <div className="space-y-5">
+      <EncabezadoEditor
+        volverA={`/materias/${id}/clases/${examen.clase_id}/examenes-codigo`}
+        volverTexto="Exámenes de código de la clase"
+        titulo={examen.tema}
+        estado={examen.estado}
+        sello={sello}
+        menu={
+          menuItems.length > 0 && (
+            <Dropdown
+              trigger={() => (
+                <button
+                  type="button"
+                  aria-label="Más acciones"
+                  className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-border bg-surface text-text-secondary transition hover:bg-surface-hover"
                 >
-                  Ver monitoreo en vivo
-                </Link>
+                  <MoreHorizontal size={16} />
+                </button>
               )}
-              {examen.estado === 'finalizada' && (
-                <Link
-                  to={`/materias/${id}/examenes-codigo/${examenId}/resultados`}
-                  className={botonClases('primary', 'md')}
-                >
-                  Ver resultados →
-                </Link>
-              )}
-              <Button variante="danger" onClick={manejarEliminar} disabled={eliminar.isPending}>
-                {eliminar.isPending ? 'Eliminando…' : 'Eliminar examen'}
-              </Button>
-            </>
-          }
-        />
-        {errorGuardar && <p className="mt-2 text-sm text-red-600">{errorGuardar}</p>}
-        {errorEliminar && <p className="mt-2 text-sm text-red-600">{errorEliminar}</p>}
-      </div>
-
-      {!editable && (
-        <Alert tone="warning" icon={<Lock size={16} />}>
-          Este examen ya fue lanzado: no se puede editar.
-        </Alert>
-      )}
-
-      {editable && (
-        <Card>
-          <CardHeader title="Configuración" description="Título, nota total y tiempo límite del examen" />
-          <CardBody>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                actualizarDatos.mutate();
-              }}
-              className="flex flex-wrap items-end gap-3"
             >
-              <Campo etiqueta="Título / tema" className="min-w-48 flex-1">
-                <Input required value={tema} onChange={(e) => setTema(e.target.value)} />
-              </Campo>
-              <Campo etiqueta="Nota total">
-                <Input
-                  type="number"
-                  min={1}
-                  required
-                  value={nota}
-                  onChange={(e) => setNota(e.target.value)}
-                  className="w-28"
-                />
-              </Campo>
-              <Campo etiqueta="Tiempo límite (min)" ayuda="Vacío = sin límite">
-                <Input
-                  type="number"
-                  min={1}
-                  value={tiempoLimite}
-                  onChange={(e) => setTiempoLimite(e.target.value)}
-                  placeholder="Sin límite"
-                  className="w-32"
-                />
-              </Campo>
-              <Button type="submit" variante="secondary" disabled={actualizarDatos.isPending}>
-                Guardar datos
-              </Button>
-            </form>
-            {errorDatos && <p className="mt-3 text-sm text-red-600">{errorDatos}</p>}
-          </CardBody>
-        </Card>
-      )}
+              {menuItems.map((item) => (
+                <DropdownItem key={item.texto} onSelect={item.onSelect}>
+                  {item.texto}
+                </DropdownItem>
+              ))}
+            </Dropdown>
+          )
+        }
+      />
 
-      <Card>
-        <CardHeader
-          title={`Ejercicios (${examen.ejercicios.length})`}
-          description="Cada uno con su enunciado, plantilla de código opcional y casos de prueba"
-          actions={
-            editable && (
-              <>
-                <Button variante="secondary" onClick={() => setModalPromptAbierto(true)}>
-                  <Sparkles size={16} /> Sugerir prompt IA
-                </Button>
-                {permiteImportWord ? (
-                  <Button variante="secondary" onClick={() => setModalImportarAbierto(true)}>
-                    <Upload size={16} /> Importar ejercicios (.md)
-                  </Button>
-                ) : (
-                  <Link
-                    to="/suscripcion/planes"
-                    className={botonClases('secondary')}
-                    title="Disponible en el plan Pro"
-                  >
-                    <Upload size={16} /> Importar ejercicios (plan Pro)
-                  </Link>
-                )}
-                <Button onClick={() => setModalEjercicioAbierto(true)}>
-                  <Plus size={16} /> Agregar ejercicio
-                </Button>
-              </>
-            )
-          }
-        />
-        <CardBody className={examen.ejercicios.length > 0 ? 'space-y-3' : ''}>
+      {error && <Alert tone="danger">{error}</Alert>}
+
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="order-2 flex flex-col gap-3 xl:order-1">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-surface px-[18px] py-[13px]">
+            <p className="text-[15px] text-text-secondary">
+              {examen.ejercicios.length === 0 ? (
+                'Sin ejercicios todavía'
+              ) : (
+                <>
+                  <strong className="text-text">
+                    {examen.ejercicios.length} ejercicio{examen.ejercicios.length === 1 ? '' : 's'}
+                  </strong>{' '}
+                  · {puntosPorEjercicio.toFixed(2).replace('.', ',')} puntos cada uno
+                </>
+              )}
+            </p>
+            {editable && (
+              <div className="flex items-center gap-2">
+                <Dropdown
+                  trigger={({ abierto }) => (
+                    <button
+                      type="button"
+                      className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 text-sm font-semibold text-text-secondary transition hover:bg-surface-hover"
+                    >
+                      Agregar de a muchas
+                      <ChevronDown size={14} className={cn('transition', abierto && 'rotate-180')} />
+                    </button>
+                  )}
+                >
+                  <DropdownItem icono={<Sparkles size={15} />} onSelect={() => setModalPromptAbierto(true)}>
+                    Sugerir prompt IA
+                  </DropdownItem>
+                  {permiteImportWord ? (
+                    <DropdownItem icono={<Upload size={15} />} onSelect={() => setModalImportarAbierto(true)}>
+                      Importar ejercicios (.md)
+                    </DropdownItem>
+                  ) : (
+                    <DropdownItem icono={<Upload size={15} />} onSelect={() => navigate('/suscripcion/planes')}>
+                      Importar ejercicios (plan Pro)
+                    </DropdownItem>
+                  )}
+                </Dropdown>
+                <button
+                  type="button"
+                  onClick={() => setModalEjercicioAbierto(true)}
+                  className="flex h-9 items-center gap-1.5 rounded-lg bg-primary-800 px-4 text-sm font-bold text-white transition hover:bg-primary-900"
+                >
+                  <Plus size={15} /> Agregar ejercicio
+                </button>
+              </div>
+            )}
+          </div>
+
           {examen.ejercicios.length === 0 && (
             <EmptyState
               icon={<Code2 size={32} />}
@@ -1211,8 +1310,148 @@ export function ExamenCodigoEditorPage() {
               onMover={(direccion) => moverEjercicio(ej.id, direccion)}
             />
           ))}
-        </CardBody>
-      </Card>
+        </div>
+
+        <div className="order-1 w-full xl:sticky xl:top-5 xl:order-2">
+          <div className="overflow-hidden rounded-[14px] border border-border bg-surface">
+            <FichaEstado estado={examen.estado} textoActual={textoEstadoActual} />
+
+            {editable && <BloqueAntesDeLanzar items={comprobaciones} />}
+            {examen.estado === 'lanzada' && monitoreo && (
+              <BloqueAhoraMismo
+                rindiendo={monitoreo.filter((f) => f.estado === 'en_curso').length}
+                terminaron={monitoreo.filter((f) => f.estado === 'finalizado').length}
+                incidentes={monitoreo.reduce((acc, f) => acc + f.incidentes, 0)}
+              />
+            )}
+
+            {editable ? (
+              <div className="flex flex-col gap-3 px-[18px] py-[15px]">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-text-muted">
+                    Configuración
+                  </p>
+                  <span className="font-mono text-[11px] text-text-disabled">
+                    {actualizarDatos.isPending ? 'GUARDANDO…' : 'GUARDADO'}
+                  </span>
+                </div>
+                <Campo etiqueta="Título / tema">
+                  <Input value={tema} onChange={(e) => setTema(e.target.value)} className="h-[38px]" />
+                </Campo>
+                <div className="flex gap-[10px]">
+                  <Campo etiqueta="Nota total" className="flex-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={nota}
+                      onChange={(e) => setNota(e.target.value)}
+                      className="h-[38px] font-mono"
+                    />
+                  </Campo>
+                  <Campo etiqueta="Tiempo (min)" className="flex-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={tiempoLimite}
+                      onChange={(e) => setTiempoLimite(e.target.value)}
+                      placeholder="Sin límite"
+                      className="h-[38px] font-mono"
+                    />
+                  </Campo>
+                </div>
+                {examen.ejercicios.length > 0 && (
+                  <p className="text-[13px] text-text-muted">
+                    Cada ejercicio vale{' '}
+                    <span className="font-mono text-text">{puntosPorEjercicio.toFixed(2).replace('.', ',')}</span>{' '}
+                    puntos.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-[9px] px-[18px] py-[15px]">
+                <p className="text-[15px] text-text-secondary">
+                  Título <strong className="text-text">{examen.tema}</strong>
+                </p>
+                <p className="text-[15px] text-text-secondary">
+                  Nota total <strong className="font-mono text-text">{examen.nota}</strong>
+                  {examen.tiempo_limite_minutos && (
+                    <>
+                      {' '}
+                      · tiempo <strong className="font-mono text-text">{examen.tiempo_limite_minutos} min</strong>
+                    </>
+                  )}
+                </p>
+                <p className="text-[13px] text-text-disabled">La configuración queda fija desde el lanzamiento.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-[14px] flex flex-col gap-[9px]">
+            {examen.estado === 'borrador' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  guardar.mutate();
+                }}
+                disabled={guardar.isPending}
+                className="flex h-[46px] items-center justify-center rounded-[10px] bg-primary-800 text-[15px] font-bold text-white transition hover:bg-primary-900 disabled:opacity-50"
+              >
+                {guardar.isPending ? 'Guardando…' : 'Dejar listo para lanzar'}
+              </button>
+            )}
+
+            {examen.estado === 'lista' && (
+              <button
+                type="button"
+                onClick={abrirModalLanzar}
+                disabled={lanzar.isPending}
+                className="flex h-[46px] items-center justify-center rounded-[10px] bg-primary-800 text-[15px] font-bold text-white transition hover:bg-primary-900 disabled:opacity-50"
+              >
+                Lanzar examen
+              </button>
+            )}
+            {examen.estado === 'lista' && (
+              <p className="text-[13px] text-text-muted">
+                {presentes.length > 0
+                  ? `Los ${presentes.length} presentes reciben el examen y la edición se cierra.`
+                  : 'Primero hay que pasar lista de esta clase.'}
+              </p>
+            )}
+
+            {examen.estado === 'lanzada' && (
+              <Link
+                to={`/materias/${id}/examenes-codigo/${examenId}/monitoreo`}
+                className="flex h-[46px] items-center justify-center rounded-[10px] bg-primary-800 text-[15px] font-bold text-white transition hover:bg-primary-900"
+              >
+                Ver monitoreo en vivo
+              </Link>
+            )}
+
+            {examen.estado === 'finalizada' && (
+              <Link
+                to={`/materias/${id}/examenes-codigo/${examenId}/resultados`}
+                className="flex h-[46px] items-center justify-center rounded-[10px] bg-primary-800 text-[15px] font-bold text-white transition hover:bg-primary-900"
+              >
+                Ver resultados →
+              </Link>
+            )}
+
+            <div className="border-t border-border pt-[13px]">
+              <button
+                type="button"
+                onClick={() => setModalEliminarAbierto(true)}
+                className="text-sm font-semibold text-text-muted transition hover:text-text"
+              >
+                Eliminar examen
+              </button>
+              <p className="mt-[5px] text-[13px] text-text-disabled">
+                Borra ejercicios, intentos, respuestas y notas.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {modalPromptAbierto && (
         <ModalPromptIACodigo
@@ -1226,8 +1465,9 @@ export function ExamenCodigoEditorPage() {
         <ModalImportarEjercicios
           materiaId={materiaId}
           examenId={examenCodigoId}
-          onImportado={() => {
+          onImportado={(n) => {
             setModalImportarAbierto(false);
+            toast({ tone: 'success', titulo: `${n} ejercicio${n === 1 ? '' : 's'} importados` });
             queryClient.invalidateQueries({ queryKey: ['examen-codigo', String(examenCodigoId)] });
           }}
           onCerrar={() => setModalImportarAbierto(false)}
@@ -1254,9 +1494,23 @@ export function ExamenCodigoEditorPage() {
           materiaId={materiaId}
           claseId={examen.clase_id}
           enviando={lanzar.isPending}
-          error={errorLanzar}
+          error={error}
           onCerrar={() => setModalLanzarAbierto(false)}
           onConfirmar={(estudianteIds) => lanzar.mutate(estudianteIds)}
+        />
+      )}
+
+      {modalEliminarAbierto && (
+        <ModalConfirmarEliminar
+          titulo={`Eliminar "${examen.tema}"`}
+          cuerpo="Se elimina el examen completo. No se puede deshacer."
+          filas={filasEliminar}
+          confirmacionTexto
+          textoBoton="Eliminar examen"
+          eliminando={eliminar.isPending}
+          error={error}
+          onConfirmar={() => eliminar.mutate()}
+          onCerrar={() => setModalEliminarAbierto(false)}
         />
       )}
     </div>
