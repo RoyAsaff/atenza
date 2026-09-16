@@ -44,6 +44,31 @@ apuntando a producción — es lo que se quiere para generar el release
 (`flutter build apk --release`), pero ojo si la idea era probar contra el
 backend local.
 
+## Publicar una versión nueva
+
+No hay workflow de CI para esto (a diferencia de `desktop/`, ver
+`.github/workflows/deploy-desktop.yml`) — se hace a mano:
+
+```bash
+cd mobile
+flutter build apk --release   # sin --dart-define=API_URL, ver arriba
+```
+
+El link fijo de descarga en la landing (`URL_APK_ANDROID` en
+`web/src/features/landing/LandingPage.tsx`) apunta al tag fijo
+`mobile-latest`, **no** a `releases/latest` — ese lo ocupa siempre la
+última versión de escritorio (su auto-updater depende de eso). Para
+publicar la build nueva ahí:
+
+```bash
+gh release upload mobile-latest build/app/outputs/apk/release/app-release.apk \
+  --clobber -R RoyAsaff/atenza
+```
+
+Opcionalmente también se puede crear un release con tag de versión
+(`vX.Y.Z`) para dejar registro/changelog, pero el link de la landing no
+depende de ese tag.
+
 ## Decisiones aplicadas
 
 - D-03: el login envía `contexto: 'estudiante'` explícito; la sesión se

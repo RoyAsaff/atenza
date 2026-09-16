@@ -17,9 +17,15 @@ import {
 import { Card, CardBody, botonClases } from '../../core/ui/ui';
 import { LogoLockup, LogoMark } from '../../core/ui/Logo';
 
-// Apunta siempre al asset del último release en GitHub — no hay que
-// actualizar este link cada vez que se publique una versión nueva.
-const URL_APK_ANDROID = 'https://github.com/RoyAsaff/atenza/releases/latest/download/app-release.apk';
+// El release "latest" de GitHub es único por repo y hoy lo ocupa siempre
+// la última versión de escritorio (deploy-desktop.yml la publica ahí a
+// propósito: el auto-updater de la app de escritorio depende de que
+// releases/latest/download/latest.json exista). Por eso el APK NO puede
+// vivir bajo /latest/ — usa en cambio el tag fijo "mobile-latest", cuyo
+// asset se reemplaza a mano (`gh release upload mobile-latest
+// app-release.apk --clobber`) cada vez que se publica una build móvil
+// nueva. Ver mobile/README.md.
+const URL_APK_ANDROID = 'https://github.com/RoyAsaff/atenza/releases/download/mobile-latest/app-release.apk';
 const URL_DESKTOP_WINDOWS =
   'https://github.com/RoyAsaff/atenza/releases/latest/download/Atenza-Examenes-Setup.exe';
 
