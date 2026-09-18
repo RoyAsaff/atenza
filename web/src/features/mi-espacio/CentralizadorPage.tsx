@@ -1028,7 +1028,10 @@ export function CentralizadorPage() {
               promedioCurso={promedioCurso}
             />
           </div>
-          <div className="order-1 w-full xl:sticky xl:top-5 xl:order-2 xl:w-[336px]">
+          {/* En xl el panel queda fijo y con scroll propio (alto = pantalla menos
+              la barra superior): marcar/desmarcar cambia su altura, y sin tope
+              eso arrastraba el scroll de toda la página. */}
+          <div className="order-1 w-full xl:sticky xl:top-5 xl:order-2 xl:max-h-[calc(100vh-8rem)] xl:w-[336px] xl:overflow-y-auto xl:overscroll-contain">
             <PanelNotaFinal
               columnas={columnas}
               marcadas={marcadas}
