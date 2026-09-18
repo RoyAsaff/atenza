@@ -19,6 +19,7 @@ import { InscripcionRepositorio } from '../../domain/repositorios/inscripcion-re
 import { MateriaRepositorio } from '../../domain/repositorios/materia-repositorio';
 import { AsistenciaRepositorio } from '../../domain/repositorios/asistencia-repositorio';
 import { EvaluacionRepositorio } from '../../domain/repositorios/evaluacion-repositorio';
+import { resumenAsistencia, tieneEvaluacionAbierta } from '../clases/resumen-clase';
 
 // Valor fijo: no hay campo de duración real en Clase (ver nota arriba).
 export const DURACION_CLASE_MINUTOS = 90;
@@ -49,8 +50,6 @@ function hoyBolivia(): Date {
   const ahora = new Date(Date.now() - OFFSET_BOLIVIA_MINUTOS * 60 * 1000);
   return new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
 }
-
-const PRESENTES: readonly string[] = ['puntual', 'atrasado'];
 
 export class VerClasesDeHoy {
   constructor(
@@ -103,13 +102,7 @@ export class VerClasesDeHoy {
               this.evaluaciones.listarPorClase(c.id),
             ]);
 
-            const asistencia_tomada = asistenciasClase.length > 0;
-            const asistencia_resumen = asistencia_tomada
-              ? {
-                  presentes: asistenciasClase.filter((a) => PRESENTES.includes(a.marcaje)).length,
-                  total: asistenciasClase.length,
-                }
-              : null;
+            const asistencia_resumen = resumenAsistencia(asistenciasClase);
 
             return {
               clase_id: c.id,
@@ -120,9 +113,9 @@ export class VerClasesDeHoy {
               duracion_minutos: DURACION_CLASE_MINUTOS,
               rol,
               total_estudiantes: totalEstudiantes,
-              asistencia_tomada,
+              asistencia_tomada: asistenciasClase.length > 0,
               asistencia_resumen,
-              tiene_evaluacion_abierta: evaluacionesClase.some((e) => e.estado === 'lanzada'),
+              tiene_evaluacion_abierta: tieneEvaluacionAbierta(evaluacionesClase),
             };
           }),
         );

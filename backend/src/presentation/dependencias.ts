@@ -348,11 +348,6 @@ export const deslindarseDeMateria = new DeslindarseDeMateria(
 // E4
 export const claseRepositorio = new PrismaClaseRepositorio(prisma);
 
-export const verClases = new VerClases(
-  claseRepositorio,
-  materiaRepositorio,
-  inscripcionRepositorio,
-);
 export const crearClase = new CrearClase(
   claseRepositorio,
   materiaRepositorio,
@@ -368,11 +363,9 @@ export const actualizarClase = new ActualizarClase(
   materiaRepositorio,
   bitacoraRepositorio,
 );
-export const eliminarClase = new EliminarClase(
-  claseRepositorio,
-  materiaRepositorio,
-  bitacoraRepositorio,
-);
+// verClases y eliminarClase se instancian más abajo (ver comentario junto a
+// examenCodigoRepositorio): dependen de asistencia/evaluación/examen de
+// código/guías, y esos repos todavía no existen a esta altura del archivo.
 
 // E5
 export const asistenciaRepositorio = new PrismaAsistenciaRepositorio(prisma);
@@ -778,6 +771,28 @@ export const verMonitoreoGuia = new VerMonitoreoGuia(
 // clases del lado estudiante que corren código.
 export const examenCodigoRepositorio = new PrismaExamenCodigoRepositorio(prisma);
 export const intentoCodigoRepositorio = new PrismaIntentoCodigoRepositorio(prisma);
+
+// Detalle de materia (handoff 1b, 18/09): verClases enriquece cada clase
+// con su estado de asistencia/evaluación (ver resumen-clase.ts) y
+// eliminarClase cascada a mano sus dependientes (FK ON DELETE RESTRICT) —
+// ambos necesitan asistencia/evaluación/examen de código/guías, así que
+// se instancian acá, una vez que todos esos repos ya existen.
+export const verClases = new VerClases(
+  claseRepositorio,
+  materiaRepositorio,
+  inscripcionRepositorio,
+  asistenciaRepositorio,
+  evaluacionRepositorio,
+);
+export const eliminarClase = new EliminarClase(
+  claseRepositorio,
+  materiaRepositorio,
+  bitacoraRepositorio,
+  asistenciaRepositorio,
+  evaluacionRepositorio,
+  examenCodigoRepositorio,
+  guiaRepositorio,
+);
 // DOCKER_SOCKET_PATH es opcional: sin ella, dockerode autodetecta el socket
 // correcto por plataforma (ver comentario en el constructor). Solo hace
 // falta setearla para forzar una ruta puntual (p.ej. un contexto de Docker

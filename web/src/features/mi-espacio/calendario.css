@@ -76,3 +76,10 @@
   background-color: #d2dde5;
   color: #556672;
 }
+
+/* Pasada y sin asistencia registrada (detalle de materia, handoff 1b) —
+   gana sobre .clase-pasada por ir después en la hoja. */
+.clase-sin-asistencia.fc-event {
+  background-color: #fef4ee;
+  color: #a15326;
+}

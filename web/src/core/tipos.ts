@@ -25,13 +25,19 @@ export interface Materia {
   docente_id: number;
 }
 
-// E4: clase de una materia
+// E4: clase de una materia. Los 4 campos de estado (detalle de materia,
+// handoff 1b 18/09) tienen el mismo shape que ClaseDeHoy — GET
+// /api/materias/:id/clases reusa el mismo cómputo que /clases-hoy.
 export interface Clase {
   id: number;
   fecha: string; // ISO; solo interesa AAAA-MM-DD
   hora: string; // "HH:MM"
   tema: string;
   materia_id: number;
+  total_estudiantes: number;
+  asistencia_tomada: boolean;
+  asistencia_resumen: { presentes: number; total: number } | null;
+  tiene_evaluacion_abierta: boolean;
 }
 
 // E3 (HU-12): fila de la nómina

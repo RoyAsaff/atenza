@@ -13,6 +13,22 @@ import { ClaseRepositorio } from '../../domain/repositorios/clase-repositorio';
 import { MateriaRepositorio } from '../../domain/repositorios/materia-repositorio';
 import { InscripcionRepositorio } from '../../domain/repositorios/inscripcion-repositorio';
 import { BitacoraRepositorio } from '../../domain/repositorios/bitacora-repositorio';
+import { AsistenciaRepositorio } from '../../domain/repositorios/asistencia-repositorio';
+import { EvaluacionRepositorio } from '../../domain/repositorios/evaluacion-repositorio';
+import { ExamenCodigoRepositorio } from '../../domain/repositorios/examen-codigo-repositorio';
+import { GuiaRepositorio } from '../../domain/repositorios/guia-repositorio';
+import { resumenAsistencia, tieneEvaluacionAbierta } from './resumen-clase';
+
+// Detalle de materia (handoff 1b, 18/09): la lista de clases ahora
+// distingue "sin asistencia" de "34 de 36" y marca evaluación abierta —
+// mismos 4 campos calculados que ya expone VerClasesDeHoy para Inicio,
+// reutilizados acá vía resumen-clase.ts.
+export interface ClaseConEstado extends Clase {
+  total_estudiantes: number;
+  asistencia_tomada: boolean;
+  asistencia_resumen: { presentes: number; total: number } | null;
+  tiene_evaluacion_abierta: boolean;
+}
 
 interface Auditoria {
   ip?: string;
@@ -39,9 +55,14 @@ export class VerClases {
     private readonly clases: ClaseRepositorio,
     private readonly materias: MateriaRepositorio,
     private readonly inscripciones: InscripcionRepositorio,
+    private readonly asistencias: AsistenciaRepositorio,
+    private readonly evaluaciones: EvaluacionRepositorio,
   ) {}
 
-  async ejecutar(entrada: { materia_id: number; usuario_id: number }): Promise<Clase[]> {
+  async ejecutar(entrada: {
+    materia_id: number;
+    usuario_id: number;
+  }): Promise<ClaseConEstado[]> {
     const materia = await this.materias.buscarPorId(entrada.materia_id);
     if (!materia) throw new NoEncontradoError('Materia');
 
@@ -56,7 +77,27 @@ export class VerClases {
         throw new NoEncontradoError('Materia');
       }
     }
-    return this.clases.listarPorMateria(entrada.materia_id);
+
+    const [clases, totalEstudiantes] = await Promise.all([
+      this.clases.listarPorMateria(entrada.materia_id),
+      this.inscripciones.contarActivosPorMateria(entrada.materia_id),
+    ]);
+
+    return Promise.all(
+      clases.map(async (c): Promise<ClaseConEstado> => {
+        const [asistenciasClase, evaluacionesClase] = await Promise.all([
+          this.asistencias.listarPorClase(c.id),
+          this.evaluaciones.listarPorClase(c.id),
+        ]);
+        return {
+          ...c,
+          total_estudiantes: totalEstudiantes,
+          asistencia_tomada: asistenciasClase.length > 0,
+          asistencia_resumen: resumenAsistencia(asistenciasClase),
+          tiene_evaluacion_abierta: tieneEvaluacionAbierta(evaluacionesClase),
+        };
+      }),
+    );
   }
 }
 
@@ -267,6 +308,10 @@ export class EliminarClase {
     private readonly clases: ClaseRepositorio,
     private readonly materias: MateriaRepositorio,
     private readonly bitacora: BitacoraRepositorio,
+    private readonly asistencias: AsistenciaRepositorio,
+    private readonly evaluaciones: EvaluacionRepositorio,
+    private readonly examenesCodigo: ExamenCodigoRepositorio,
+    private readonly guias: GuiaRepositorio,
   ) {}
 
   async ejecutar(
@@ -282,6 +327,23 @@ export class EliminarClase {
     if (!clase || clase.materia_id !== entrada.materia_id) {
       throw new NoEncontradoError('Clase');
     }
+
+    // Cascada real (18/09): las FK de asistencias/evaluaciones/exámenes de
+    // código/guías hacia clases son ON DELETE RESTRICT, así que hay que
+    // borrar cada dependiente a mano antes de la clase — eliminar()
+    // de evaluaciones/exámenes/guías ya cascadea sus propios hijos
+    // (preguntas, intentos, notas, etc.), asistencias no tiene hijos.
+    const [evaluacionesClase, examenesClase, guiasClase] = await Promise.all([
+      this.evaluaciones.listarPorClase(clase.id),
+      this.examenesCodigo.listarPorClase(clase.id),
+      this.guias.listarPorClase(clase.id),
+    ]);
+    await Promise.all([
+      ...evaluacionesClase.map((e) => this.evaluaciones.eliminar(e.id)),
+      ...examenesClase.map((e) => this.examenesCodigo.eliminar(e.id)),
+      ...guiasClase.map((g) => this.guias.eliminar(g.id)),
+    ]);
+    await this.asistencias.eliminarPorClase(clase.id);
 
     await this.clases.eliminar(clase.id);
 

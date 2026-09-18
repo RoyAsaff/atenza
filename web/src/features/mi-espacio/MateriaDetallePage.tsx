@@ -1,38 +1,43 @@
-// E3 · HU-11 (código de materia) + HU-12 (nómina) — ahora dentro de un
-// modal ("Código y nómina"), porque lo primero que se ve al entrar a la
-// materia es el calendario de clases (E4, HU-13/14) con "Pasar lista"
-// (HU-15) como acción principal al tocar una clase.
+// E3/E4 · Detalle de materia — rediseño (dirección 1b aprobada,
+// design_handoff_detalle_materia, 18/09): clases en lista a la izquierda
+// ordenadas por fecha con "Pasar lista" a un toque, panel fijo de 320px a
+// la derecha con todo lo que describe la materia (código/nómina,
+// evaluaciones/consolidado/centralizador). Mismo patrón de dos columnas
+// que EvaluacionEditorPage/CentralizadorPage.
+//
+// PanelClase (seis botones apilados en un modal) desaparece: se reparte
+// en un botón visible "Pasar lista" + un Dropdown de acciones, reusado en
+// las tres listas (Hoy/Próximas/Pasadas) y — vía navegación directa,
+// aceptada como alternativa en el handoff — en el clic de un evento del
+// calendario (el Dropdown de este repo se posiciona contra su propio
+// trigger, no contra un nodo arbitrario de FullCalendar).
 
-import { FormEvent, ReactNode, useState } from 'react';
+import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import esLocale from '@fullcalendar/core/locales/es';
 import type { EventClickArg } from '@fullcalendar/core';
-import {
-  BookOpen,
-  ClipboardCheck,
-  ClipboardList,
-  Code2,
-  FileSpreadsheet,
-  ListChecks,
-  Plus,
-  Search,
-  SquareUser,
-} from 'lucide-react';
+import { BookOpen, ClipboardCheck, Code2, ListChecks, MoreHorizontal, Search } from 'lucide-react';
 import { api, mensajeDeError } from '../../core/api/cliente';
 import { Clase, InscripcionNomina, Materia } from '../../core/tipos';
 import {
-  Badge,
-  Button,
+  Alert,
   botonClases,
+  Button,
   Card,
-  CardBody,
+  cn,
+  Dropdown,
+  DropdownItem,
+  DropdownSeparator,
+  EmptyState,
+  IconButton,
   Input,
   Modal,
-  PageHeader,
+  PageBreadcrumb,
+  Skeleton,
   Spinner,
   Tabla,
   Tbody,
@@ -40,10 +45,17 @@ import {
   Th,
   Thead,
   Tr,
+  useToast,
 } from '../../core/ui/ui';
+import { ModalConfirmarEliminar } from './FichaEditor';
 import './calendario.css';
 
-const DIAS = [
+const CLAVE_VISTA = 'atenza:materia-vista';
+// Clase no tiene duración real en el schema (mismo bug/decisión que
+// InicioPage y ver-clases-hoy.ts en el backend): valor fijo.
+const DURACION_CLASE_MINUTOS = 90;
+
+const DIAS_SEMANA = [
   { iso: 1, texto: 'Lun' },
   { iso: 2, texto: 'Mar' },
   { iso: 3, texto: 'Mié' },
@@ -52,6 +64,8 @@ const DIAS = [
   { iso: 6, texto: 'Sáb' },
   { iso: 7, texto: 'Dom' },
 ];
+
+const DIA_ABREV = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 /** "2026-08-03T00:00:00.000Z" → "2026-08-03" */
 const soloFecha = (iso: string) => iso.slice(0, 10);
@@ -66,211 +80,300 @@ function fechaLegible(iso: string): string {
   });
 }
 
-// ── HU-11 · Código de inscripción ────────────────────────────────
+function fechaCorta(iso: string): { dia: string; numero: number } {
+  const d = new Date(`${soloFecha(iso)}T00:00:00.000Z`);
+  return { dia: DIA_ABREV[d.getUTCDay()], numero: d.getUTCDate() };
+}
 
-function SeccionCodigo({ materia }: { materia: Materia }) {
-  const queryClient = useQueryClient();
-  const [error, setError] = useState('');
-  const [copiado, setCopiado] = useState(false);
+function sumarMinutos(hora: string, minutos: number): string {
+  const [h, m] = hora.split(':').map(Number);
+  const total = ((h * 60 + m + minutos) % (24 * 60) + 24 * 60) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
 
-  const alTerminar = {
-    onSuccess: () => {
-      setError('');
-      queryClient.invalidateQueries({ queryKey: ['materia', String(materia.id)] });
-      queryClient.invalidateQueries({ queryKey: ['mi-espacio'] });
-    },
-    onError: (err: unknown) => setError(mensajeDeError(err)),
-  };
-
-  const regenerar = useMutation({
-    mutationFn: () => api.post(`/api/materias/${materia.id}/codigo/regenerar`),
-    ...alTerminar,
-  });
-
-  const cambiarEstado = useMutation({
-    mutationFn: (activo: boolean) =>
-      api.patch(`/api/materias/${materia.id}/codigo`, { activo }),
-    ...alTerminar,
-  });
-
-  async function copiar() {
-    await navigator.clipboard.writeText(materia.codigo);
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2000);
+function leerVistaGuardada(): 'lista' | 'calendario' {
+  try {
+    return localStorage.getItem(CLAVE_VISTA) === 'calendario' ? 'calendario' : 'lista';
+  } catch {
+    return 'lista';
   }
+}
 
-  function manejarRegenerar() {
-    if (
-      window.confirm(
-        'El código actual dejará de funcionar y nadie podrá usarlo para inscribirse. ¿Generar uno nuevo?',
-      )
-    ) {
-      regenerar.mutate();
-    }
-  }
+// ── Menú "···" de una clase: compartido por Hoy/Próximas/Pasadas ────
+
+function MenuClase({
+  clase,
+  materiaId,
+  incluirAsistencia,
+  onEditar,
+  onEliminar,
+  className = '',
+}: {
+  clase: Clase;
+  materiaId: number;
+  incluirAsistencia: boolean;
+  onEditar: () => void;
+  onEliminar: () => void;
+  className?: string;
+}) {
+  const navigate = useNavigate();
+  const base = `/materias/${materiaId}/clases/${clase.id}`;
 
   return (
-    <div>
-      <h4 className="font-bold text-text mb-1">Código de inscripción</h4>
-      <p className="text-sm text-text-secondary mb-3">
-        Compártelo con tus estudiantes para que se unan a la materia.
-      </p>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <span
-          className={`font-mono text-2xl font-bold tracking-widest ${
-            materia.codigo_activo ? 'text-primary-700' : 'text-text-disabled line-through'
-          }`}
-        >
-          {materia.codigo}
-        </span>
-        <Badge tone={materia.codigo_activo ? 'success' : 'neutral'}>
-          {materia.codigo_activo ? 'Inscripciones abiertas' : 'Inscripciones cerradas'}
-        </Badge>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mt-4">
-        <Button tamano="sm" onClick={copiar}>
-          {copiado ? 'Copiado ✓' : 'Copiar código'}
-        </Button>
-        <Button
-          variante="secondary"
+    <Dropdown
+      trigger={({ abierto }) => (
+        <IconButton
+          aria-label="Más acciones de la clase"
           tamano="sm"
-          onClick={manejarRegenerar}
-          disabled={regenerar.isPending}
+          className={cn('h-[30px] w-[30px]', abierto && 'bg-surface-hover', className)}
         >
-          Regenerar
-        </Button>
-        <Button
-          variante="secondary"
-          tamano="sm"
-          onClick={() => cambiarEstado.mutate(!materia.codigo_activo)}
-          disabled={cambiarEstado.isPending}
-        >
-          {materia.codigo_activo ? 'Cerrar inscripciones' : 'Reabrir inscripciones'}
-        </Button>
-      </div>
-
-      {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
-    </div>
+          <MoreHorizontal size={16} />
+        </IconButton>
+      )}
+    >
+      {incluirAsistencia && (
+        <DropdownItem icono={<ClipboardCheck size={15} />} onSelect={() => navigate(`${base}/asistencia`)}>
+          {clase.asistencia_tomada ? 'Ver asistencia' : 'Pasar lista'}
+        </DropdownItem>
+      )}
+      <DropdownItem icono={<ListChecks size={15} />} onSelect={() => navigate(`${base}/evaluaciones`)}>
+        Evaluaciones
+      </DropdownItem>
+      <DropdownItem icono={<Code2 size={15} />} onSelect={() => navigate(`${base}/examenes-codigo`)}>
+        Exámenes de código
+      </DropdownItem>
+      <DropdownItem icono={<BookOpen size={15} />} onSelect={() => navigate(`${base}/guias`)}>
+        Guías
+      </DropdownItem>
+      <DropdownSeparator />
+      <DropdownItem onSelect={onEditar}>Editar clase</DropdownItem>
+      <DropdownItem peligro onSelect={onEliminar}>
+        Eliminar clase
+      </DropdownItem>
+    </Dropdown>
   );
 }
 
-// ── HU-12 · Nómina ────────────────────────────────────────────────
+// ── Bloque "Hoy" ──────────────────────────────────────────────────
 
-function SeccionNomina({ materiaId }: { materiaId: number }) {
-  const queryClient = useQueryClient();
-  const [buscar, setBuscar] = useState('');
-  const [error, setError] = useState('');
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['nomina', String(materiaId), buscar],
-    queryFn: async () => {
-      const { data } = await api.get<{ nomina: InscripcionNomina[] }>(
-        `/api/materias/${materiaId}/nomina`,
-        { params: buscar ? { buscar } : {} },
-      );
-      return data.nomina;
-    },
-  });
-
-  const retirar = useMutation({
-    mutationFn: (inscripcionId: number) =>
-      api.post(`/api/materias/${materiaId}/inscripciones/${inscripcionId}/retirar`),
-    onSuccess: () => {
-      setError('');
-      queryClient.invalidateQueries({ queryKey: ['nomina', String(materiaId)] });
-    },
-    onError: (err: unknown) => setError(mensajeDeError(err)),
-  });
-
-  function manejarRetiro(i: InscripcionNomina) {
-    if (
-      window.confirm(
-        `${i.estudiante.apellidos} ${i.estudiante.nombres} perderá acceso a la materia. ` +
-          'Su historial se conserva. ¿Retirar?',
-      )
-    ) {
-      retirar.mutate(i.id);
-    }
-  }
-
+function BloqueHoy({
+  clase,
+  materiaId,
+  onEditar,
+  onEliminar,
+}: {
+  clase: Clase;
+  materiaId: number;
+  onEditar: () => void;
+  onEliminar: () => void;
+}) {
   return (
-    <div className="mt-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <h4 className="font-semibold text-text">
-          Nómina{data ? ` (${data.length})` : ''}
-        </h4>
-        <Input
-          value={buscar}
-          onChange={(e) => setBuscar(e.target.value)}
-          placeholder="Buscar por nombre, código o correo…"
-          iconoIzq={<Search size={15} />}
-          className="w-72 max-w-full"
+    <div className="flex flex-wrap items-center justify-between gap-5 rounded-xl border border-border-hover border-l-4 border-l-primary-800 bg-surface px-5 py-[18px]">
+      <div className="min-w-0">
+        <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-primary-700">
+          Hoy · {clase.hora}–{sumarMinutos(clase.hora, DURACION_CLASE_MINUTOS)}
+        </p>
+        <h3 className="mt-1 text-[19px] font-extrabold tracking-tight text-text">{clase.tema}</h3>
+        <p className="mt-0.5 text-sm text-text-secondary">
+          {clase.asistencia_tomada
+            ? `Asistencia registrada · ${clase.asistencia_resumen?.presentes} de ${clase.asistencia_resumen?.total}`
+            : 'Asistencia sin registrar'}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+        <Link
+          to={`/materias/${materiaId}/clases/${clase.id}/asistencia`}
+          className={cn(botonClases('primary', 'lg'), 'h-[42px] px-5 text-[15px] font-bold whitespace-nowrap')}
+        >
+          Pasar lista
+        </Link>
+        <MenuClase
+          clase={clase}
+          materiaId={materiaId}
+          incluirAsistencia={false}
+          onEditar={onEditar}
+          onEliminar={onEliminar}
+          className="h-[42px] w-[42px]"
         />
       </div>
-
-      {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-      {isLoading && <Spinner />}
-
-      {data && data.length === 0 && (
-        <p className="text-text-secondary text-sm py-4 text-center">
-          {buscar
-            ? 'Sin resultados para la búsqueda.'
-            : 'Aún no hay estudiantes inscritos. Comparte el código de la materia.'}
-        </p>
-      )}
-
-      {data && data.length > 0 && (
-        <Tabla>
-          <Thead>
-            <Tr>
-              <Th>N°</Th>
-              <Th>Código</Th>
-              <Th>Apellidos y nombres</Th>
-              <Th>Correo</Th>
-              <Th>Inscrito el</Th>
-              <Th />
-            </Tr>
-          </Thead>
-          <Tbody>
-            {data.map((i, indice) => (
-              <Tr key={i.id}>
-                <Td className="text-text-disabled">{indice + 1}</Td>
-                <Td className="font-mono">{i.codigo_estudiante}</Td>
-                <Td>
-                  {i.estudiante.apellidos} {i.estudiante.nombres}
-                </Td>
-                <Td className="text-text-secondary">{i.estudiante.email}</Td>
-                <Td className="text-text-secondary">
-                  {new Date(i.fecha_inscripcion).toLocaleDateString()}
-                </Td>
-                <Td alineado="right">
-                  <button
-                    onClick={() => manejarRetiro(i)}
-                    disabled={retirar.isPending}
-                    className="text-red-600 hover:underline disabled:opacity-50"
-                  >
-                    Retirar
-                  </button>
-                </Td>
-              </Tr>
-            ))}
-          </Tbody>
-        </Tabla>
-      )}
     </div>
   );
 }
 
-// ── Modal "Código y nómina" ───────────────────────────────────────
+// ── Fila de "Próximas"/"Pasadas" ─────────────────────────────────
 
-function ModalCodigoNomina({ materia, onCerrar }: { materia: Materia; onCerrar: () => void }) {
+function FilaClase({
+  clase,
+  materiaId,
+  variante,
+  onEditar,
+  onEliminar,
+}: {
+  clase: Clase;
+  materiaId: number;
+  variante: 'proxima' | 'pasada-sin-asistencia' | 'pasada-con-asistencia';
+  onEditar: () => void;
+  onEliminar: () => void;
+}) {
+  const { dia, numero } = fechaCorta(clase.fecha);
+  const conBoton = variante !== 'pasada-con-asistencia';
+
   return (
-    <Modal titulo="Código y nómina" onCerrar={onCerrar} maxWidth="max-w-2xl">
-      <SeccionCodigo materia={materia} />
-      <hr className="my-5 border-border" />
-      <SeccionNomina materiaId={materia.id} />
+    <div
+      className={cn(
+        'flex items-center gap-[14px] px-4 hover:bg-surface-hover',
+        variante === 'proxima' ? 'h-[58px]' : 'h-[54px]',
+        variante === 'pasada-sin-asistencia' && 'border-l-[3px] border-l-accent-600 bg-accent-50 pl-[13px]',
+      )}
+    >
+      <div className="w-20 shrink-0">
+        <p
+          className={cn(
+            'text-sm',
+            variante === 'pasada-con-asistencia' ? 'font-medium text-text-secondary' : 'font-bold text-text',
+          )}
+        >
+          {dia} {numero}
+        </p>
+        <p className="font-mono text-[11px] text-text-muted">{clase.hora}</p>
+      </div>
+
+      <p
+        className={cn(
+          'min-w-0 flex-1 truncate text-[15px]',
+          variante === 'pasada-con-asistencia' ? 'font-medium text-text-secondary' : 'font-semibold text-text',
+        )}
+      >
+        {clase.tema}
+      </p>
+
+      {variante === 'proxima' && clase.tiene_evaluacion_abierta && (
+        <span className="hidden shrink-0 items-center gap-1.5 text-[13px] text-text-secondary sm:flex">
+          <span className="h-2 w-2 rounded-[3px] bg-accent-600" />
+          Evaluación
+        </span>
+      )}
+
+      {variante === 'pasada-con-asistencia' && (
+        <span className="flex shrink-0 items-center gap-1.5 text-[13px] text-text-secondary">
+          <span className="h-2 w-2 rounded-[3px] bg-secondary-700" />
+          {clase.asistencia_resumen?.presentes} de {clase.asistencia_resumen?.total}
+        </span>
+      )}
+
+      {conBoton && (
+        <Link
+          to={`/materias/${materiaId}/clases/${clase.id}/asistencia`}
+          className={cn(
+            botonClases('secondary', 'sm'),
+            'h-8 shrink-0 px-[13px] text-[13px] font-semibold text-link',
+            variante === 'pasada-sin-asistencia' && 'border-accent-300 bg-surface font-bold text-accent-700',
+          )}
+        >
+          Pasar lista
+        </Link>
+      )}
+
+      <MenuClase
+        clase={clase}
+        materiaId={materiaId}
+        incluirAsistencia={!conBoton}
+        onEditar={onEditar}
+        onEliminar={onEliminar}
+        className={variante === 'pasada-sin-asistencia' ? 'text-accent-300' : 'text-text-disabled'}
+      />
+    </div>
+  );
+}
+
+function ListaClases({
+  titulo,
+  contador,
+  clases,
+  materiaId,
+  variante,
+  onEditar,
+  onEliminar,
+}: {
+  titulo: string;
+  contador: ReactNode;
+  clases: Clase[];
+  materiaId: number;
+  variante: 'proxima' | 'pasada';
+  onEditar: (c: Clase) => void;
+  onEliminar: (c: Clase) => void;
+}) {
+  if (clases.length === 0) return null;
+  return (
+    <section>
+      <div className="flex items-baseline justify-between gap-3">
+        <h4 className="text-base font-extrabold tracking-tight text-text">{titulo}</h4>
+        {contador}
+      </div>
+      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-surface">
+        {clases.map((c, i) => (
+          <div key={c.id} className={i < clases.length - 1 ? 'border-b border-neutral-100' : ''}>
+            <FilaClase
+              clase={c}
+              materiaId={materiaId}
+              variante={variante === 'proxima' ? 'proxima' : c.asistencia_tomada ? 'pasada-con-asistencia' : 'pasada-sin-asistencia'}
+              onEditar={() => onEditar(c)}
+              onEliminar={() => onEliminar(c)}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── Modal "Editar clase" (reemplaza el modo edición de PanelClase) ──
+
+function ModalEditarClase({
+  clase,
+  materiaId,
+  onCerrar,
+}: {
+  clase: Clase;
+  materiaId: number;
+  onCerrar: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [fecha, setFecha] = useState(soloFecha(clase.fecha));
+  const [hora, setHora] = useState(clase.hora);
+  const [tema, setTema] = useState(clase.tema);
+  const [error, setError] = useState('');
+
+  const guardar = useMutation({
+    mutationFn: () => api.patch(`/api/materias/${materiaId}/clases/${clase.id}`, { fecha, hora, tema }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clases', String(materiaId)] });
+      onCerrar();
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
+  });
+
+  function manejarEnvio(e: FormEvent) {
+    e.preventDefault();
+    guardar.mutate();
+  }
+
+  return (
+    <Modal titulo="Editar clase" onCerrar={onCerrar} maxWidth="max-w-md">
+      <form onSubmit={manejarEnvio} className="space-y-3">
+        <Input type="date" required value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        <Input type="time" required value={hora} onChange={(e) => setHora(e.target.value)} />
+        <Input required value={tema} onChange={(e) => setTema(e.target.value)} />
+        <div className="flex gap-3 pt-1">
+          <Button type="submit" className="flex-1" disabled={guardar.isPending}>
+            Guardar
+          </Button>
+          <Button type="button" variante="secondary" className="flex-1" onClick={onCerrar}>
+            Cancelar
+          </Button>
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </form>
     </Modal>
   );
 }
@@ -279,18 +382,19 @@ function ModalCodigoNomina({ materia, onCerrar }: { materia: Materia; onCerrar: 
 
 function FormNuevaClase({ materiaId }: { materiaId: number }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [fecha, setFecha] = useState('');
   const [hora, setHora] = useState('08:00');
   const [tema, setTema] = useState('');
   const [error, setError] = useState('');
 
   const crear = useMutation({
-    mutationFn: () =>
-      api.post(`/api/materias/${materiaId}/clases`, { fecha, hora, tema }),
+    mutationFn: () => api.post(`/api/materias/${materiaId}/clases`, { fecha, hora, tema }),
     onSuccess: () => {
       setError('');
       setTema('');
       queryClient.invalidateQueries({ queryKey: ['clases', String(materiaId)] });
+      toast({ tone: 'success', titulo: 'Clase creada' });
     },
     onError: (err: unknown) => setError(mensajeDeError(err)),
   });
@@ -305,23 +409,11 @@ function FormNuevaClase({ materiaId }: { materiaId: number }) {
       <div className="flex flex-wrap gap-3 items-end">
         <label className="text-sm text-text-secondary">
           Fecha
-          <Input
-            type="date"
-            required
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="mt-1"
-          />
+          <Input type="date" required value={fecha} onChange={(e) => setFecha(e.target.value)} className="mt-1" />
         </label>
         <label className="text-sm text-text-secondary">
           Hora
-          <Input
-            type="time"
-            required
-            value={hora}
-            onChange={(e) => setHora(e.target.value)}
-            className="mt-1"
-          />
+          <Input type="time" required value={hora} onChange={(e) => setHora(e.target.value)} className="mt-1" />
         </label>
         <label className="text-sm text-text-secondary flex-1 min-w-48">
           Tema
@@ -346,13 +438,13 @@ function FormNuevaClase({ materiaId }: { materiaId: number }) {
 
 function FormGenerarCalendario({ materiaId }: { materiaId: number }) {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [dias, setDias] = useState<number[]>([]);
   const [hora, setHora] = useState('08:00');
   const [inicio, setInicio] = useState('');
   const [fin, setFin] = useState('');
   const [tema, setTema] = useState('Clase');
   const [error, setError] = useState('');
-  const [resumen, setResumen] = useState('');
 
   const generar = useMutation({
     mutationFn: () =>
@@ -362,19 +454,15 @@ function FormGenerarCalendario({ materiaId }: { materiaId: number }) {
       ),
     onSuccess: ({ data }) => {
       setError('');
-      // HU-14 Esc. 1: mostrar el total generado
-      setResumen(
-        `Se crearon ${data.total_creadas} clases` +
-          (data.omitidas > 0
-            ? ` (${data.omitidas} omitidas por chocar con clases existentes)`
-            : ''),
-      );
       queryClient.invalidateQueries({ queryKey: ['clases', String(materiaId)] });
+      toast({
+        tone: 'success',
+        titulo: `${data.total_creadas} clases generadas`,
+        descripcion:
+          data.omitidas > 0 ? `${data.omitidas} omitidas por chocar con clases existentes` : undefined,
+      });
     },
-    onError: (err: unknown) => {
-      setResumen('');
-      setError(mensajeDeError(err));
-    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
   });
 
   function alternarDia(iso: number) {
@@ -398,7 +486,7 @@ function FormGenerarCalendario({ materiaId }: { materiaId: number }) {
       </p>
 
       <div className="flex flex-wrap gap-2 mb-3">
-        {DIAS.map((d) => (
+        {DIAS_SEMANA.map((d) => (
           <button
             key={d.iso}
             type="button"
@@ -436,152 +524,14 @@ function FormGenerarCalendario({ materiaId }: { materiaId: number }) {
         </Button>
       </div>
 
-      {resumen && <p className="text-sm text-secondary-800 mt-3">{resumen}</p>}
       {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
     </form>
   );
 }
 
-// ── Panel de una clase: Pasar lista (acción principal) + editar/eliminar ──
-
-function PanelClase({
-  clase,
-  materiaId,
-  onCerrar,
-}: {
-  clase: Clase;
-  materiaId: number;
-  onCerrar: () => void;
-}) {
-  const queryClient = useQueryClient();
-  const [editando, setEditando] = useState(false);
-  const [fecha, setFecha] = useState(soloFecha(clase.fecha));
-  const [hora, setHora] = useState(clase.hora);
-  const [tema, setTema] = useState(clase.tema);
-  const [error, setError] = useState('');
-
-  const alTerminar = {
-    onSuccess: () => {
-      setError('');
-      queryClient.invalidateQueries({ queryKey: ['clases', String(materiaId)] });
-      onCerrar();
-    },
-    onError: (err: unknown) => setError(mensajeDeError(err)),
-  };
-
-  const guardar = useMutation({
-    mutationFn: () =>
-      api.patch(`/api/materias/${materiaId}/clases/${clase.id}`, { fecha, hora, tema }),
-    ...alTerminar,
-  });
-
-  const eliminar = useMutation({
-    mutationFn: () => api.delete(`/api/materias/${materiaId}/clases/${clase.id}`),
-    ...alTerminar,
-  });
-
-  function manejarEliminar() {
-    if (
-      window.confirm(
-        `Se eliminará la clase del ${fechaLegible(clase.fecha)} (${clase.hora}). ¿Continuar?`,
-      )
-    ) {
-      eliminar.mutate();
-    }
-  }
-
-  return (
-    <Modal
-      titulo={editando ? 'Editar clase' : `${clase.hora} · ${clase.tema}`}
-      eyebrow={!editando ? <span className="capitalize">{fechaLegible(clase.fecha)}</span> : undefined}
-      onCerrar={onCerrar}
-      maxWidth="max-w-md"
-    >
-      {!editando ? (
-        <>
-          <Link
-            to={`/materias/${materiaId}/clases/${clase.id}/asistencia`}
-            onClick={onCerrar}
-            className={botonClases('primary', 'lg') + ' w-full'}
-          >
-            <ClipboardCheck size={18} /> Pasar lista
-          </Link>
-
-          <Link
-            to={`/materias/${materiaId}/clases/${clase.id}/evaluaciones`}
-            onClick={onCerrar}
-            className={botonClases('secondary', 'md') + ' mt-2 w-full'}
-          >
-            <ListChecks size={16} /> Evaluaciones
-          </Link>
-
-          <Link
-            to={`/materias/${materiaId}/clases/${clase.id}/examenes-codigo`}
-            onClick={onCerrar}
-            className={botonClases('secondary', 'md') + ' mt-2 w-full'}
-          >
-            <Code2 size={16} /> Exámenes de código
-          </Link>
-
-          <Link
-            to={`/materias/${materiaId}/clases/${clase.id}/guias`}
-            onClick={onCerrar}
-            className={botonClases('secondary', 'md') + ' mt-2 w-full'}
-          >
-            <BookOpen size={16} /> Guías
-          </Link>
-
-          <div className="mt-3 flex gap-3">
-            <Button variante="secondary" className="flex-1" onClick={() => setEditando(true)}>
-              Editar
-            </Button>
-            <Button
-              variante="danger"
-              className="flex-1 border border-red-200"
-              onClick={manejarEliminar}
-              disabled={eliminar.isPending}
-            >
-              Eliminar
-            </Button>
-          </div>
-          <button
-            onClick={onCerrar}
-            className="mt-3 w-full text-sm text-text-disabled hover:text-text-secondary"
-          >
-            Cerrar
-          </button>
-        </>
-      ) : (
-        <>
-          <div className="space-y-3">
-            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-            <Input type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
-            <Input value={tema} onChange={(e) => setTema(e.target.value)} />
-          </div>
-          <div className="mt-4 flex gap-3">
-            <Button className="flex-1" onClick={() => guardar.mutate()} disabled={guardar.isPending}>
-              Guardar
-            </Button>
-            <Button variante="secondary" className="flex-1" onClick={() => setEditando(false)}>
-              Cancelar
-            </Button>
-          </div>
-        </>
-      )}
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-    </Modal>
-  );
-}
-
 // ── Modal "+ Agregar clases": pestañas individual / generar varias ──
 
-function ModalAgregarClases({
-  materiaId,
-  onCerrar,
-}: {
-  materiaId: number;
-  onCerrar: () => void;
-}) {
+function ModalAgregarClases({ materiaId, onCerrar }: { materiaId: number; onCerrar: () => void }) {
   const [pestana, setPestana] = useState<'individual' | 'generar'>('individual');
 
   return (
@@ -620,48 +570,324 @@ function ModalAgregarClases({
   );
 }
 
-function TarjetaAccion({
-  icono,
-  titulo,
-  descripcion,
-  to,
-  onClick,
-}: {
-  icono: ReactNode;
-  titulo: string;
-  descripcion: string;
-  to?: string;
-  onClick?: () => void;
-}) {
-  const clases =
-    'flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 shadow-xs transition hover:border-primary-200 hover:bg-primary-50/60';
-  const contenido = (
-    <>
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-700">
-        {icono}
-      </span>
-      <span>
-        <span className="block text-sm font-semibold text-text">{titulo}</span>
-        <span className="block text-xs text-text-secondary">{descripcion}</span>
-      </span>
-    </>
-  );
-  return to ? (
-    <Link to={to} className={clases}>
-      {contenido}
-    </Link>
-  ) : (
-    <button onClick={onClick} className={clases}>
-      {contenido}
-    </button>
+// ── Panel derecho · Inscripción ──────────────────────────────────
+
+function PanelInscripcion({ materia, setError }: { materia: Materia; setError: (msg: string) => void }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [modalRegenerarAbierto, setModalRegenerarAbierto] = useState(false);
+
+  const invalidar = () => {
+    queryClient.invalidateQueries({ queryKey: ['materia', String(materia.id)] });
+    queryClient.invalidateQueries({ queryKey: ['mi-espacio'] });
+  };
+
+  const regenerar = useMutation({
+    mutationFn: () => api.post(`/api/materias/${materia.id}/codigo/regenerar`),
+    onMutate: () => setError(''),
+    onSuccess: () => {
+      invalidar();
+      setModalRegenerarAbierto(false);
+      toast({ tone: 'success', titulo: 'Código regenerado' });
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
+  });
+
+  const cambiarEstado = useMutation({
+    mutationFn: (activo: boolean) => api.patch(`/api/materias/${materia.id}/codigo`, { activo }),
+    onMutate: () => setError(''),
+    onSuccess: (_data, activo) => {
+      invalidar();
+      toast({ tone: 'success', titulo: activo ? 'Inscripciones abiertas' : 'Inscripciones cerradas' });
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
+  });
+
+  async function copiar() {
+    await navigator.clipboard.writeText(materia.codigo);
+    toast({ tone: 'success', titulo: 'Código copiado' });
+  }
+
+  return (
+    <Card className="px-5 py-[18px]">
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-extrabold text-text">Inscripción</p>
+
+        <div className="flex items-center justify-between gap-[10px]">
+          <span
+            className={cn(
+              'font-mono text-[22px] font-medium tracking-[0.14em]',
+              materia.codigo_activo ? 'text-primary-800' : 'text-text-disabled line-through',
+            )}
+          >
+            {materia.codigo}
+          </span>
+          <Button variante="secondary" tamano="sm" className="h-[34px]" onClick={copiar}>
+            Copiar
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between gap-[10px]">
+          <span className="flex items-center gap-2 text-[13px] text-text-secondary">
+            <span
+              className={cn('h-2 w-2 shrink-0 rounded-full', materia.codigo_activo ? 'bg-secondary-700' : 'bg-neutral-400')}
+            />
+            {materia.codigo_activo ? 'Abiertas' : 'Cerradas'}
+          </span>
+          <span className="text-[13px] font-medium text-link">
+            <button
+              type="button"
+              onClick={() => cambiarEstado.mutate(!materia.codigo_activo)}
+              disabled={cambiarEstado.isPending}
+              className="hover:underline"
+            >
+              {materia.codigo_activo ? 'Cerrar' : 'Reabrir'}
+            </button>
+            {' · '}
+            <button type="button" onClick={() => setModalRegenerarAbierto(true)} className="hover:underline">
+              Regenerar
+            </button>
+          </span>
+        </div>
+      </div>
+
+      {modalRegenerarAbierto && (
+        <ModalConfirmarEliminar
+          titulo="Generar un código nuevo"
+          cuerpo="El código actual dejará de funcionar y nadie podrá usarlo para inscribirse."
+          textoBoton="Generar uno nuevo"
+          eliminando={regenerar.isPending}
+          onConfirmar={() => regenerar.mutate()}
+          onCerrar={() => setModalRegenerarAbierto(false)}
+        />
+      )}
+    </Card>
   );
 }
 
+// ── Panel derecho · Nómina ────────────────────────────────────────
+
+function PanelNomina({
+  nomina,
+  onVerNomina,
+}: {
+  nomina: InscripcionNomina[] | undefined;
+  onVerNomina: () => void;
+}) {
+  const ultimoInscrito = useMemo(() => {
+    if (!nomina || nomina.length === 0) return null;
+    return nomina.reduce((mas, i) =>
+      new Date(i.fecha_inscripcion) > new Date(mas.fecha_inscripcion) ? i : mas,
+    );
+  }, [nomina]);
+
+  return (
+    <Card className="px-5 py-[18px]">
+      <div className="flex flex-col gap-[10px]">
+        <div className="flex items-baseline justify-between">
+          <p className="text-sm font-extrabold text-text">Nómina</p>
+          <span className="font-mono text-[18px] font-medium text-text">{nomina ? nomina.length : '—'}</span>
+        </div>
+        <p className="text-[13px] text-text-muted">
+          {ultimoInscrito
+            ? `Último inscrito: ${ultimoInscrito.estudiante.apellidos}, ${ultimoInscrito.estudiante.nombres} · ${new Date(ultimoInscrito.fecha_inscripcion).toLocaleDateString()}`
+            : 'Aún no hay estudiantes inscritos.'}
+        </p>
+        <button
+          type="button"
+          onClick={onVerNomina}
+          className="self-start text-[13px] font-semibold text-link hover:underline"
+        >
+          Ver nómina completa
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+function SeccionNomina({ materiaId, setError }: { materiaId: number; setError: (msg: string) => void }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [buscar, setBuscar] = useState('');
+  const [aRetirar, setARetirar] = useState<InscripcionNomina | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['nomina', String(materiaId), buscar],
+    queryFn: async () => {
+      const { data } = await api.get<{ nomina: InscripcionNomina[] }>(
+        `/api/materias/${materiaId}/nomina`,
+        { params: buscar ? { buscar } : {} },
+      );
+      return data.nomina;
+    },
+  });
+
+  const retirar = useMutation({
+    mutationFn: (inscripcionId: number) =>
+      api.post(`/api/materias/${materiaId}/inscripciones/${inscripcionId}/retirar`),
+    onMutate: () => setError(''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nomina', String(materiaId)] });
+      if (aRetirar) toast({ tone: 'success', titulo: `${aRetirar.estudiante.nombres} retirado de la materia` });
+      setARetirar(null);
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
+  });
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h4 className="font-semibold text-text">Nómina{data ? ` (${data.length})` : ''}</h4>
+        <Input
+          value={buscar}
+          onChange={(e) => setBuscar(e.target.value)}
+          placeholder="Buscar por nombre, código o correo…"
+          iconoIzq={<Search size={15} />}
+          className="w-72 max-w-full"
+        />
+      </div>
+
+      {isLoading && <Spinner />}
+
+      {data && data.length === 0 && (
+        <p className="text-text-secondary text-sm py-4 text-center">
+          {buscar
+            ? 'Sin resultados para la búsqueda.'
+            : 'Aún no hay estudiantes inscritos. Comparte el código de la materia.'}
+        </p>
+      )}
+
+      {data && data.length > 0 && (
+        <Tabla>
+          <Thead>
+            <Tr>
+              <Th>N°</Th>
+              <Th>Código</Th>
+              <Th>Apellidos y nombres</Th>
+              <Th>Correo</Th>
+              <Th>Inscrito el</Th>
+              <Th />
+            </Tr>
+          </Thead>
+          <Tbody>
+            {data.map((i, indice) => (
+              <Tr key={i.id}>
+                <Td className="text-text-disabled">{indice + 1}</Td>
+                <Td className="font-mono">{i.codigo_estudiante}</Td>
+                <Td>
+                  {i.estudiante.apellidos} {i.estudiante.nombres}
+                </Td>
+                <Td className="text-text-secondary">{i.estudiante.email}</Td>
+                <Td className="text-text-secondary">{new Date(i.fecha_inscripcion).toLocaleDateString()}</Td>
+                <Td alineado="right">
+                  <button
+                    onClick={() => setARetirar(i)}
+                    disabled={retirar.isPending}
+                    className="text-red-600 hover:underline disabled:opacity-50"
+                  >
+                    Retirar
+                  </button>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Tabla>
+      )}
+
+      {aRetirar && (
+        <ModalConfirmarEliminar
+          titulo={`Retirar a ${aRetirar.estudiante.apellidos} ${aRetirar.estudiante.nombres}`}
+          cuerpo="Perderá acceso a la materia. Su historial se conserva."
+          textoBoton="Retirar"
+          eliminando={retirar.isPending}
+          onConfirmar={() => retirar.mutate(aRetirar.id)}
+          onCerrar={() => setARetirar(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ModalNomina({
+  materiaId,
+  nombreMateria,
+  setError,
+  onCerrar,
+}: {
+  materiaId: number;
+  nombreMateria: string;
+  setError: (msg: string) => void;
+  onCerrar: () => void;
+}) {
+  return (
+    <Modal titulo={`Nómina · ${nombreMateria}`} onCerrar={onCerrar} maxWidth="max-w-2xl">
+      <SeccionNomina materiaId={materiaId} setError={setError} />
+    </Modal>
+  );
+}
+
+// ── Panel derecho · Accesos ───────────────────────────────────────
+
+function FilaAcceso({ to, titulo, derecha }: { to: string; titulo: string; derecha?: ReactNode }) {
+  return (
+    <Link to={to} className="flex h-12 items-center justify-between gap-[10px] px-5 transition hover:bg-surface-hover">
+      <span className="text-sm font-medium text-text">{titulo}</span>
+      {derecha}
+    </Link>
+  );
+}
+
+function PanelAccesos({ materiaId, porcentajeAsistencia }: { materiaId: number; porcentajeAsistencia: number | null }) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="border-b border-neutral-100">
+        <FilaAcceso to={`/materias/${materiaId}/evaluaciones`} titulo="Evaluaciones" />
+      </div>
+      <div className="border-b border-neutral-100">
+        <FilaAcceso
+          to={`/materias/${materiaId}/asistencia`}
+          titulo="Consolidado de asistencia"
+          derecha={
+            porcentajeAsistencia !== null ? (
+              <span className="font-mono text-[12px] text-secondary-700">{porcentajeAsistencia}%</span>
+            ) : undefined
+          }
+        />
+      </div>
+      <FilaAcceso
+        to={`/materias/${materiaId}/centralizador`}
+        titulo="Centralizador"
+        derecha={<span className="font-mono text-[12px] text-text-muted">›</span>}
+      />
+    </Card>
+  );
+}
+
+// ── Página ────────────────────────────────────────────────────────
+
 export function MateriaDetallePage() {
   const { id } = useParams();
-  const [claseSeleccionada, setClaseSeleccionada] = useState<Clase | null>(null);
+  const navigate = useNavigate();
+  const materiaId = Number(id);
+
+  const [vista, setVista] = useState<'lista' | 'calendario'>(leerVistaGuardada);
+  const [error, setError] = useState('');
   const [modalAgregarAbierto, setModalAgregarAbierto] = useState(false);
-  const [modalCodigoNominaAbierto, setModalCodigoNominaAbierto] = useState(false);
+  const [modalNominaAbierto, setModalNominaAbierto] = useState(false);
+  const [claseEditando, setClaseEditando] = useState<Clase | null>(null);
+  const [claseEliminando, setClaseEliminando] = useState<Clase | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  function cambiarVista(v: 'lista' | 'calendario') {
+    setVista(v);
+    try {
+      localStorage.setItem(CLAVE_VISTA, v);
+    } catch {
+      // localStorage puede fallar (modo privado, cuota) — la preferencia
+      // simplemente no persiste, no es motivo para romper la pantalla.
+    }
+  }
 
   const { data: materia, isLoading, isError } = useQuery({
     queryKey: ['materia', id],
@@ -679,136 +905,258 @@ export function MateriaDetallePage() {
     },
   });
 
-  const materiaId = Number(id);
+  const { data: nomina } = useQuery({
+    queryKey: ['nomina', String(materiaId), ''],
+    queryFn: async () => {
+      const { data } = await api.get<{ nomina: InscripcionNomina[] }>(`/api/materias/${materiaId}/nomina`);
+      return data.nomina;
+    },
+    enabled: Number.isFinite(materiaId),
+  });
+
+  const eliminarClase = useMutation({
+    mutationFn: (clase: Clase) => api.delete(`/api/materias/${materiaId}/clases/${clase.id}`),
+    onMutate: () => setError(''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clases', String(materiaId)] });
+      setClaseEliminando(null);
+      toast({ tone: 'success', titulo: 'Clase eliminada' });
+    },
+    onError: (err: unknown) => setError(mensajeDeError(err)),
+  });
+
   const hoy = new Date().toISOString().slice(0, 10);
 
+  const { deHoy, proximas, pasadas } = useMemo(() => {
+    const lista = clases ?? [];
+    const deHoy = lista.filter((c) => soloFecha(c.fecha) === hoy).sort((a, b) => a.hora.localeCompare(b.hora));
+    const proximas = lista
+      .filter((c) => soloFecha(c.fecha) > hoy)
+      .sort((a, b) => soloFecha(a.fecha).localeCompare(soloFecha(b.fecha)) || a.hora.localeCompare(b.hora));
+    const pasadas = lista
+      .filter((c) => soloFecha(c.fecha) < hoy)
+      .sort((a, b) => soloFecha(b.fecha).localeCompare(soloFecha(a.fecha)) || b.hora.localeCompare(a.hora));
+    return { deHoy, proximas, pasadas };
+  }, [clases, hoy]);
+
+  const pasadasSinAsistencia = pasadas.filter((c) => !c.asistencia_tomada).length;
+
+  const porcentajeAsistencia = useMemo(() => {
+    if (!clases) return null;
+    const conAsistencia = clases.filter((c) => c.asistencia_tomada && c.asistencia_resumen);
+    if (conAsistencia.length === 0) return null;
+    const presentes = conAsistencia.reduce((s, c) => s + (c.asistencia_resumen?.presentes ?? 0), 0);
+    const total = conAsistencia.reduce((s, c) => s + (c.asistencia_resumen?.total ?? 0), 0);
+    return total > 0 ? Math.round((presentes / total) * 100) : null;
+  }, [clases]);
+
   function manejarClicEvento(info: EventClickArg) {
-    const clase = clases?.find((c) => String(c.id) === info.event.id) ?? null;
-    setClaseSeleccionada(clase);
+    const clase = clases?.find((c) => String(c.id) === info.event.id);
+    if (clase) navigate(`/materias/${materiaId}/clases/${clase.id}/asistencia`);
   }
 
-  if (isLoading) {
+  if (isError) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-surface p-5 text-text-secondary">
-        <Spinner /> Cargando…
-      </div>
+      <Alert tone="danger">No se pudo cargar la materia.</Alert>
     );
   }
-  if (isError || !materia) {
-    return (
-      <p className="rounded-lg border border-red-100 bg-red-50 p-5 text-red-600">
-        No se pudo cargar la materia.
-      </p>
-    );
-  }
+
+  const errorVisible = error || (errorClases ? 'No se pudieron cargar las clases.' : '');
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Link
-          to="/"
-          className="text-sm font-medium text-primary-700 hover:text-primary-800 hover:underline"
-        >
-          ← Mis materias
-        </Link>
-        <div className="mt-1">
-          <PageHeader
-            title={`${materia.nombre_materia}${materia.sigla ? ` (${materia.sigla})` : ''}`}
-            description={`${materia.carrera} · ${materia.semestre} · ${materia.universidad}`}
-          />
+    <div>
+      <div className="flex items-start justify-between gap-5 flex-wrap border-b border-border bg-surface px-6 py-[18px]">
+        <div className="flex flex-col gap-[5px]">
+          <PageBreadcrumb>
+            <Link to="/">‹ Mis materias</Link>
+          </PageBreadcrumb>
+          {isLoading || !materia ? (
+            <>
+              <Skeleton className="h-6 w-64" />
+              <Skeleton className="mt-1 h-4 w-48" />
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-extrabold tracking-tight text-text">
+                {materia.nombre_materia}
+                {materia.sigla && <span className="font-semibold text-text-muted"> ({materia.sigla})</span>}
+              </h1>
+              <p className="text-[15px] text-text-secondary">
+                {materia.carrera} · {materia.semestre} · {materia.universidad}
+              </p>
+            </>
+          )}
         </div>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <TarjetaAccion
-            icono={<SquareUser size={18} />}
-            titulo="Código y nómina"
-            descripcion="Compartir código, ver inscritos"
-            onClick={() => setModalCodigoNominaAbierto(true)}
-          />
-          <TarjetaAccion
-            icono={<ListChecks size={18} />}
-            titulo="Evaluaciones"
-            descripcion="Todas las evaluaciones de la materia"
-            to={`/materias/${materia.id}/evaluaciones`}
-          />
-          <TarjetaAccion
-            icono={<ClipboardList size={18} />}
-            titulo="Consolidado de asistencia"
-            descripcion="Totales y % por estudiante"
-            to={`/materias/${materia.id}/asistencia`}
-          />
-          <TarjetaAccion
-            icono={<FileSpreadsheet size={18} />}
-            titulo="Centralizador"
-            descripcion="Notas de evaluaciones y guías"
-            to={`/materias/${materia.id}/centralizador`}
-          />
+
+        <div className="inline-flex h-9 overflow-hidden rounded-[9px] border border-border">
+          <button
+            type="button"
+            onClick={() => cambiarVista('lista')}
+            className={cn(
+              'px-4 text-[13px]',
+              vista === 'lista' ? 'bg-primary-800 font-bold text-white' : 'bg-surface font-medium text-text-secondary',
+            )}
+          >
+            Lista
+          </button>
+          <button
+            type="button"
+            onClick={() => cambiarVista('calendario')}
+            className={cn(
+              'border-l border-border px-4 text-[13px]',
+              vista === 'calendario' ? 'bg-primary-800 font-bold text-white' : 'bg-surface font-medium text-text-secondary',
+            )}
+          >
+            Calendario
+          </button>
         </div>
       </div>
 
-      <Card>
-        <CardBody>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-semibold text-text">
-              Calendario{clases ? ` (${clases.length} clases)` : ''}
-            </h2>
-            <Button onClick={() => setModalAgregarAbierto(true)}>
-              <Plus size={16} /> Agregar clases
-            </Button>
-          </div>
-          <p className="text-sm text-text-secondary mb-3">
-            Toca una clase para pasar lista, editarla o eliminarla.
-          </p>
-
-          {cargandoClases && <Spinner />}
-          {errorClases && <p className="text-red-600">No se pudieron cargar las clases.</p>}
-
-          {clases && clases.length === 0 && (
-            <p className="text-text-secondary text-sm py-4 text-center">
-              Aún no hay clases. Usa "+ Agregar clases" para crear una o generar el
-              calendario del semestre.
-            </p>
-          )}
-
-          {clases && clases.length > 0 && (
-            <FullCalendar
-              plugins={[dayGridPlugin, interactionPlugin]}
-              initialView="dayGridMonth"
-              locale={esLocale}
-              height="auto"
-              firstDay={1}
-              dayMaxEventRows={3}
-              events={clases.map((c) => ({
-                id: String(c.id),
-                title: `${c.hora} ${c.tema}`,
-                start: soloFecha(c.fecha),
-                allDay: true,
-                classNames: [soloFecha(c.fecha) < hoy ? 'clase-pasada' : 'clase-proxima'],
-              }))}
-              eventClick={manejarClicEvento}
-            />
-          )}
-        </CardBody>
-      </Card>
-
-      {claseSeleccionada && (
-        <PanelClase
-          clase={claseSeleccionada}
-          materiaId={materiaId}
-          onCerrar={() => setClaseSeleccionada(null)}
-        />
+      {errorVisible && (
+        <div className="px-6 pt-4">
+          <Alert tone="danger">{errorVisible}</Alert>
+        </div>
       )}
+
+      <div className="grid grid-cols-1 items-start gap-5 px-6 pb-6 pt-[22px] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex flex-col gap-5">
+          {isLoading || cargandoClases ? (
+            <>
+              <Skeleton className="h-24 rounded-xl" />
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-[58px] rounded-xl" />
+              ))}
+            </>
+          ) : (
+            <>
+              {deHoy.map((c) => (
+                <BloqueHoy
+                  key={c.id}
+                  clase={c}
+                  materiaId={materiaId}
+                  onEditar={() => setClaseEditando(c)}
+                  onEliminar={() => setClaseEliminando(c)}
+                />
+              ))}
+
+              {clases && clases.length === 0 ? (
+                <EmptyState
+                  title="Aún no hay clases"
+                  description='Usa "Agregar clases" para crear una o generar el calendario del semestre.'
+                  action={<Button onClick={() => setModalAgregarAbierto(true)}>Agregar clases</Button>}
+                />
+              ) : (
+                <>
+                  <ListaClases
+                    titulo="Próximas"
+                    contador={
+                      <span className="font-mono text-[12px] text-text-muted">
+                        {proximas.length} clase{proximas.length === 1 ? '' : 's'}
+                      </span>
+                    }
+                    clases={proximas}
+                    materiaId={materiaId}
+                    variante="proxima"
+                    onEditar={setClaseEditando}
+                    onEliminar={setClaseEliminando}
+                  />
+                  <ListaClases
+                    titulo="Pasadas"
+                    contador={
+                      pasadasSinAsistencia > 0 ? (
+                        <span className="font-mono text-[12px] text-accent-600">
+                          {pasadasSinAsistencia} sin asistencia
+                        </span>
+                      ) : undefined
+                    }
+                    clases={pasadas}
+                    materiaId={materiaId}
+                    variante="pasada"
+                    onEditar={setClaseEditando}
+                    onEliminar={setClaseEliminando}
+                  />
+                </>
+              )}
+            </>
+          )}
+
+          {vista === 'calendario' && (
+            <Card>
+              <div className="p-4">
+                {clases && clases.length > 0 && (
+                  <FullCalendar
+                    plugins={[dayGridPlugin, interactionPlugin]}
+                    initialView="dayGridMonth"
+                    locale={esLocale}
+                    height="auto"
+                    firstDay={1}
+                    dayMaxEventRows={3}
+                    events={clases.map((c) => {
+                      const pasada = soloFecha(c.fecha) < hoy;
+                      return {
+                        id: String(c.id),
+                        title: `${c.hora} ${c.tema}`,
+                        start: soloFecha(c.fecha),
+                        allDay: true,
+                        classNames:
+                          pasada && !c.asistencia_tomada
+                            ? ['clase-pasada', 'clase-sin-asistencia']
+                            : [pasada ? 'clase-pasada' : 'clase-proxima'],
+                      };
+                    })}
+                    eventClick={manejarClicEvento}
+                  />
+                )}
+              </div>
+            </Card>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-5 xl:sticky xl:top-5">
+          {isLoading || !materia ? (
+            <>
+              <Skeleton className="h-32 rounded-lg" />
+              <Skeleton className="h-24 rounded-lg" />
+              <Skeleton className="h-36 rounded-lg" />
+            </>
+          ) : (
+            <>
+              <PanelInscripcion materia={materia} setError={setError} />
+              <PanelNomina nomina={nomina} onVerNomina={() => setModalNominaAbierto(true)} />
+              <PanelAccesos materiaId={materiaId} porcentajeAsistencia={porcentajeAsistencia} />
+              <Button variante="secondary" className="h-10 w-full text-sm font-semibold" onClick={() => setModalAgregarAbierto(true)}>
+                Agregar clases
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
 
       {modalAgregarAbierto && (
-        <ModalAgregarClases
+        <ModalAgregarClases materiaId={materiaId} onCerrar={() => setModalAgregarAbierto(false)} />
+      )}
+
+      {modalNominaAbierto && materia && (
+        <ModalNomina
           materiaId={materiaId}
-          onCerrar={() => setModalAgregarAbierto(false)}
+          nombreMateria={materia.nombre_materia}
+          setError={setError}
+          onCerrar={() => setModalNominaAbierto(false)}
         />
       )}
 
-      {modalCodigoNominaAbierto && (
-        <ModalCodigoNomina
-          materia={materia}
-          onCerrar={() => setModalCodigoNominaAbierto(false)}
+      {claseEditando && (
+        <ModalEditarClase clase={claseEditando} materiaId={materiaId} onCerrar={() => setClaseEditando(null)} />
+      )}
+
+      {claseEliminando && (
+        <ModalConfirmarEliminar
+          titulo={`Eliminar la clase del ${fechaLegible(claseEliminando.fecha)}`}
+          cuerpo="Se borra la clase y su asistencia. Las evaluaciones, exámenes y guías vinculados se eliminan con ella."
+          textoBoton="Eliminar clase"
+          eliminando={eliminarClase.isPending}
+          onConfirmar={() => eliminarClase.mutate(claseEliminando)}
+          onCerrar={() => setClaseEliminando(null)}
         />
       )}
     </div>

@@ -33,4 +33,8 @@ export class PrismaAsistenciaRepositorio implements AsistenciaRepositorio {
       ),
     );
   }
+
+  async eliminarPorClase(clase_id: number): Promise<void> {
+    await this.prisma.asistencia.deleteMany({ where: { clase_id } });
+  }
 }

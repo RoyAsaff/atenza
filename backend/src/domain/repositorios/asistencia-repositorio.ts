@@ -12,4 +12,7 @@ export interface AsistenciaRepositorio {
   listarPorMateria(materia_id: number): Promise<Asistencia[]>;
   /** Crea el registro si no existe o actualiza el marcaje si ya existía (HU-15 Esc. 2). */
   guardarVarias(datos: DatosMarcaje[]): Promise<Asistencia[]>;
+  /** Eliminar clase (handoff detalle materia, 18/09): asistencia no tiene
+   * hijos propios, así que basta un borrado directo por clase. */
+  eliminarPorClase(clase_id: number): Promise<void>;
 }
