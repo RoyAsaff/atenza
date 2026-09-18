@@ -5,12 +5,13 @@
 // evaluaciones/consolidado/centralizador). Mismo patrón de dos columnas
 // que EvaluacionEditorPage/CentralizadorPage.
 //
-// PanelClase (seis botones apilados en un modal) desaparece: se reparte
-// en un botón visible "Pasar lista" + un Dropdown de acciones, reusado en
-// las tres listas (Hoy/Próximas/Pasadas) y — vía navegación directa,
-// aceptada como alternativa en el handoff — en el clic de un evento del
-// calendario (el Dropdown de este repo se posiciona contra su propio
-// trigger, no contra un nodo arbitrario de FullCalendar).
+// PanelClase (seis botones apilados en un modal) se reparte en un botón
+// visible "Pasar lista" + un Dropdown de acciones, reusado en las tres
+// listas (Hoy/Próximas/Pasadas); en el clic de un evento del
+// calendario, que abre un modal con las mismas acciones (el Dropdown de
+// este repo se posiciona contra su propio trigger, no contra un nodo
+// arbitrario de FullCalendar). Una primera versión navegaba directo a la
+// asistencia y dejaba el calendario sin acceso a evaluaciones/guías.
 
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -151,6 +152,64 @@ function MenuClase({
         Eliminar clase
       </DropdownItem>
     </Dropdown>
+  );
+}
+
+// ── Modal de acciones de una clase (clic en el calendario) ────────────
+
+function ModalAccionesClase({
+  clase,
+  materiaId,
+  onEditar,
+  onEliminar,
+  onCerrar,
+}: {
+  clase: Clase;
+  materiaId: number;
+  onEditar: () => void;
+  onEliminar: () => void;
+  onCerrar: () => void;
+}) {
+  const base = `/materias/${materiaId}/clases/${clase.id}`;
+  return (
+    <Modal
+      titulo={`${clase.hora} · ${clase.tema}`}
+      eyebrow={<span className="capitalize">{fechaLegible(clase.fecha)}</span>}
+      onCerrar={onCerrar}
+      maxWidth="max-w-md"
+    >
+      <Link to={`${base}/asistencia`} onClick={onCerrar} className={botonClases('primary', 'lg') + ' w-full'}>
+        <ClipboardCheck size={18} /> {clase.asistencia_tomada ? 'Ver asistencia' : 'Pasar lista'}
+      </Link>
+      <Link
+        to={`${base}/evaluaciones`}
+        onClick={onCerrar}
+        className={botonClases('secondary', 'md') + ' mt-2 w-full'}
+      >
+        <ListChecks size={16} /> Evaluaciones
+      </Link>
+      <Link
+        to={`${base}/examenes-codigo`}
+        onClick={onCerrar}
+        className={botonClases('secondary', 'md') + ' mt-2 w-full'}
+      >
+        <Code2 size={16} /> Exámenes de código
+      </Link>
+      <Link to={`${base}/guias`} onClick={onCerrar} className={botonClases('secondary', 'md') + ' mt-2 w-full'}>
+        <BookOpen size={16} /> Guías
+      </Link>
+      <div className="mt-3 flex gap-3">
+        <Button variante="secondary" className="flex-1" onClick={onEditar}>
+          Editar
+        </Button>
+        <Button variante="danger" className="flex-1 border border-red-200" onClick={onEliminar}>
+          Eliminar
+        </Button>
+      </div>
+      <button onClick={onCerrar} className="mt-3 w-full text-sm text-text-disabled hover:text-text-secondary">
+        Cerrar
+      </button>
+    </Modal>
   );
 }
 
@@ -867,13 +926,13 @@ function PanelAccesos({ materiaId, porcentajeAsistencia }: { materiaId: number; 
 
 export function MateriaDetallePage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const materiaId = Number(id);
 
   const [vista, setVista] = useState<'lista' | 'calendario'>(leerVistaGuardada);
   const [error, setError] = useState('');
   const [modalAgregarAbierto, setModalAgregarAbierto] = useState(false);
   const [modalNominaAbierto, setModalNominaAbierto] = useState(false);
+  const [claseSeleccionada, setClaseSeleccionada] = useState<Clase | null>(null);
   const [claseEditando, setClaseEditando] = useState<Clase | null>(null);
   const [claseEliminando, setClaseEliminando] = useState<Clase | null>(null);
   const queryClient = useQueryClient();
@@ -952,7 +1011,7 @@ export function MateriaDetallePage() {
 
   function manejarClicEvento(info: EventClickArg) {
     const clase = clases?.find((c) => String(c.id) === info.event.id);
-    if (clase) navigate(`/materias/${materiaId}/clases/${clase.id}/asistencia`);
+    if (clase) setClaseSeleccionada(clase);
   }
 
   if (isError) {
@@ -1144,6 +1203,22 @@ export function MateriaDetallePage() {
           nombreMateria={materia.nombre_materia}
           setError={setError}
           onCerrar={() => setModalNominaAbierto(false)}
+        />
+      )}
+
+      {claseSeleccionada && (
+        <ModalAccionesClase
+          clase={claseSeleccionada}
+          materiaId={materiaId}
+          onEditar={() => {
+            setClaseEditando(claseSeleccionada);
+            setClaseSeleccionada(null);
+          }}
+          onEliminar={() => {
+            setClaseEliminando(claseSeleccionada);
+            setClaseSeleccionada(null);
+          }}
+          onCerrar={() => setClaseSeleccionada(null)}
         />
       )}
 
