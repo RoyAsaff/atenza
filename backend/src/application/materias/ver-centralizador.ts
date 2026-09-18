@@ -141,9 +141,9 @@ export class ExportarCentralizador {
     materia_id: number;
     docente_id: number;
     nombre_materia: string;
-    // Último cálculo de "Nota final" hecho en pantalla (CentralizadorPage):
-    // si vienen y hay intersección con las columnas reales, se agrega esa
-    // columna extra al Excel. Opcional — sin esto exporta como siempre.
+    // Columnas marcadas en pantalla (CentralizadorPage): solo esas se
+    // exportan; con `nota_base` además se agrega la columna "Nota final"
+    // calculada sobre ellas. Opcional — sin esto exporta todas las columnas.
     // Claves con formato claveColumnaCentralizador ("evaluacion:3", "guia:5").
     columna_claves?: string[];
     nota_base?: number;
@@ -155,11 +155,14 @@ export class ExportarCentralizador {
   }): Promise<ExcelJS.Buffer> {
     const centralizador = await this.verCentralizador.ejecutar(entrada);
 
-    const columnasNotaFinal = entrada.columna_claves
+    // Solo se exportan las columnas marcadas en pantalla; sin
+    // `columna_claves` (llamada sin filtro) salen todas, como antes.
+    const columnasExportadas = entrada.columna_claves
       ? centralizador.columnas.filter((c) =>
           entrada.columna_claves!.includes(claveColumnaCentralizador(c)),
         )
-      : [];
+      : centralizador.columnas;
+    const columnasNotaFinal = entrada.columna_claves ? columnasExportadas : [];
     const incluirNotaFinal =
       !!entrada.nota_base && entrada.nota_base > 0 && columnasNotaFinal.length > 0;
 
@@ -168,7 +171,7 @@ export class ExportarCentralizador {
 
     hoja.columns = [
       { header: 'Estudiante', key: 'estudiante', width: 32 },
-      ...centralizador.columnas.map((c) => ({
+      ...columnasExportadas.map((c) => ({
         header: `${c.tipo === 'guia' ? 'Guía · ' : ''}${c.tema} (/${c.nota_total})`,
         key: claveColumnaCentralizador(c),
         width: 20,
@@ -183,7 +186,7 @@ export class ExportarCentralizador {
       const registro: Record<string, string | number> = {
         estudiante: `${fila.apellidos} ${fila.nombres}`,
       };
-      for (const columna of centralizador.columnas) {
+      for (const columna of columnasExportadas) {
         const nota = fila.celdas[claveColumnaCentralizador(columna)];
         registro[claveColumnaCentralizador(columna)] = nota ?? '—';
       }

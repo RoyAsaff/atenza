@@ -1020,14 +1020,16 @@ export function MateriaDetallePage() {
 
       <div className="grid grid-cols-1 items-start gap-5 px-6 pb-6 pt-[22px] xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-5">
-          {isLoading || cargandoClases ? (
+          {vista === 'lista' && (isLoading || cargandoClases) && (
             <>
               <Skeleton className="h-24 rounded-xl" />
               {[0, 1, 2].map((i) => (
                 <Skeleton key={i} className="h-[58px] rounded-xl" />
               ))}
             </>
-          ) : (
+          )}
+
+          {vista === 'lista' && !isLoading && !cargandoClases && (
             <>
               {deHoy.map((c) => (
                 <BloqueHoy

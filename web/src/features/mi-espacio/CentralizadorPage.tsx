@@ -114,6 +114,22 @@ function notaTextoPeso(grupo: ColumnaCentralizador[]): string | null {
   return `Pesan igual entre sí: "${mayor.tema}" (${mayor.nota_total} pts) vale lo mismo que "${menor.tema}" (${menor.nota_total} pts).`;
 }
 
+/** "Materia_2026-09-18.xlsx" — nombre de la materia (sin caracteres que
+ * Windows no admite en archivos) y fecha local de la exportación. */
+function nombreArchivoExportacion(nombreMateria: string | undefined): string {
+  const hoy = new Date();
+  const fecha = [
+    hoy.getFullYear(),
+    String(hoy.getMonth() + 1).padStart(2, '0'),
+    String(hoy.getDate()).padStart(2, '0'),
+  ].join('-');
+  const materia = (nombreMateria ?? 'Centralizador')
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\s+/g, '_')
+    .trim();
+  return `${materia || 'Centralizador'}_${fecha}.xlsx`;
+}
+
 // ── Persistencia (localStorage por materia) ───────────────────────────
 
 interface ConfigGuardada {
@@ -707,7 +723,7 @@ function PanelNotaFinal({
       <Button
         variante="primary"
         onClick={onExportar}
-        disabled={exportando}
+        disabled={exportando || columnasSeleccionadas.length === 0}
         className="w-full justify-start gap-2 rounded-[9px] px-[18px] py-[13px] text-[15px] font-bold"
       >
         <Download size={16} />
@@ -715,8 +731,8 @@ function PanelNotaFinal({
       </Button>
       <p className="-mt-1 text-[13px] leading-[1.45] text-text-muted">
         {mostrarNotaFinal
-          ? `El Excel lleva la matriz y la columna Nota final /${formatearNumero(notaBaseNum)} tal como se ve acá.`
-          : 'El Excel lleva la matriz tal como está.'}
+          ? `El Excel lleva solo lo marcado y la columna Nota final /${formatearNumero(notaBaseNum)} tal como se ve acá.`
+          : 'El Excel lleva solo lo marcado en "Qué cuenta".'}
       </p>
       {errorExportar && <p className="text-sm text-red-600">{errorExportar}</p>}
     </div>
@@ -883,16 +899,17 @@ export function CentralizadorPage() {
     setExportando(true);
     setErrorExportar('');
     try {
-      // Si hay una "Nota final" calculada, se manda tal cual para que el
-      // Excel traiga esa misma columna extra.
-      const params = mostrarNotaFinal
-        ? {
-            columna_claves: columnasSeleccionadas.map(claveColumnaCentralizador).join(','),
-            nota_base: notaBaseNum,
-            peso_evaluaciones: pesoEvaluaciones,
-            peso_guias: 100 - pesoEvaluaciones,
-          }
-        : undefined;
+      // Siempre se manda la selección de "Qué cuenta": el Excel lleva solo
+      // esas columnas. Si además hay una "Nota final" calculada, se manda
+      // tal cual para que traiga esa misma columna extra.
+      const params = {
+        columna_claves: columnasSeleccionadas.map(claveColumnaCentralizador).join(','),
+        ...(mostrarNotaFinal && {
+          nota_base: notaBaseNum,
+          peso_evaluaciones: pesoEvaluaciones,
+          peso_guias: 100 - pesoEvaluaciones,
+        }),
+      };
       // responseType 'blob' (en vez de un <a href> plano) para que el
       // interceptor de axios adjunte el Bearer token de la sesión.
       const respuesta = await api.get(`/api/materias/${materiaId}/centralizador/exportar`, {
@@ -902,7 +919,7 @@ export function CentralizadorPage() {
       const url = URL.createObjectURL(respuesta.data as Blob);
       const enlace = document.createElement('a');
       enlace.href = url;
-      enlace.download = `centralizador_${materiaId}.xlsx`;
+      enlace.download = nombreArchivoExportacion(materia?.nombre_materia);
       enlace.click();
       URL.revokeObjectURL(url);
     } catch (err) {
