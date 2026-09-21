@@ -41,11 +41,12 @@ export interface Resultados {
   estadisticas: EstadisticasResultados;
 }
 
-/** HU-27 + fusión con guías (24/08): una columna del centralizador — una
- * evaluación finalizada o una guía cerrada. `id` es el evaluacion_id o
- * guia_id según `tipo` (dos secuencias autoincrement separadas, por eso no
- * alcanza un solo número para identificar la columna sin ambigüedad). */
-export type TipoColumnaCentralizador = 'evaluacion' | 'guia';
+/** HU-27 + fusión con guías (24/08) + exámenes de código: una columna del
+ * centralizador — una evaluación finalizada, una guía cerrada o un examen de
+ * código finalizado. `id` es el evaluacion_id, guia_id o examen_codigo_id
+ * según `tipo` (secuencias autoincrement separadas, por eso no alcanza un
+ * solo número para identificar la columna sin ambigüedad). */
+export type TipoColumnaCentralizador = 'evaluacion' | 'guia' | 'examen_codigo';
 
 export interface ColumnaCentralizador {
   tipo: TipoColumnaCentralizador;

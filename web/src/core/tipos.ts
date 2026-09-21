@@ -491,11 +491,12 @@ export interface DetalleIntentoCodigo {
   ejercicios: EjercicioConRespuesta[];
 }
 
-// Fusión con guías (24/08): una columna es una evaluación finalizada o una
-// guía cerrada — `id` es el evaluacion_id o guia_id según `tipo` (dos
-// secuencias separadas, por eso la celda se indexa por clave compuesta,
-// no por `id` solo). Ver claveColumnaCentralizador.
-export type TipoColumnaCentralizador = 'evaluacion' | 'guia';
+// Fusión con guías (24/08) + exámenes de código: una columna es una
+// evaluación finalizada, una guía cerrada o un examen de código finalizado —
+// `id` es el evaluacion_id, guia_id o examen_codigo_id según `tipo`
+// (secuencias separadas, por eso la celda se indexa por clave compuesta, no
+// por `id` solo). Ver claveColumnaCentralizador.
+export type TipoColumnaCentralizador = 'evaluacion' | 'guia' | 'examen_codigo';
 
 export interface ColumnaCentralizador {
   tipo: TipoColumnaCentralizador;

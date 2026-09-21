@@ -721,8 +721,9 @@ evaluacionesRouter.get('/:id/centralizador', autenticar, soloDocente, async (req
 
 // Nota final calculada en CentralizadorPage: query opcional para que el
 // Excel exportado incluya la misma columna que se ve en pantalla. Claves
-// con formato "evaluacion:3"/"guia:5" (claveColumnaCentralizador) — desde
-// la fusión con guías (24/08) un solo número ya no identifica la columna.
+// con formato "evaluacion:3"/"guia:5"/"examen_codigo:2"
+// (claveColumnaCentralizador) — desde la fusión con guías (24/08) un solo
+// número ya no identifica la columna.
 const esquemaExportarCentralizador = z.object({
   columna_claves: z
     .string()
@@ -731,6 +732,7 @@ const esquemaExportarCentralizador = z.object({
   nota_base: z.coerce.number().positive().optional(),
   peso_evaluaciones: z.coerce.number().min(0).max(100).optional(),
   peso_guias: z.coerce.number().min(0).max(100).optional(),
+  peso_examenes_codigo: z.coerce.number().min(0).max(100).optional(),
 });
 
 // GET /api/materias/:id/centralizador/exportar — HU-27 (descarga .xlsx)
@@ -741,7 +743,7 @@ evaluacionesRouter.get(
   async (req, res, next) => {
     try {
       const materia_id = idNumerico.parse(req.params.id);
-      const { columna_claves, nota_base, peso_evaluaciones, peso_guias } =
+      const { columna_claves, nota_base, peso_evaluaciones, peso_guias, peso_examenes_codigo } =
         esquemaExportarCentralizador.parse(req.query);
       const materia = await materiaRepositorio.buscarPorId(materia_id);
       const buffer = await exportarCentralizador.ejecutar({
@@ -752,6 +754,7 @@ evaluacionesRouter.get(
         nota_base,
         peso_evaluaciones,
         peso_guias,
+        peso_examenes_codigo,
       });
       res.setHeader(
         'Content-Type',

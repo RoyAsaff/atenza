@@ -612,18 +612,6 @@ export const guiaRepositorio = new PrismaGuiaRepositorio(prisma);
 export const guiaCompletadaRepositorio = new PrismaGuiaCompletadaRepositorio(prisma);
 export const guiaIntentoRepositorio = new PrismaGuiaIntentoRepositorio(prisma);
 
-// El Centralizador (HU-27) fusiona evaluaciones + guías (24/08) — necesita
-// los repos de guía de arriba, por eso queda después de declararlos.
-export const verCentralizador = new VerCentralizador(
-  materiaRepositorio,
-  evaluacionRepositorio,
-  guiaRepositorio,
-  inscripcionRepositorio,
-  intentoRepositorio,
-  guiaIntentoRepositorio,
-);
-export const exportarCentralizador = new ExportarCentralizador(verCentralizador);
-
 export const crearGuia = new CrearGuia(
   guiaRepositorio,
   claseRepositorio,
@@ -771,6 +759,21 @@ export const verMonitoreoGuia = new VerMonitoreoGuia(
 // clases del lado estudiante que corren código.
 export const examenCodigoRepositorio = new PrismaExamenCodigoRepositorio(prisma);
 export const intentoCodigoRepositorio = new PrismaIntentoCodigoRepositorio(prisma);
+
+// El Centralizador (HU-27) fusiona evaluaciones + guías (24/08) + exámenes de
+// código — necesita los repos de guía y de código de arriba, por eso queda
+// después de declararlos.
+export const verCentralizador = new VerCentralizador(
+  materiaRepositorio,
+  evaluacionRepositorio,
+  guiaRepositorio,
+  examenCodigoRepositorio,
+  inscripcionRepositorio,
+  intentoRepositorio,
+  guiaIntentoRepositorio,
+  intentoCodigoRepositorio,
+);
+export const exportarCentralizador = new ExportarCentralizador(verCentralizador);
 
 // Detalle de materia (handoff 1b, 18/09): verClases enriquece cada clase
 // con su estado de asistencia/evaluación (ver resumen-clase.ts) y
