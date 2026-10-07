@@ -105,6 +105,7 @@ export interface Pago {
   id: number;
   fecha: string;
   usuario_id: number;
+  docente: { nombres: string; apellidos: string; email: string; whatsapp: string | null };
   monto_lista: number; // precio de plan sin descuento, para mostrar tachado
   monto: number; // lo que realmente se debe/se transfirió
   comprobante: string | null;

@@ -7,17 +7,23 @@ import {
   PagoRepositorio,
 } from '../../domain/repositorios/pago-repositorio';
 
-const includePagoConPlan = { plan: true, promocion: true } as const;
+const includePagoConPlan = {
+  plan: true,
+  promocion: true,
+  usuario: { select: { nombres: true, apellidos: true, email: true, whatsapp: true } },
+} as const;
 
 type PagoConPlanPrisma = NonNullable<
   Awaited<ReturnType<PrismaClient['pago']['findFirst']>>
 > & {
   plan: NonNullable<Awaited<ReturnType<PrismaClient['plan']['findFirst']>>>;
   promocion: Awaited<ReturnType<PrismaClient['promocion']['findFirst']>> | null;
+  usuario: { nombres: string; apellidos: string; email: string; whatsapp: string | null };
 };
 
 function aDominio(p: PagoConPlanPrisma): PagoConPlan {
   return {
+    docente: p.usuario,
     id: p.id,
     fecha: p.fecha,
     usuario_id: p.usuario_id,

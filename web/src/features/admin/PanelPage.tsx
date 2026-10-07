@@ -1,10 +1,10 @@
-// HU-09 · Panel de administración general: usuarios y materias con búsqueda
+// HU-09 · Panel de administración general: KPIs de la plataforma y docentes
+// con sus materias, estudiantes, plan y vigencia en un solo lugar.
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { api } from '../../core/api/cliente';
-import { Materia, Usuario } from '../../core/tipos';
 import {
   Badge,
   Card,
@@ -16,29 +16,57 @@ import {
   Spinner,
 } from '../../core/ui/ui';
 
+interface ResumenDocente {
+  id: number;
+  nombres: string;
+  apellidos: string;
+  email: string;
+  whatsapp: string | null;
+  activo: boolean;
+  plan: string | null;
+  vigencia: string | null;
+  pago_en_verificacion: boolean;
+  materias: { id: number; nombre_materia: string; sigla: string | null; estudiantes: number }[];
+}
+
+interface Resumen {
+  kpis: {
+    usuarios: number;
+    docentes: number;
+    materias: number;
+    estudiantes_activos: number;
+    pagos_por_verificar: number;
+    ingresos_aprobados: number;
+    cuentas_por_vencer: number;
+  };
+  docentes: ResumenDocente[];
+}
+
+function Kpi({ titulo, valor, aviso }: { titulo: string; valor: string | number; aviso?: boolean }) {
+  return (
+    <Card>
+      <CardBody>
+        <p className="text-xs text-text-secondary">{titulo}</p>
+        <p className={`text-2xl font-bold ${aviso ? 'text-red-600' : 'text-text'}`}>{valor}</p>
+      </CardBody>
+    </Card>
+  );
+}
+
 export function PanelPage() {
-  const [buscarUsuario, setBuscarUsuario] = useState('');
-  const [buscarMateria, setBuscarMateria] = useState('');
+  const [buscar, setBuscar] = useState('');
 
-  const usuarios = useQuery({
-    queryKey: ['admin-usuarios', buscarUsuario],
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-resumen', buscar],
     queryFn: async () => {
-      const { data } = await api.get<{ usuarios: Usuario[] }>('/api/admin/usuarios', {
-        params: buscarUsuario ? { buscar: buscarUsuario } : {},
+      const { data } = await api.get<Resumen>('/api/admin/resumen', {
+        params: buscar ? { buscar } : {},
       });
-      return data.usuarios;
+      return data;
     },
   });
 
-  const materias = useQuery({
-    queryKey: ['admin-materias', buscarMateria],
-    queryFn: async () => {
-      const { data } = await api.get<{ materias: Materia[] }>('/api/admin/materias', {
-        params: buscarMateria ? { buscar: buscarMateria } : {},
-      });
-      return data.materias;
-    },
-  });
+  const k = data?.kpis;
 
   return (
     <div>
@@ -46,92 +74,95 @@ export function PanelPage() {
         <PageHeader eyebrow="Administración" title="Panel general" />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader title={`Usuarios${usuarios.data ? ` (${usuarios.data.length})` : ''}`} />
-          <CardBody>
-            <Input
-              placeholder="Buscar por nombre, apellido o correo…"
-              value={buscarUsuario}
-              onChange={(e) => setBuscarUsuario(e.target.value)}
-              iconoIzq={<Search size={15} />}
-              className="mb-3"
+      {k && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <Kpi titulo="Docentes con materias" valor={k.docentes} />
+          <Kpi titulo="Materias" valor={k.materias} />
+          <Kpi titulo="Estudiantes activos" valor={k.estudiantes_activos} />
+          <Kpi titulo="Usuarios registrados" valor={k.usuarios} />
+          <Kpi
+            titulo="Pagos por verificar"
+            valor={k.pagos_por_verificar}
+            aviso={k.pagos_por_verificar > 0}
+          />
+          <Kpi titulo="Cuentas por vencer (30 días)" valor={k.cuentas_por_vencer} />
+          <Kpi titulo="Ingresos aprobados" valor={`Bs. ${k.ingresos_aprobados.toFixed(2)}`} />
+        </div>
+      )}
+
+      <Card>
+        <CardHeader title={`Docentes${data ? ` (${data.docentes.length})` : ''}`} />
+        <CardBody>
+          <Input
+            placeholder="Buscar docente por nombre, apellido o correo…"
+            value={buscar}
+            onChange={(e) => setBuscar(e.target.value)}
+            iconoIzq={<Search size={15} />}
+            className="mb-3"
+          />
+
+          {isLoading && <Spinner />}
+
+          {data && data.docentes.length === 0 && (
+            <EmptyState
+              title="Sin resultados"
+              description={
+                buscar
+                  ? 'No se encontraron docentes con ese criterio.'
+                  : 'Aún no hay docentes con materias.'
+              }
             />
+          )}
 
-            {usuarios.isLoading && <Spinner />}
-
-            {usuarios.data && usuarios.data.length === 0 && (
-              <EmptyState
-                title="Sin resultados"
-                description={
-                  buscarUsuario
-                    ? 'No se encontraron usuarios con ese criterio.'
-                    : 'Aún no hay usuarios registrados.'
-                }
-              />
-            )}
-
-            <div className="divide-y divide-border max-h-96 overflow-y-auto">
-              {usuarios.data?.map((u) => (
-                <div key={u.id} className="flex items-center justify-between gap-3 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-text">
-                      {u.apellidos}, {u.nombres}
-                    </p>
-                    <p className="text-xs text-text-secondary">{u.email}</p>
+          <div className="divide-y divide-border">
+            {data?.docentes.map((d) => {
+              const vencida = d.vigencia && new Date(d.vigencia) < new Date();
+              const totalEstudiantes = d.materias.reduce((s, m) => s + m.estudiantes, 0);
+              return (
+                <div key={d.id} className="py-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-text">
+                        {d.apellidos}, {d.nombres}
+                      </p>
+                      <p className="text-xs text-text-secondary">
+                        {d.email}
+                        {d.whatsapp && ` · WhatsApp ${d.whatsapp}`}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Badge tone="primary">{d.plan ?? 'Sin plan'}</Badge>
+                      {d.vigencia && (
+                        <Badge tone={vencida ? 'danger' : 'success'}>
+                          {vencida ? 'Venció' : 'Vigente hasta'}{' '}
+                          {new Date(d.vigencia).toLocaleDateString()}
+                        </Badge>
+                      )}
+                      {d.pago_en_verificacion && <Badge tone="danger">Pago por verificar</Badge>}
+                      {!d.activo && <Badge tone="danger">inactivo</Badge>}
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    {u.rol_nombre === 'admin' && <Badge tone="primary">admin</Badge>}
-                    {!u.activo && <Badge tone="danger">inactivo</Badge>}
-                  </div>
+                  <p className="mt-2 text-xs text-text-secondary">
+                    {d.materias.length} materia{d.materias.length === 1 ? '' : 's'} ·{' '}
+                    {totalEstudiantes} estudiante{totalEstudiantes === 1 ? '' : 's'}
+                  </p>
+                  <ul className="mt-1 text-sm text-text">
+                    {d.materias.map((m) => (
+                      <li key={m.id}>
+                        {m.nombre_materia}
+                        {m.sigla ? ` (${m.sigla})` : ''}{' '}
+                        <span className="text-xs text-text-secondary">
+                          · {m.estudiantes} estudiante{m.estudiantes === 1 ? '' : 's'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              ))}
-            </div>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader title={`Materias${materias.data ? ` (${materias.data.length})` : ''}`} />
-          <CardBody>
-            <Input
-              placeholder="Buscar por nombre, sigla o código…"
-              value={buscarMateria}
-              onChange={(e) => setBuscarMateria(e.target.value)}
-              iconoIzq={<Search size={15} />}
-              className="mb-3"
-            />
-
-            {materias.isLoading && <Spinner />}
-
-            {materias.data && materias.data.length === 0 && (
-              <EmptyState
-                title="Sin resultados"
-                description={
-                  buscarMateria
-                    ? 'No se encontraron materias con ese criterio.'
-                    : 'Aún no hay materias registradas.'
-                }
-              />
-            )}
-
-            <div className="divide-y divide-border max-h-96 overflow-y-auto">
-              {materias.data?.map((m) => (
-                <div key={m.id} className="flex items-center justify-between gap-3 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-text">
-                      {m.nombre_materia} {m.sigla ? `(${m.sigla})` : ''}
-                    </p>
-                    <p className="text-xs text-text-secondary">
-                      {m.carrera} · {m.semestre} · código{' '}
-                      <span className="font-mono">{m.codigo}</span>
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardBody>
-        </Card>
-      </div>
+              );
+            })}
+          </div>
+        </CardBody>
+      </Card>
     </div>
   );
 }

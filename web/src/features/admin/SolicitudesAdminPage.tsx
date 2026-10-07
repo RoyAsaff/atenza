@@ -105,7 +105,11 @@ export function SolicitudesAdminPage() {
             <CardBody className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="font-bold text-text">
-                  #{p.id} · Docente #{p.usuario_id} · Plan {p.plan.nombre}
+                  #{p.id} · {p.docente.nombres} {p.docente.apellidos} · Plan {p.plan.nombre}
+                </p>
+                <p className="text-sm text-text-secondary">
+                  {p.docente.email}
+                  {p.docente.whatsapp && ` · WhatsApp ${p.docente.whatsapp}`}
                 </p>
                 <p className="text-sm text-text-secondary">
                   {p.monto !== p.monto_lista && (

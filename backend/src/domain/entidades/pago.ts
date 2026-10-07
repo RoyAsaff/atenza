@@ -32,6 +32,10 @@ export interface Pago {
 }
 
 /** Vista completa de un pago con su plan y, si aplica, la promoción usada. */
-export type PagoConPlan = Pago & { plan: Plan; promocion: Promocion | null };
+export type PagoConPlan = Pago & {
+  plan: Plan;
+  promocion: Promocion | null;
+  docente: { nombres: string; apellidos: string; email: string; whatsapp: string | null };
+};
 
 export const PLAZO_COMPROBANTE_HORAS = 24; // HU-06, Escenario 2 y 3

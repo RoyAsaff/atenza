@@ -19,6 +19,7 @@ import { crearAutenticar } from '../middlewares/autenticar';
 import { autorizarContexto } from '../middlewares/autorizar';
 import { rutaPublica, subirArchivo } from '../middlewares/subir-archivos';
 import { aPublico } from '../../domain/entidades/usuario';
+import { prisma } from '../../infrastructure/db/prisma';
 
 export const adminRouter = Router();
 
@@ -135,6 +136,111 @@ adminRouter.post('/solicitudes/:id/rechazar', async (req, res, next) => {
       dispositivo: req.headers['user-agent'],
     });
     res.json({ solicitud });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/admin/resumen?buscar= — panel general: KPIs + docentes con sus
+// materias, estudiantes, plan y vigencia (datos relacionados en un solo lugar)
+adminRouter.get('/resumen', async (req, res, next) => {
+  try {
+    const { buscar } = z.object({ buscar: z.string().optional() }).parse(req.query);
+    const ahora = new Date();
+    const en30 = new Date(ahora.getTime() + 30 * 24 * 3600 * 1000);
+
+    const [
+      totalUsuarios,
+      totalMaterias,
+      estudiantesActivos,
+      pagosPorVerificar,
+      ingresos,
+      porVencer,
+      docentes,
+    ] = await Promise.all([
+      prisma.usuario.count({ where: { rol: { nombre_rol: 'docente_estudiante' } } }),
+      prisma.materia.count(),
+      prisma.inscripcion.groupBy({ by: ['estudiante_id'], where: { retirado: false } }),
+      prisma.pago.count({ where: { estado: 'en_verificacion' } }),
+      prisma.pago.aggregate({ where: { estado: 'aprobada' }, _sum: { monto: true } }),
+      prisma.pago.groupBy({
+        by: ['usuario_id'],
+        where: { estado: 'aprobada' },
+        _max: { fecha_expira: true },
+        having: { fecha_expira: { _max: { gte: ahora, lte: en30 } } },
+      }),
+      prisma.usuario.findMany({
+        where: {
+          materias: { some: {} },
+          ...(buscar
+            ? {
+                OR: [
+                  { nombres: { contains: buscar, mode: 'insensitive' } },
+                  { apellidos: { contains: buscar, mode: 'insensitive' } },
+                  { email: { contains: buscar, mode: 'insensitive' } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          nombres: true,
+          apellidos: true,
+          email: true,
+          whatsapp: true,
+          activo: true,
+          plan: { select: { nombre: true } },
+          materias: {
+            select: {
+              id: true,
+              nombre_materia: true,
+              sigla: true,
+              _count: { select: { inscripciones: { where: { retirado: false } } } },
+            },
+            orderBy: { id: 'asc' },
+          },
+          pagos: {
+            where: { OR: [{ estado: 'aprobada' }, { estado: 'en_verificacion' }] },
+            select: { estado: true, fecha_expira: true },
+          },
+        },
+        orderBy: { apellidos: 'asc' },
+      }),
+    ]);
+
+    res.json({
+      kpis: {
+        usuarios: totalUsuarios,
+        docentes: docentes.length,
+        materias: totalMaterias,
+        estudiantes_activos: estudiantesActivos.length,
+        pagos_por_verificar: pagosPorVerificar,
+        ingresos_aprobados: Number(ingresos._sum.monto ?? 0),
+        cuentas_por_vencer: porVencer.length,
+      },
+      docentes: docentes.map((d) => {
+        const vigencias = d.pagos
+          .filter((p) => p.estado === 'aprobada' && p.fecha_expira)
+          .map((p) => p.fecha_expira!.getTime());
+        return {
+          id: d.id,
+          nombres: d.nombres,
+          apellidos: d.apellidos,
+          email: d.email,
+          whatsapp: d.whatsapp,
+          activo: d.activo,
+          plan: d.plan?.nombre ?? null,
+          vigencia: vigencias.length ? new Date(Math.max(...vigencias)) : null,
+          pago_en_verificacion: d.pagos.some((p) => p.estado === 'en_verificacion'),
+          materias: d.materias.map((m) => ({
+            id: m.id,
+            nombre_materia: m.nombre_materia,
+            sigla: m.sigla,
+            estudiantes: m._count.inscripciones,
+          })),
+        };
+      }),
+    });
   } catch (error) {
     next(error);
   }
