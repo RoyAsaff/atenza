@@ -40,7 +40,8 @@ intentosCodigoRouter.get('/actual', autenticar, soloEstudiante, async (req, res,
 const esquemaCodigo = z.object({ codigo_fuente: z.string() });
 
 // POST /api/intentos-codigo/:id/ejercicios/:ejercicioId/ejecutar — solo
-// casos visibles, no persiste nada (scratchpad de prueba-y-error).
+// casos: detalle de los visibles + solo paso/no paso de los ocultos. No
+// persiste nada (scratchpad de prueba-y-error).
 intentosCodigoRouter.post(
   '/:id/ejercicios/:ejercicioId/ejecutar',
   autenticar,
@@ -49,13 +50,13 @@ intentosCodigoRouter.post(
   async (req, res, next) => {
     try {
       const { codigo_fuente } = esquemaCodigo.parse(req.body);
-      const resultados = await ejecutarCodigo.ejecutar({
+      const { resultados, ocultos } = await ejecutarCodigo.ejecutar({
         intento_id: idNumerico.parse(req.params.id),
         estudiante_id: req.auth!.sub,
         ejercicio_id: idNumerico.parse(req.params.ejercicioId),
         codigo_fuente,
       });
-      res.json({ resultados });
+      res.json({ resultados, ocultos });
     } catch (error) {
       next(error);
     }

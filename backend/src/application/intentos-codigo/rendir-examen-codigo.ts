@@ -15,7 +15,9 @@ import {
   IntentoCodigo,
   IntentoCodigoParaRendir,
   ResultadoCaso,
+  ResultadoEjecucion,
   ResultadoEnvio,
+  ResultadoOculto,
   TipoIncidenteCodigo,
 } from '../../domain/entidades/intento-codigo';
 import { EstadoInvalidoError, NoEncontradoError, ProhibidoError } from '../../domain/errores';
@@ -71,6 +73,24 @@ function filtrarResultadosVisibles(
   return visibles.length > 0 ? visibles : null;
 }
 
+/** Parte una corrida completa: detalle solo de los casos visibles y, de los
+ * ocultos, únicamente `paso` (en el orden del ejercicio). */
+function separarVisiblesYOcultos(
+  corrida: ResultadoCaso[],
+  casos: { id: number; es_oculto: boolean }[],
+): ResultadoEjecucion {
+  const porId = new Map(corrida.map((r) => [r.caso_id, r]));
+  const resultados: ResultadoCaso[] = [];
+  const ocultos: ResultadoOculto[] = [];
+  for (const caso of casos) {
+    const r = porId.get(caso.id);
+    if (!r) continue;
+    if (caso.es_oculto) ocultos.push({ paso: r.paso });
+    else resultados.push(r);
+  }
+  return { resultados, ocultos };
+}
+
 // ── Abrir / reanudar el examen vigente ───────────────────────────
 
 export class VerIntentoCodigoActual {
@@ -113,6 +133,9 @@ export class VerIntentoCodigoActual {
           total_casos: ejercicio.casos_prueba.length,
           ultimo_codigo: respuesta?.codigo_fuente ?? null,
           ultimo_resultado: filtrarResultadosVisibles(respuesta?.resultado_json ?? null, idsVisibles),
+          ultimos_ocultos: respuesta
+            ? separarVisiblesYOcultos(respuesta.resultado_json, ejercicio.casos_prueba).ocultos
+            : null,
           enviado_en: respuesta?.respondida_en ?? null,
         };
       });
@@ -145,7 +168,7 @@ export class EjecutarCodigo {
     estudiante_id: number;
     ejercicio_id: number;
     codigo_fuente: string;
-  }): Promise<ResultadoCaso[]> {
+  }): Promise<ResultadoEjecucion> {
     const propio = await exigirIntentoPropio(this.intentos, entrada.intento_id, entrada.estudiante_id);
     const intento = await aplicarExpiracionSiToca(this.intentos, this.tiempoReal, propio);
     if (intento.estado !== 'en_curso' && intento.estado !== 'desconectado') {
@@ -157,10 +180,11 @@ export class EjecutarCodigo {
       throw new NoEncontradoError('Ejercicio');
     }
 
-    const casosVisibles = ejercicio.casos_prueba.filter((c) => !c.es_oculto);
-    if (casosVisibles.length === 0) return [];
+    if (ejercicio.casos_prueba.length === 0) return { resultados: [], ocultos: [] };
 
-    return this.ejecutor.ejecutar(entrada.codigo_fuente, casosVisibles);
+    // Corre TODOS los casos, pero del oculto solo sale el veredicto.
+    const todos = await this.ejecutor.ejecutar(entrada.codigo_fuente, ejercicio.casos_prueba);
+    return separarVisiblesYOcultos(todos, ejercicio.casos_prueba);
   }
 }
 
@@ -213,11 +237,12 @@ export class EnviarRespuestaCodigo {
       ejercicios_enviados: ejerciciosEnviados,
     });
 
-    const idsVisibles = new Set(ejercicio.casos_prueba.filter((c) => !c.es_oculto).map((c) => c.id));
+    const { resultados, ocultos } = separarVisiblesYOcultos(resultado_json, ejercicio.casos_prueba);
     return {
       casos_acertados,
       casos_totales,
-      resultados_visibles: resultado_json.filter((r) => idsVisibles.has(r.caso_id)),
+      resultados_visibles: resultados,
+      resultados_ocultos: ocultos,
       enviado_en: guardada.respondida_en,
     };
   }

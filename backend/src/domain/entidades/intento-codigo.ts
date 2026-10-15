@@ -86,6 +86,8 @@ export interface EjercicioParaRendir {
   /** Resultado de la última corrida, si la hay (para repintar el panel de
    * pruebas al reanudar sin que el estudiante tenga que volver a correr). */
   ultimo_resultado: ResultadoCaso[] | null;
+  /** Veredicto de los ocultos del último "Enviar" (solo paso/no paso). */
+  ultimos_ocultos: ResultadoOculto[] | null;
   /** Cuándo se hizo el último "Enviar" (RespuestaCodigo.respondida_en), para
    * que la hora de entrega sobreviva a un refresh/reconexión del cliente. */
   enviado_en: Date | null;
@@ -113,7 +115,21 @@ export interface ResultadoEnvio {
   casos_acertados: number;
   casos_totales: number;
   resultados_visibles: ResultadoCaso[];
+  resultados_ocultos: ResultadoOculto[];
   enviado_en: Date;
+}
+
+/** Veredicto de un caso oculto: SOLO si pasó. Sin entrada, salida esperada,
+ * stdout ni stderr — el estudiante sabe que su código falla en alguno
+ * oculto, pero no puede reconstruir el caso. */
+export interface ResultadoOculto {
+  paso: boolean;
+}
+
+/** Respuesta de "Ejecutar": detalle de los visibles + veredicto de los ocultos. */
+export interface ResultadoEjecucion {
+  resultados: ResultadoCaso[];
+  ocultos: ResultadoOculto[];
 }
 
 // ── HU-25-equivalente · "Ver examen" del docente ────────────────────

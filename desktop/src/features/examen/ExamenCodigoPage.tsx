@@ -49,6 +49,7 @@ import {
   IntentoCodigoParaRendir,
   ResultadoCaso,
   ResultadoEnvio,
+  ResultadoOculto,
   TipoIncidenteCodigo,
 } from '../../core/tipos';
 import { Button, cn } from '../../core/ui';
@@ -485,7 +486,7 @@ function TarjetaCaso({ caso, indice }: { caso: CasoParaRendir; indice: number })
           <p className="mb-1.5 text-[10.5px] font-bold tracking-[0.08em] text-white/40 uppercase">Entrada</p>
           <pre
             className={cn(
-              'max-h-[150px] overflow-auto font-mono text-[12.5px] leading-[1.65] whitespace-pre',
+              'font-mono text-[12.5px] leading-[1.65] whitespace-pre-wrap [overflow-wrap:anywhere]',
               caso.entrada ? 'text-white/90' : 'text-white/40',
             )}
           >
@@ -494,7 +495,7 @@ function TarjetaCaso({ caso, indice }: { caso: CasoParaRendir; indice: number })
         </div>
         <div className="bg-exam-bar px-3 pt-[9px] pb-[11px]">
           <p className="mb-1.5 text-[10.5px] font-bold tracking-[0.08em] text-white/40 uppercase">Salida esperada</p>
-          <pre className="max-h-[150px] overflow-auto font-mono text-[12.5px] leading-[1.65] whitespace-pre text-secondary-300">
+          <pre className="font-mono text-[12.5px] leading-[1.65] whitespace-pre-wrap [overflow-wrap:anywhere] text-secondary-300">
             {caso.salida_esperada}
           </pre>
         </div>
@@ -582,7 +583,7 @@ function FilaResultado({
         <div className="grid grid-cols-3 gap-px border-t border-white/7 bg-white/7">
           <div className="bg-exam-bar px-3 pt-2.5 pb-3">
             <p className="mb-1.5 text-[10.5px] font-bold tracking-[0.08em] text-white/40 uppercase">Entrada</p>
-            <pre className="overflow-x-auto font-mono text-[12.5px] leading-[1.7] whitespace-pre text-white/86">
+            <pre className="font-mono text-[12.5px] leading-[1.7] whitespace-pre-wrap [overflow-wrap:anywhere] text-white/86">
               {caso.entrada || '(vacía)'}
             </pre>
           </div>
@@ -590,7 +591,7 @@ function FilaResultado({
             <p className="mb-1.5 text-[10.5px] font-bold tracking-[0.08em] text-white/40 uppercase">Esperado</p>
             <div>
               {esperadoLineas.map((linea, i) => (
-                <pre key={i} className="rounded-[3px] px-1 font-mono text-[12.5px] leading-[1.7] whitespace-pre text-secondary-300">
+                <pre key={i} className="rounded-[3px] px-1 font-mono text-[12.5px] leading-[1.7] whitespace-pre-wrap [overflow-wrap:anywhere] text-secondary-300">
                   {linea || ' '}
                 </pre>
               ))}
@@ -605,7 +606,7 @@ function FilaResultado({
                 <pre
                   key={i}
                   className={cn(
-                    'rounded-[3px] px-1 font-mono text-[12.5px] leading-[1.7] whitespace-pre',
+                    'rounded-[3px] px-1 font-mono text-[12.5px] leading-[1.7] whitespace-pre-wrap [overflow-wrap:anywhere]',
                     l.estado === 'diff' ? 'bg-red-600/20 text-red-300' : l.estado === 'falta' ? 'text-white/38' : 'text-white/86',
                   )}
                 >
@@ -614,7 +615,7 @@ function FilaResultado({
               ))}
             </div>
             {resultado.stderr && (
-              <pre className="mt-2 rounded-md bg-[rgba(153,27,27,0.22)] px-2.5 py-2 font-mono text-xs leading-[1.6] whitespace-pre-wrap text-red-300">
+              <pre className="mt-2 rounded-md bg-[rgba(153,27,27,0.22)] px-2.5 py-2 font-mono text-xs leading-[1.6] whitespace-pre-wrap [overflow-wrap:anywhere] text-red-300">
                 {resultado.stderr}
               </pre>
             )}
@@ -625,10 +626,31 @@ function FilaResultado({
   );
 }
 
+// Caso oculto: solo veredicto. Sin detalle ni "ver detalle" — el backend
+// ni siquiera manda su contenido.
+function FilaOculto({ indice, paso }: { indice: number; paso: boolean }) {
+  return (
+    <article
+      className={cn(
+        'flex items-center gap-2.5 rounded-[10px] border px-3 py-[9px]',
+        paso ? 'border-[rgba(20,163,179,0.32)] bg-[rgba(24,197,216,0.05)]' : 'border-[rgba(248,113,113,0.34)] bg-[rgba(248,113,113,0.07)]',
+      )}
+    >
+      <span className={cn('h-2 w-2 shrink-0 rounded-full', paso ? 'bg-secondary-400' : 'bg-red-400')} />
+      <span className={cn('text-[12.5px] font-bold', paso ? 'text-secondary-400' : 'text-red-400')}>
+        Caso oculto {indice + 1}
+      </span>
+      <span className="text-[12.5px] text-white/52">{paso ? 'pasó' : 'no pasó — revisa tu código'}</span>
+      <Lock size={12} className="ml-auto shrink-0 text-white/30" />
+    </article>
+  );
+}
+
 function PanelResultados({
   origen,
   casosVisibles,
   resultados,
+  ocultos,
   horaEntrega,
   ejercicioId,
   casosAbiertos,
@@ -637,13 +659,14 @@ function PanelResultados({
   origen: 'ejecutar' | 'envio';
   casosVisibles: CasoParaRendir[];
   resultados: ResultadoCaso[];
+  ocultos: ResultadoOculto[];
   horaEntrega: string;
   ejercicioId: number;
   casosAbiertos: Record<string, boolean>;
   onAlternarCaso: (clave: string) => void;
 }) {
-  const pasados = resultados.filter((r) => r.paso).length;
-  const total = resultados.length;
+  const pasados = resultados.filter((r) => r.paso).length + ocultos.filter((o) => o.paso).length;
+  const total = resultados.length + ocultos.length;
   const todosPasan = pasados === total;
 
   return (
@@ -680,6 +703,9 @@ function PanelResultados({
             />
           );
         })}
+        {ocultos.map((o, i) => (
+          <FilaOculto key={`oculto-${i}`} indice={i} paso={o.paso} />
+        ))}
       </div>
     </div>
   );
@@ -692,6 +718,7 @@ function EditorColumna({
   codigo,
   onCambiarCodigo,
   resultados,
+  ocultos,
   origen,
   ejecutando,
   enviando,
@@ -707,6 +734,7 @@ function EditorColumna({
   codigo: string;
   onCambiarCodigo: (valor: string) => void;
   resultados: ResultadoCaso[] | null;
+  ocultos: ResultadoOculto[];
   origen: 'ejecutar' | 'envio' | undefined;
   ejecutando: boolean;
   enviando: boolean;
@@ -781,7 +809,7 @@ function EditorColumna({
           className="inline-flex h-[38px] items-center gap-2 rounded-[9px] border border-white/22 bg-white/5 px-[15px] text-sm font-semibold text-white hover:border-white/34 hover:bg-white/12 disabled:pointer-events-none disabled:opacity-60"
         >
           {ejecutando ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
-          {ejecutando ? 'Ejecutando…' : 'Ejecutar casos visibles'}
+          {ejecutando ? 'Ejecutando…' : 'Ejecutar casos de prueba'}
         </button>
 
         <div ref={wrapperRef} className="relative">
@@ -837,11 +865,12 @@ function EditorColumna({
       </div>
       {error && <p className="shrink-0 bg-exam-bar px-5 pb-3 text-sm text-red-400">{error}</p>}
 
-      {resultados && resultados.length > 0 && (
+      {((resultados?.length ?? 0) > 0 || ocultos.length > 0) && (
         <PanelResultados
           origen={origen ?? 'ejecutar'}
           casosVisibles={ejercicio.casos_visibles}
-          resultados={resultados}
+          resultados={resultados ?? []}
+          ocultos={ocultos}
           horaEntrega={horaEntrega}
           ejercicioId={ejercicio.id}
           casosAbiertos={casosAbiertos}
@@ -867,6 +896,7 @@ export function ExamenCodigoPage({ onTerminado }: { onTerminado?: () => void } =
   const [ejercicioActivoId, setEjercicioActivoId] = useState<number | null>(null);
   const [codigos, setCodigos] = useState<Record<number, string>>({});
   const [resultados, setResultados] = useState<Record<number, ResultadoCaso[] | null>>({});
+  const [ocultos, setOcultos] = useState<Record<number, ResultadoOculto[]>>({});
   const [origenResultados, setOrigenResultados] = useState<Record<number, 'ejecutar' | 'envio'>>({});
   const [enviados, setEnviados] = useState<Record<number, string>>({});
   const [casosAbiertos, setCasosAbiertos] = useState<Record<string, boolean>>({});
@@ -897,12 +927,14 @@ export function ExamenCodigoPage({ onTerminado }: { onTerminado?: () => void } =
     if (!intento) return;
     const codigosIniciales: Record<number, string> = {};
     const resultadosIniciales: Record<number, ResultadoCaso[] | null> = {};
+    const ocultosIniciales: Record<number, ResultadoOculto[]> = {};
     const origenIniciales: Record<number, 'ejecutar' | 'envio'> = {};
     const enviadosIniciales: Record<number, string> = {};
     const aperturaInicial: Record<string, boolean> = {};
     for (const ej of intento.ejercicios) {
       codigosIniciales[ej.id] = ej.ultimo_codigo ?? ej.plantilla_codigo ?? '';
       resultadosIniciales[ej.id] = ej.ultimo_resultado;
+      ocultosIniciales[ej.id] = ej.ultimos_ocultos ?? [];
       // `ultimo_codigo` solo se completa vía "Enviar" (Ejecutar es
       // scratchpad, no persiste) — si viene, el ejercicio ya fue entregado.
       if (ej.ultimo_codigo !== null) {
@@ -913,6 +945,7 @@ export function ExamenCodigoPage({ onTerminado }: { onTerminado?: () => void } =
     }
     setCodigos(codigosIniciales);
     setResultados(resultadosIniciales);
+    setOcultos(ocultosIniciales);
     setOrigenResultados(origenIniciales);
     setEnviados(enviadosIniciales);
     setCasosAbiertos(aperturaInicial);
@@ -998,11 +1031,12 @@ export function ExamenCodigoPage({ onTerminado }: { onTerminado?: () => void } =
     setEjecutando(true);
     setErrorEjercicio('');
     try {
-      const { data } = await api.post<{ resultados: ResultadoCaso[] }>(
+      const { data } = await api.post<{ resultados: ResultadoCaso[]; ocultos: ResultadoOculto[] }>(
         `/api/intentos-codigo/${intento.intento_id}/ejercicios/${id}/ejecutar`,
         { codigo_fuente: codigos[id] ?? '' },
       );
       setResultados((r) => ({ ...r, [id]: data.resultados }));
+      setOcultos((o) => ({ ...o, [id]: data.ocultos ?? [] }));
       setOrigenResultados((o) => ({ ...o, [id]: 'ejecutar' }));
       setCasosAbiertos((prev) => ({ ...limpiarClaves(prev, id), ...clavesAbiertasPorDefecto(id, data.resultados) }));
     } catch (err) {
@@ -1024,6 +1058,7 @@ export function ExamenCodigoPage({ onTerminado }: { onTerminado?: () => void } =
       );
       const hora = formatearHora(data.resultado.enviado_en);
       setResultados((r) => ({ ...r, [id]: data.resultado.resultados_visibles }));
+      setOcultos((o) => ({ ...o, [id]: data.resultado.resultados_ocultos ?? [] }));
       setOrigenResultados((o) => ({ ...o, [id]: 'envio' }));
       setEnviados((e) => ({ ...e, [id]: hora }));
       setCasosAbiertos((prev) => ({
@@ -1128,6 +1163,7 @@ export function ExamenCodigoPage({ onTerminado }: { onTerminado?: () => void } =
               codigo={codigos[ejercicioActivo.id] ?? ''}
               onCambiarCodigo={(valor) => setCodigos((c) => ({ ...c, [ejercicioActivo.id]: valor }))}
               resultados={resultados[ejercicioActivo.id] ?? null}
+              ocultos={ocultos[ejercicioActivo.id] ?? []}
               origen={origenResultados[ejercicioActivo.id]}
               ejecutando={ejecutando}
               enviando={enviandoEjercicio}

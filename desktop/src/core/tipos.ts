@@ -47,6 +47,7 @@ export interface EjercicioParaRendir {
   total_casos: number;
   ultimo_codigo: string | null;
   ultimo_resultado: ResultadoCaso[] | null;
+  ultimos_ocultos: ResultadoOculto[] | null;
   enviado_en: string | null;
 }
 
@@ -61,9 +62,15 @@ export interface IntentoCodigoParaRendir {
   ejercicios: EjercicioParaRendir[];
 }
 
+/** Veredicto de un caso oculto: solo si pasó, nunca su contenido. */
+export interface ResultadoOculto {
+  paso: boolean;
+}
+
 export interface ResultadoEnvio {
   casos_acertados: number;
   casos_totales: number;
   resultados_visibles: ResultadoCaso[];
+  resultados_ocultos: ResultadoOculto[];
   enviado_en: string;
 }
