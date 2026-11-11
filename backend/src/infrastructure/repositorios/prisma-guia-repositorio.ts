@@ -39,10 +39,27 @@ export class PrismaGuiaRepositorio implements GuiaRepositorio {
   }
 
   async listarCerradasPorMateria(materia_id: number): Promise<Guia[]> {
-    return this.prisma.guia.findMany({
+    // Ordenadas por fecha de lanzamiento: la guía no guarda ese dato, pero al
+    // lanzarla se crea el intento oficial de cada inscrito, así que el primero
+    // de ellos marca cuándo salió. Sin intentos oficiales (datos viejos) se
+    // usa la fecha de la clase y luego `orden`.
+    const guias = await this.prisma.guia.findMany({
       where: { estado: 'cerrada', clase: { materia_id } },
-      orderBy: { orden: 'asc' },
+      include: {
+        clase: { select: { fecha: true, hora: true } },
+        intentos: {
+          where: { es_oficial: true },
+          select: { fecha_inicio: true },
+          orderBy: { fecha_inicio: 'asc' },
+          take: 1,
+        },
+      },
     });
+    const claveFecha = (g: (typeof guias)[number]): number =>
+      g.intentos[0]?.fecha_inicio.getTime() ?? g.clase.fecha.getTime();
+    return guias
+      .sort((a, b) => claveFecha(a) - claveFecha(b) || a.clase.hora.localeCompare(b.clase.hora) || a.orden - b.orden)
+      .map(({ clase: _clase, intentos: _intentos, ...guia }) => guia);
   }
 
   async crear(datos: DatosNuevaGuia): Promise<Guia> {
