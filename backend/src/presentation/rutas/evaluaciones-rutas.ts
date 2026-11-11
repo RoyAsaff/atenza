@@ -730,9 +730,6 @@ const esquemaExportarCentralizador = z.object({
     .optional()
     .transform((valor) => valor?.split(',')),
   nota_base: z.coerce.number().positive().optional(),
-  peso_evaluaciones: z.coerce.number().min(0).max(100).optional(),
-  peso_guias: z.coerce.number().min(0).max(100).optional(),
-  peso_examenes_codigo: z.coerce.number().min(0).max(100).optional(),
 });
 
 // GET /api/materias/:id/centralizador/exportar — HU-27 (descarga .xlsx)
@@ -743,8 +740,7 @@ evaluacionesRouter.get(
   async (req, res, next) => {
     try {
       const materia_id = idNumerico.parse(req.params.id);
-      const { columna_claves, nota_base, peso_evaluaciones, peso_guias, peso_examenes_codigo } =
-        esquemaExportarCentralizador.parse(req.query);
+      const { columna_claves, nota_base } = esquemaExportarCentralizador.parse(req.query);
       const materia = await materiaRepositorio.buscarPorId(materia_id);
       const buffer = await exportarCentralizador.ejecutar({
         materia_id,
@@ -752,9 +748,6 @@ evaluacionesRouter.get(
         nombre_materia: materia?.nombre_materia ?? 'materia',
         columna_claves,
         nota_base,
-        peso_evaluaciones,
-        peso_guias,
-        peso_examenes_codigo,
       });
       res.setHeader(
         'Content-Type',

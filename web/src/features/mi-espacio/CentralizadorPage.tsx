@@ -6,20 +6,14 @@
 //
 // Fusión con guías (24/08): en vez de un centralizador aparte para la
 // nota de guías, se sumaron como columnas más (guías cerradas) al mismo
-// Centralizador — misma matriz, misma nómina, un solo Excel. Como
-// evaluaciones y guías suelen pesar distinto en la nota final, "Qué
-// cuenta" ahora agrupa por tipo (solo cuando hay de ambos) y aparece un
-// control de peso evaluaciones/guías; dentro de cada grupo, lo marcado
-// sigue pesando igual entre sí (ver calcularNotaFinal).
-//
-// Exámenes de código: tercer grupo, con su propio peso. Como ya son tres, el
-// control de peso pasó de un slider evaluaciones/guías a un slider por
-// grupo marcado; son pesos relativos y lo que se muestra es el % efectivo
-// (normalizado entre los grupos que tienen algo marcado).
+// Centralizador — misma matriz, misma nómina, un solo Excel. "Qué cuenta"
+// agrupa por tipo (evaluaciones, guías, exámenes de código) solo para
+// ordenar la lista: la nota final es el promedio simple de TODO lo marcado,
+// sin pesos por grupo (ver calcularNotaFinal).
 //
 // Todo el cálculo (nota final, promedios, distribución) es en el
 // cliente sobre el `Centralizador` que ya trae el GET; no hay queries
-// nuevas. La selección de columnas, la nota base y los pesos se guardan en
+// nuevas. La selección de columnas y la nota base se guardan en
 // localStorage por materia para no perderse al recargar.
 
 import { useEffect, useRef, useState } from 'react';
@@ -53,11 +47,6 @@ const BADGE_COLUMNA: Record<TipoColumnaCentralizador, string | null> = {
   examen_codigo: 'Código',
 };
 
-/** Pesos relativos (0-100) por grupo. No suman 100 a propósito: el % que
- * realmente pesa cada grupo sale de pesosEfectivos. */
-type PesosGrupos = Record<TipoColumnaCentralizador, number>;
-const PESOS_DEFECTO: PesosGrupos = { evaluacion: 70, guia: 30, examen_codigo: 70 };
-
 type CampoOrden = 'final' | 'apellidos';
 interface OrdenCentralizador {
   campo: CampoOrden;
@@ -73,45 +62,22 @@ interface FilaEnriquecida {
 
 // ── Cálculo (igual al que ya viaja en el Excel exportado) ────────────
 
-/** % que realmente pesa cada grupo con algo marcado (suma 100; los grupos
- * sin nada marcado valen 0). Con un solo grupo, ese pesa 100 % sin importar
- * el peso configurado. */
-function pesosEfectivos(columnas: ColumnaCentralizador[], pesos: PesosGrupos): PesosGrupos {
-  const presentes = TIPOS_GRUPO.filter((tipo) => columnas.some((c) => c.tipo === tipo));
-  const total = presentes.reduce((acc, tipo) => acc + pesos[tipo], 0);
-  const efectivos: PesosGrupos = { evaluacion: 0, guia: 0, examen_codigo: 0 };
-  for (const tipo of presentes) {
-    efectivos[tipo] = presentes.length === 1 ? 100 : total > 0 ? (pesos[tipo] / total) * 100 : 0;
-  }
-  return efectivos;
-}
-
-/** Promedia el % de cada columna marcada (nota_obtenida/nota_total, 0 si
- * no tiene nota) DENTRO de su grupo (evaluación/guía/examen de código) y
- * recién combina los grupos según su peso efectivo antes de multiplicar por
- * la nota base. */
+/** Promedio simple de TODAS las columnas marcadas, sin importar su tipo:
+ * el % de cada una (nota_obtenida/nota_total, 0 si no la rindió) pesa igual,
+ * se promedian y el resultado se multiplica por la nota base. Las columnas
+ * con nota_total <= 0 no se pueden expresar en % y no entran al promedio. */
 function calcularNotaFinal(
   fila: FilaCentralizador,
   columnas: ColumnaCentralizador[],
   notaBase: number,
-  pesos: PesosGrupos,
 ): number {
-  function promedioGrupo(grupo: ColumnaCentralizador[]): number {
-    if (grupo.length === 0) return 0;
-    const suma = grupo.reduce((acc, c) => {
-      if (c.nota_total <= 0) return acc;
-      const obtenida = fila.celdas[claveColumnaCentralizador(c)] ?? 0;
-      return acc + obtenida / c.nota_total;
-    }, 0);
-    return suma / grupo.length;
-  }
-
-  const efectivos = pesosEfectivos(columnas, pesos);
-  const porcentaje = TIPOS_GRUPO.reduce(
-    (acc, tipo) => acc + (promedioGrupo(columnas.filter((c) => c.tipo === tipo)) * efectivos[tipo]) / 100,
+  const validas = columnas.filter((c) => c.nota_total > 0);
+  if (validas.length === 0) return 0;
+  const suma = validas.reduce(
+    (acc, c) => acc + (fila.celdas[claveColumnaCentralizador(c)] ?? 0) / c.nota_total,
     0,
   );
-  return Math.round(porcentaje * notaBase * 100) / 100;
+  return Math.round((suma / validas.length) * notaBase * 100) / 100;
 }
 
 function estiloPorPorcentaje(pct: number): { fondo: string; texto: string } {
@@ -130,16 +96,6 @@ function formatearNombre(fila: FilaCentralizador): string {
 
 function formatearNumero(valor: number): string {
   return Number.isInteger(valor) ? String(valor) : valor.toFixed(1);
-}
-
-/** FYI dentro de un grupo: aunque tengan distinto puntaje, lo marcado
- * pesa igual entre sí — null si no hace falta aclararlo (0 o 1 marcada). */
-function notaTextoPeso(grupo: ColumnaCentralizador[]): string | null {
-  if (grupo.length < 2) return null;
-  const mayor = grupo.reduce((m, c) => (c.nota_total > m.nota_total ? c : m));
-  const menor = grupo.reduce((m, c) => (c.nota_total < m.nota_total ? c : m));
-  if (mayor.nota_total === menor.nota_total) return null;
-  return `Pesan igual entre sí: "${mayor.tema}" (${mayor.nota_total} pts) vale lo mismo que "${menor.tema}" (${menor.nota_total} pts).`;
 }
 
 /** "Materia_2026-09-18.xlsx" — nombre de la materia (sin caracteres que
@@ -163,7 +119,6 @@ function nombreArchivoExportacion(nombreMateria: string | undefined): string {
 interface ConfigGuardada {
   columnaClaves: string[];
   notaBase: string;
-  pesos: PesosGrupos;
 }
 
 function claveConfig(materiaId: number): string {
@@ -177,19 +132,10 @@ function leerConfigGuardada(materiaId: number): ConfigGuardada | null {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const datos = JSON.parse(crudo) as any;
     if (typeof datos.notaBase !== 'string') return null;
-    const pesos: PesosGrupos = { ...PESOS_DEFECTO };
-    if (datos.pesos && typeof datos.pesos === 'object') {
-      for (const tipo of TIPOS_GRUPO) {
-        if (typeof datos.pesos[tipo] === 'number') pesos[tipo] = datos.pesos[tipo];
-      }
-    } else if (typeof datos.pesoEvaluaciones === 'number') {
-      // Config de antes de los exámenes de código: un solo slider
-      // evaluaciones/guías (guías = 100 - evaluaciones).
-      pesos.evaluacion = datos.pesoEvaluaciones;
-      pesos.guia = 100 - datos.pesoEvaluaciones;
-    }
+    // Configs viejas pueden traer `pesos`/`pesoEvaluaciones`: se ignoran, ya
+    // no hay pesos por grupo.
     if (Array.isArray(datos.columnaClaves)) {
-      return { columnaClaves: datos.columnaClaves, notaBase: datos.notaBase, pesos };
+      return { columnaClaves: datos.columnaClaves, notaBase: datos.notaBase };
     }
     // Config de antes de la fusión con guías (24/08): solo evaluacion_ids
     // numéricos, sin tipo — se migran a la clave compuesta de hoy.
@@ -197,7 +143,6 @@ function leerConfigGuardada(materiaId: number): ConfigGuardada | null {
       return {
         columnaClaves: datos.evaluacionIds.map((id: number) => `evaluacion:${id}`),
         notaBase: datos.notaBase,
-        pesos,
       };
     }
     return null;
@@ -417,12 +362,13 @@ function Matriz({
 function ListaQueCuenta({
   columnas,
   marcadas,
-  pesoPorColumna,
+  pesoColumna,
   onAlternarColumna,
 }: {
   columnas: ColumnaCentralizador[];
   marcadas: Set<string>;
-  pesoPorColumna: (columna: ColumnaCentralizador) => number;
+  /** % que pesa cada columna marcada en la nota final (todas pesan igual). */
+  pesoColumna: number;
   onAlternarColumna: (clave: string) => void;
 }) {
   return (
@@ -469,7 +415,7 @@ function ListaQueCuenta({
                 marcada ? 'text-primary-800' : 'font-normal text-neutral-300',
               )}
             >
-              {marcada ? `${formatearNumero(pesoPorColumna(columna))} %` : '—'}
+              {marcada ? `${formatearNumero(Math.round(pesoColumna * 10) / 10)} %` : '—'}
             </span>
           </button>
         );
@@ -484,11 +430,9 @@ function PanelNotaFinal({
   columnasSeleccionadas,
   notaBase,
   origenPreset,
-  pesos,
   onCambiarNotaBase,
   onElegirPreset,
   onAlternarColumna,
-  onCambiarPeso,
   onMarcarTodas,
   onMarcarNinguna,
   mostrarNotaFinal,
@@ -513,11 +457,9 @@ function PanelNotaFinal({
   columnasSeleccionadas: ColumnaCentralizador[];
   notaBase: string;
   origenPreset: boolean;
-  pesos: PesosGrupos;
   onCambiarNotaBase: (valor: string) => void;
   onElegirPreset: (valor: number) => void;
   onAlternarColumna: (clave: string) => void;
-  onCambiarPeso: (tipo: TipoColumnaCentralizador, valor: number) => void;
   onMarcarTodas: () => void;
   onMarcarNinguna: () => void;
   mostrarNotaFinal: boolean;
@@ -539,17 +481,11 @@ function PanelNotaFinal({
 }) {
   const todasMarcadas = columnas.length > 0 && marcadas.size === columnas.length;
 
-  // Grupos que existen (para "Qué cuenta") y grupos con algo marcado (para
-  // los pesos) — un grupo sin columnas finalizadas/cerradas no se muestra.
+  // Grupos que existen (solo para ordenar "Qué cuenta") — un grupo sin
+  // columnas finalizadas/cerradas no se muestra.
   const gruposExistentes = TIPOS_GRUPO.filter((tipo) => columnas.some((c) => c.tipo === tipo));
   const hayVariosGrupos = gruposExistentes.length > 1;
-  const gruposMarcados = TIPOS_GRUPO.filter((tipo) => columnasSeleccionadas.some((c) => c.tipo === tipo));
-  const efectivos = pesosEfectivos(columnasSeleccionadas, pesos);
-
-  function pesoPorColumna(columna: ColumnaCentralizador): number {
-    const enGrupo = columnasSeleccionadas.filter((c) => c.tipo === columna.tipo).length;
-    return enGrupo > 0 ? efectivos[columna.tipo] / enGrupo : 0;
-  }
+  const pesoColumna = (100 / Math.max(1, columnasSeleccionadas.filter((c) => c.nota_total > 0).length));
 
   return (
     <div className="flex flex-col gap-[14px]">
@@ -558,9 +494,8 @@ function PanelNotaFinal({
         <div className="border-b border-border px-[18px] py-[14px]">
           <p className="text-[15px] font-bold text-text">Nota final</p>
           <p className="mt-[3px] text-[13px] leading-[1.45] text-text-muted">
-            {hayVariosGrupos
-              ? 'El % de lo marcado se promedia dentro de su grupo (evaluaciones, guías, exámenes de código), los grupos se combinan según su peso, y recién ahí se multiplica por la nota base.'
-              : 'El % de cada evaluación marcada se promedia y se multiplica por la nota base.'}
+            El % de cada nota marcada (evaluaciones, guías y exámenes de código) se promedia, todas por igual, y se
+            multiplica por la nota base.
           </p>
         </div>
 
@@ -620,8 +555,6 @@ function PanelNotaFinal({
           {hayVariosGrupos ? (
             <>
               {gruposExistentes.map((tipo, i) => {
-                const seleccionadasDelGrupo = columnasSeleccionadas.filter((c) => c.tipo === tipo);
-                const aclaracion = notaTextoPeso(seleccionadasDelGrupo);
                 return (
                   <div key={tipo}>
                     <p
@@ -635,10 +568,9 @@ function PanelNotaFinal({
                     <ListaQueCuenta
                       columnas={columnas.filter((c) => c.tipo === tipo)}
                       marcadas={marcadas}
-                      pesoPorColumna={pesoPorColumna}
+                      pesoColumna={pesoColumna}
                       onAlternarColumna={onAlternarColumna}
                     />
-                    {aclaracion && <p className="mt-2 text-[12px] leading-[1.4] text-text-muted">{aclaracion}</p>}
                   </div>
                 );
               })}
@@ -648,48 +580,12 @@ function PanelNotaFinal({
               <ListaQueCuenta
                 columnas={columnas}
                 marcadas={marcadas}
-                pesoPorColumna={pesoPorColumna}
+                pesoColumna={pesoColumna}
                 onAlternarColumna={onAlternarColumna}
               />
-              {notaTextoPeso(columnasSeleccionadas) && (
-                <p className="mt-3 text-[13px] leading-[1.45] text-text-muted">
-                  {notaTextoPeso(columnasSeleccionadas)}
-                </p>
-              )}
             </>
           )}
         </div>
-
-        {/* 3b · Peso por grupo — solo si hay marcado de más de un tipo */}
-        {gruposMarcados.length > 1 && (
-          <div className="border-b border-neutral-100 px-[18px] py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted">Peso por grupo</p>
-            {gruposMarcados.map((tipo) => (
-              <div key={tipo} className="mt-3">
-                <div className="flex items-baseline justify-between gap-[10px]">
-                  <span className="text-[13px] font-medium text-text">{ETIQUETA_GRUPO[tipo]}</span>
-                  <span className="font-mono text-[13px] font-bold text-text">
-                    {formatearNumero(Math.round(efectivos[tipo] * 10) / 10)} %
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={pesos[tipo]}
-                  onChange={(e) => onCambiarPeso(tipo, Number(e.target.value))}
-                  className="mt-1 w-full accent-primary-700"
-                  aria-label={`Peso de ${ETIQUETA_GRUPO[tipo].toLowerCase()}`}
-                />
-              </div>
-            ))}
-            <p className="mt-2 text-[13px] leading-[1.45] text-text-muted">
-              Los sliders son pesos relativos: el % de cada grupo se calcula entre los que tienen algo marcado.
-              Dentro de cada uno, lo marcado sigue pesando igual entre sí.
-            </p>
-          </div>
-        )}
 
         {/* 4 · Resultado */}
         <div className="px-[18px] py-4">
@@ -808,13 +704,12 @@ export function CentralizadorPage() {
     },
   });
 
-  // Nota final: selección de columnas + nota base + pesos por grupo,
+  // Nota final: selección de columnas + nota base,
   // persistidos en localStorage por materia (leerConfigGuardada/guardarConfig
   // arriba).
   const [seleccionadas, setSeleccionadas] = useState<Set<string> | null>(null);
   const [notaBase, setNotaBase] = useState('');
   const [origenPreset, setOrigenPreset] = useState(false);
-  const [pesos, setPesos] = useState<PesosGrupos>(PESOS_DEFECTO);
   const hidratado = useRef(false);
 
   useEffect(() => {
@@ -825,7 +720,6 @@ export function CentralizadorPage() {
         setSeleccionadas(new Set(guardada.columnaClaves.filter((clave) => clavesValidas.has(clave))));
         setNotaBase(guardada.notaBase);
         setOrigenPreset(PRESETS_NOTA_BASE.includes(Number(guardada.notaBase)));
-        setPesos(guardada.pesos);
       } else {
         setSeleccionadas(clavesValidas);
       }
@@ -836,8 +730,8 @@ export function CentralizadorPage() {
 
   useEffect(() => {
     if (!hidratado.current || seleccionadas === null) return;
-    guardarConfig(materiaId, { columnaClaves: Array.from(seleccionadas), notaBase, pesos });
-  }, [seleccionadas, notaBase, pesos, materiaId]);
+    guardarConfig(materiaId, { columnaClaves: Array.from(seleccionadas), notaBase });
+  }, [seleccionadas, notaBase, materiaId]);
 
   const [ordenManual, setOrdenManual] = useState<OrdenCentralizador | null>(null);
   const [busqueda, setBusqueda] = useState('');
@@ -860,7 +754,7 @@ export function CentralizadorPage() {
   const filasEnriquecidas: FilaEnriquecida[] = (centralizador?.filas ?? []).map((fila) => {
     const tieneSinRendir = columnasSeleccionadas.some((c) => fila.celdas[claveColumnaCentralizador(c)] == null);
     const notaFinal = mostrarNotaFinal
-      ? calcularNotaFinal(fila, columnasSeleccionadas, notaBaseNum, pesos)
+      ? calcularNotaFinal(fila, columnasSeleccionadas, notaBaseNum)
       : null;
     return {
       fila,
@@ -942,9 +836,6 @@ export function CentralizadorPage() {
         columna_claves: columnasSeleccionadas.map(claveColumnaCentralizador).join(','),
         ...(mostrarNotaFinal && {
           nota_base: notaBaseNum,
-          peso_evaluaciones: pesos.evaluacion,
-          peso_guias: pesos.guia,
-          peso_examenes_codigo: pesos.examen_codigo,
         }),
       };
       // responseType 'blob' (en vez de un <a href> plano) para que el
@@ -1083,7 +974,6 @@ export function CentralizadorPage() {
               columnasSeleccionadas={columnasSeleccionadas}
               notaBase={notaBase}
               origenPreset={origenPreset}
-              pesos={pesos}
               onCambiarNotaBase={(valor) => {
                 setNotaBase(valor);
                 setOrigenPreset(false);
@@ -1093,7 +983,6 @@ export function CentralizadorPage() {
                 setOrigenPreset(true);
               }}
               onAlternarColumna={alternarColumna}
-              onCambiarPeso={(tipo, valor) => setPesos((prev) => ({ ...prev, [tipo]: valor }))}
               onMarcarTodas={() => setSeleccionadas(new Set(columnas.map(claveColumnaCentralizador)))}
               onMarcarNinguna={() => setSeleccionadas(new Set())}
               mostrarNotaFinal={mostrarNotaFinal}

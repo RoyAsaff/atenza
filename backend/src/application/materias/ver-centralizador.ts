@@ -117,15 +117,6 @@ export class VerCentralizador {
   }
 }
 
-/** Pesos relativos (%) de cada grupo, tal como quedaron en pantalla. */
-interface PesosGrupos {
-  evaluacion?: number;
-  guia?: number;
-  examen_codigo?: number;
-}
-
-const TIPOS_GRUPO: TipoColumnaCentralizador[] = ['evaluacion', 'guia', 'examen_codigo'];
-
 /** Prefijo del encabezado en el Excel (las evaluaciones van sin prefijo). */
 const ETIQUETA_TIPO: Record<TipoColumnaCentralizador, string> = {
   evaluacion: '',
@@ -133,42 +124,22 @@ const ETIQUETA_TIPO: Record<TipoColumnaCentralizador, string> = {
   examen_codigo: 'Código · ',
 };
 
-/** Misma fórmula que el frontend (CentralizadorPage): promedia el % de
- * cada columna seleccionada dentro de su grupo (evaluación/guía/examen de
- * código; 0 si no tiene nota) y combina los grupos según su peso antes de
- * multiplicar por la nota base. Si solo hay un grupo marcado, ese pesa
- * 100 % (los otros pesos, si vienen, se ignoran). */
+/** Misma fórmula que el frontend (CentralizadorPage): promedio simple del %
+ * de TODAS las columnas seleccionadas (0 si no rindió), sin importar su
+ * tipo, multiplicado por la nota base. Las columnas con nota_total <= 0 no
+ * entran al promedio. */
 function calcularNotaFinal(
   fila: FilaCentralizador,
   columnas: ColumnaCentralizador[],
   notaBase: number,
-  pesos: PesosGrupos,
 ): number {
-  function promedioGrupo(grupo: ColumnaCentralizador[]): number {
-    if (grupo.length === 0) return 0;
-    const suma = grupo.reduce((acc, c) => {
-      if (c.nota_total <= 0) return acc;
-      const obtenida = fila.celdas[claveColumnaCentralizador(c)] ?? 0;
-      return acc + obtenida / c.nota_total;
-    }, 0);
-    return suma / grupo.length;
-  }
-
-  const presentes = TIPOS_GRUPO.map((tipo) => ({
-    grupo: columnas.filter((c) => c.tipo === tipo),
-    // Sin peso explícito (llamada sin pesos): las evaluaciones pesan todo y
-    // los demás nada, igual que antes de las guías.
-    peso: pesos[tipo] ?? (tipo === 'evaluacion' ? 100 : 0),
-  })).filter(({ grupo }) => grupo.length > 0);
-
-  const soloUno = presentes.length === 1;
-  const pesoTotal = presentes.reduce((acc, { peso }) => acc + (soloUno ? 100 : peso), 0) || 100;
-  const suma = presentes.reduce(
-    (acc, { grupo, peso }) => acc + promedioGrupo(grupo) * (soloUno ? 100 : peso),
+  const validas = columnas.filter((c) => c.nota_total > 0);
+  if (validas.length === 0) return 0;
+  const suma = validas.reduce(
+    (acc, c) => acc + (fila.celdas[claveColumnaCentralizador(c)] ?? 0) / c.nota_total,
     0,
   );
-
-  return Math.round((suma / pesoTotal) * notaBase * 100) / 100;
+  return Math.round((suma / validas.length) * notaBase * 100) / 100;
 }
 
 export class ExportarCentralizador {
@@ -184,12 +155,6 @@ export class ExportarCentralizador {
     // Claves con formato claveColumnaCentralizador ("evaluacion:3", "guia:5").
     columna_claves?: string[];
     nota_base?: number;
-    // Pesos de cada grupo (%) tal como quedaron en pantalla — solo importan
-    // cuando hay columnas marcadas de MÁS de un tipo; con uno solo, ese pesa
-    // 100 % sin importar lo que venga acá (ver calcularNotaFinal).
-    peso_evaluaciones?: number;
-    peso_guias?: number;
-    peso_examenes_codigo?: number;
   }): Promise<ExcelJS.Buffer> {
     const centralizador = await this.verCentralizador.ejecutar(entrada);
 
@@ -229,16 +194,7 @@ export class ExportarCentralizador {
         registro[claveColumnaCentralizador(columna)] = nota ?? '—';
       }
       if (incluirNotaFinal) {
-        registro.nota_final = calcularNotaFinal(
-          fila,
-          columnasNotaFinal,
-          entrada.nota_base!,
-          {
-            evaluacion: entrada.peso_evaluaciones,
-            guia: entrada.peso_guias,
-            examen_codigo: entrada.peso_examenes_codigo,
-          },
-        );
+        registro.nota_final = calcularNotaFinal(fila, columnasNotaFinal, entrada.nota_base!);
       }
       hoja.addRow(registro);
     }
